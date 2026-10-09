@@ -15,6 +15,13 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | F7 | 09/10 | `Idempotency-Key` reaproveitada enquanto a tentativa de registro não termina. | Clique duplo não gera duas transações. |
 | F8 | 09/10 | Testes e2e rodam contra um build de produção e um dublê de teste do backend. | O servidor de desenvolvimento do Next compila rotas sob demanda e deixava o teste instável. |
 
+## Decisões da gestão
+
+| # | Data | Decisão |
+|---|---|---|
+| G1 | 09/10 | A confirmação do sacado (função A do v1.1) é **obrigatória** antes de selecionar uma oferta simulada. |
+| G2 | 09/10 | O backend da demo vai ser hospedado no **Railway**. |
+
 ## Decisões do backend
 
 | # | Data | Decisão | Motivo |
@@ -26,8 +33,9 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | B5 | 09/10 | Tipo do arquivo detectado pelo conteúdo (assinatura de PDF/PNG/JPEG), não pelo tipo declarado. | Um arquivo renomeado não passa como PDF. |
 | B6 | 09/10 | Assinatura enviada é guardada internamente antes do envio. Nova tentativa após `TIMEOUT` confere essa assinatura antes de enviar outra; pendentes são retomados ao reiniciar. | Evita duas transações para o mesmo recebível e recebível preso em pendente. |
 | B7 | 09/10 | Verificação lê o memo dos dados da instrução e recalcula o hash do arquivo guardado e o payload canônico. | Detecta adulteração do arquivo ou divergência on-chain. |
-| B9 | 09/10 | `/demo/reset` espera a confirmação real do exemplo registrado e responde 503 se ela falhar. O registro em andamento ignora recebíveis apagados pelo reset. | A demo nunca começa com um exemplo "registrado" sem transação, e o reset não derruba o servidor. |
 | B8 | 09/10 | Ofertas: 3 financiadores fixos, taxa e tarifa derivadas de um hash do recebível (determinístico), geradas uma vez e persistidas. | §3.7: mesma entrada, mesmas ofertas. |
+| B9 | 09/10 | `/demo/reset` espera a confirmação real do exemplo registrado e responde 503 se ela falhar. O registro em andamento ignora recebíveis apagados pelo reset. | A demo nunca começa com um exemplo "registrado" sem transação, e o reset não derruba o servidor. |
+| B10 | 09/10 | `tsx` em `dependencies`; `npm start` é o comando de produção no Railway, com raiz em `backend/` e volume persistente montado em `DATA_DIR`. | O Railway pode descartar as dependências de desenvolvimento, e sem volume o `db.json` e os uploads se perdem a cada deploy. |
 
 ## O frontend depende de
 

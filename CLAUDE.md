@@ -52,12 +52,12 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
 1. Push dos commits de documentação pendentes.
 2. ~~`/demo/reset` com seed~~ (feito em 09/10).
 3. Conferir o hash de imagem (PNG/JPEG) entre navegador e backend.
-4. Hospedar o backend (escolher Render, Railway ou Fly) e fazer o deploy do front na Vercel em modo `http`.
+4. Hospedar o backend no **Railway** (decisão G2) e fazer o deploy do front na Vercel em modo `http`.
    Com isso, uma demo do fluxo principal fica no ar antes de mexer nas funções novas.
 
 **10/10: contrato e preparação**
 5. Escrever a proposta do contrato v1.1 (A + B) em `docs/api-contract.md` e **PARAR** para a aprovação da gestão
-   (diff + lista de arquivos). Levar a proposta para a decisão em aberto: a confirmação do sacado é obrigatória antes da seleção de oferta?
+   (diff + lista de arquivos). Decisão G1: a confirmação do sacado é **obrigatória** antes da seleção de oferta.
 6. Em paralelo, sem depender do contrato: instalar Rust, Solana CLI e Anchor no WSL (Ubuntu) e criar as carteiras
    "distribuidor demo" e "financiador demo" (secrets só no `.env`).
 

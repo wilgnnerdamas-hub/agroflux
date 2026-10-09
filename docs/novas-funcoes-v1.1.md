@@ -24,7 +24,7 @@ Depois de escrever, **parar** e mostrar à gestão o diff do contrato e a lista 
 - Novo bloco no `Receivable`, independente do status principal:
   `debtorConfirmation: { status: "none"|"requested"|"confirmed"|"declined", isSimulated: true, requestedAt, respondedAt, chain: { signature, explorerUrl } | null }`
 - Permitido quando `status = "registered"`.
-- **Decisão em aberto:** a confirmação precisa estar `confirmed` antes de selecionar uma oferta? É preciso propor uma resposta e perguntar à gestão.
+- **Decidido pela gestão (G1, 09/10):** a confirmação precisa estar `confirmed` antes de selecionar uma oferta. Impacto no v1.1: `POST /offers/:offerId/select` ganha uma nova pré-condição (`409 INVALID_STATE` sem a confirmação). Isso muda o comportamento da v1.0, então a proposta precisa tratar a compatibilidade e o novo passo no roteiro da demo.
 - Endpoints:
   - `POST /receivables/:id/debtor-confirmation`: gera um link com token aleatório, de uso único e válido por 7 dias.
   - `GET /confirmations/:token`: resumo mínimo (referência, insumo, valor, vencimento, distribuidor), sem o documento.
