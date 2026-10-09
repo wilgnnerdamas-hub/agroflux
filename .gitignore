@@ -6,3 +6,6 @@ node_modules/
 id.json
 *keypair*.json
 .DS_Store
+
+# dados locais do backend (db.json e uploads)
+backend/data/
