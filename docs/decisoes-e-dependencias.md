@@ -26,6 +26,7 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | B5 | 09/10 | Tipo do arquivo detectado pelo conteúdo (assinatura de PDF/PNG/JPEG), não pelo tipo declarado. | Um arquivo renomeado não passa como PDF. |
 | B6 | 09/10 | Assinatura enviada é guardada internamente antes do envio. Nova tentativa após `TIMEOUT` confere essa assinatura antes de enviar outra; pendentes são retomados ao reiniciar. | Evita duas transações para o mesmo recebível e recebível preso em pendente. |
 | B7 | 09/10 | Verificação lê o memo dos dados da instrução e recalcula o hash do arquivo guardado e o payload canônico. | Detecta adulteração do arquivo ou divergência on-chain. |
+| B9 | 09/10 | `/demo/reset` espera a confirmação real do exemplo registrado e responde 503 se ela falhar. O registro em andamento ignora recebíveis apagados pelo reset. | A demo nunca começa com um exemplo "registrado" sem transação, e o reset não derruba o servidor. |
 | B8 | 09/10 | Ofertas: 3 financiadores fixos, taxa e tarifa derivadas de um hash do recebível (determinístico), geradas uma vez e persistidas. | §3.7: mesma entrada, mesmas ofertas. |
 
 ## O frontend depende de
@@ -43,5 +44,5 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 - [x] Rodar o fluxo completo contra a API real e a Devnet real. (09/10, tx `bN39u67wVjhCzggQfyaw9CCDuYPX1768JvL76ovaXQQgKQjDY16CCJe5FHeXXwAxjbTL4pLkPDTPKsR6vnz11aR`, confirmada em ~2 s, verificação 4/4.) Carteira `GsvBgHVej6pvz4zKLC1rSMLX9KWfH3V69ZKTPFyRS8oV` abastecida pelo faucet.solana.com.
 - [ ] Conferir se o hash do navegador bate com o do backend para PDF e imagem. PDF confere (09/10); falta imagem.
 - [x] Testar o caso de falha com a carteira da Devnet sem saldo (`INSUFFICIENT_FUNDS`). Tela de falha e botão de nova tentativa ok (09/10).
-- [ ] `/demo/reset` com seed.
+- [x] `/demo/reset` com seed (09/10): 1 recebível `registered` com tx real na Devnet (verificação 4/4) + 1 `created`, em ~2,5 s. Ligar com `DEMO_RESET_ENABLED=true`.
 - [ ] Deploy do frontend (Vercel) apontando para a URL pública do backend.

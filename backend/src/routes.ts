@@ -3,6 +3,7 @@ import type { ChainGateway } from "./chain/solana.js";
 import { ApiError } from "./errors.js";
 import { listOffers, selectOffer } from "./offers.js";
 import type { Registrar } from "./registration.js";
+import { resetDemo } from "./seed.js";
 import { createReceivable, getReceivable, listReceivables, type UploadedDocument } from "./receivables.js";
 import type { Store } from "./store.js";
 import type { Health } from "./types.js";
@@ -16,6 +17,7 @@ export interface RouteDeps {
   store: Store;
   chain: ChainGateway;
   registrar: Registrar;
+  demoResetEnabled: boolean;
 }
 
 type IdParams = { Params: { id: string } };
@@ -38,7 +40,7 @@ async function readMultipart(req: FastifyRequest) {
   return { data, document };
 }
 
-export async function routes(api: FastifyInstance, { store, chain, registrar }: RouteDeps) {
+export async function routes(api: FastifyInstance, { store, chain, registrar, demoResetEnabled }: RouteDeps) {
   api.get("/health", async (): Promise<Health> => {
     const solana = await chain.health();
     return { status: "ok", version: API_VERSION, cluster: "devnet", solana };
@@ -88,4 +90,12 @@ export async function routes(api: FastifyInstance, { store, chain, registrar }: 
   api.post<OfferParams>("/receivables/:id/offers/:offerId/select", async (req) =>
     selectOffer(store, req.params.id, req.params.offerId),
   );
+
+  // Só existe com DEMO_RESET_ENABLED=true; sem isso, cai no 404 padrão.
+  if (demoResetEnabled) {
+    api.post("/demo/reset", async (_req, reply) => {
+      await resetDemo(store, registrar);
+      return reply.status(204).send();
+    });
+  }
 }

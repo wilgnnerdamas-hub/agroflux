@@ -40,6 +40,6 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
   const registrar = new Registrar(store, chain, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
   registrar.resumePending();
 
-  await app.register(routes, { prefix: "/api/v1", store, chain, registrar });
+  await app.register(routes, { prefix: "/api/v1", store, chain, registrar, demoResetEnabled: config.demoResetEnabled });
   return { app, registrar, store };
 }

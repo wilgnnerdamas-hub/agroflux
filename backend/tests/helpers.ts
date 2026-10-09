@@ -47,9 +47,12 @@ export async function createRegistered(built: Awaited<ReturnType<typeof makeApp>
   return r as { id: string };
 }
 
-export async function makeApp(chain: ChainGateway = fakeChain(), opts: { dataDir?: string; confirmTimeoutMs?: number } = {}) {
+export async function makeApp(
+  chain: ChainGateway = fakeChain(),
+  opts: { dataDir?: string; confirmTimeoutMs?: number; env?: Record<string, string> } = {},
+) {
   const dataDir = opts.dataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "agroflux-test-"));
-  const config = loadConfig({ FRONTEND_ORIGIN: "http://localhost:3000", DATA_DIR: dataDir });
+  const config = loadConfig({ FRONTEND_ORIGIN: "http://localhost:3000", DATA_DIR: dataDir, ...opts.env });
   const built = await buildApp({ config, chain, confirmTimeoutMs: opts.confirmTimeoutMs });
   return { ...built, dataDir };
 }

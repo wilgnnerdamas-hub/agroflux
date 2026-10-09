@@ -50,7 +50,7 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
 
 **09/10 (noite) e 10/10 de manhã: fechar o fluxo principal e criar uma rede de segurança**
 1. Push dos commits de documentação pendentes.
-2. `/demo/reset` com seed (1 recebível `registered` com tx real + 1 `created`).
+2. ~~`/demo/reset` com seed~~ (feito em 09/10).
 3. Conferir o hash de imagem (PNG/JPEG) entre navegador e backend.
 4. Hospedar o backend (escolher Render, Railway ou Fly) e fazer o deploy do front na Vercel em modo `http`.
    Com isso, uma demo do fluxo principal fica no ar antes de mexer nas funções novas.

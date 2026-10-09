@@ -109,6 +109,12 @@ export class Registrar {
     }
   }
 
+  // Espera as tentativas em andamento (usado pelo seed da demo e pelos testes).
+  async settle(id?: string) {
+    if (id) await this.inflight.get(id);
+    else await Promise.all([...this.inflight.values()]);
+  }
+
   private async resume(id: string) {
     const signature = this.store.getSubmission(id);
     const deadline = Date.now() + this.timeoutMs;
@@ -120,9 +126,10 @@ export class Registrar {
     this.markFailed(id, "TIMEOUT", signature ?? null);
   }
 
+  // Os dois métodos abaixo ignoram recebíveis que sumiram (por exemplo, apagados por /demo/reset no meio da tentativa).
   private markConfirmed(id: string, c: Confirmed) {
-    const r = getReceivable(this.store, id);
-    if (r.status !== "registration_pending") return;
+    const r = this.store.get(id);
+    if (r?.status !== "registration_pending") return;
     const explorerUrl = explorerTxUrl(c.signature);
     const at = now();
     r.status = "registered";
@@ -140,8 +147,8 @@ export class Registrar {
   }
 
   private markFailed(id: string, code: ChainErrorCode, signature: string | null) {
-    const r = getReceivable(this.store, id);
-    if (r.status !== "registration_pending") return;
+    const r = this.store.get(id);
+    if (r?.status !== "registration_pending") return;
     const message = CHAIN_ERROR_MESSAGES[code];
     r.status = "registration_failed";
     r.chain = {
