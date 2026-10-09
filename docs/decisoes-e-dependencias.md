@@ -40,8 +40,8 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 ## Pendências de integração (10/10)
 
 - [x] Backend no ar localmente; trocar `.env.development.local` para `http`. (09/10)
-- [ ] Rodar o fluxo completo contra a API real e a Devnet real. **Bloqueado: carteira `GsvBgHVej6pvz4zKLC1rSMLX9KWfH3V69ZKTPFyRS8oV` sem SOL** (faucet público com 429, Helius com 500, faucet.solana.com recusou a conta do GitHub).
+- [x] Rodar o fluxo completo contra a API real e a Devnet real. (09/10, tx `bN39u67wVjhCzggQfyaw9CCDuYPX1768JvL76ovaXQQgKQjDY16CCJe5FHeXXwAxjbTL4pLkPDTPKsR6vnz11aR`, confirmada em ~2 s, verificação 4/4.) Carteira `GsvBgHVej6pvz4zKLC1rSMLX9KWfH3V69ZKTPFyRS8oV` abastecida pelo faucet.solana.com.
 - [ ] Conferir se o hash do navegador bate com o do backend para PDF e imagem. PDF confere (09/10); falta imagem.
 - [x] Testar o caso de falha com a carteira da Devnet sem saldo (`INSUFFICIENT_FUNDS`). Tela de falha e botão de nova tentativa ok (09/10).
-- [ ] `/demo/reset` com seed (precisa de saldo para a transação real do seed).
+- [ ] `/demo/reset` com seed.
 - [ ] Deploy do frontend (Vercel) apontando para a URL pública do backend.

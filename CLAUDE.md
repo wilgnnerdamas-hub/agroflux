@@ -40,11 +40,11 @@ documento com hash, estado atual e histórico de eventos verificáveis na **Sola
 - Estados de carregamento, sucesso, erro e pendência em todas as telas; layout responsivo.
 - Teste e2e do fluxo completo passando (desktop e celular) contra o dublê `frontend/tests/fake-backend.mjs`, que é só para testes.
 - Backend implementado (passos 1–6): health, cadastro, lista, passaporte, registro on-chain, verificação e ofertas. 32 testes (`npm test` em `backend/`).
-- Front integrado ao backend real em modo `http`; o fluxo vai até o registro, que falha com `INSUFFICIENT_FUNDS` porque a carteira da Devnet está sem SOL.
+- Fluxo completo da demo funcionando de ponta a ponta com front + backend reais na Devnet real (09/10). Carteira com ~5 SOL.
 - Repositório público: https://github.com/wilgnnerdamas-hub/agroflux
 
 ## Próximos passos
-- **10/10:** integrar com a API real (`NEXT_PUBLIC_API_MODE=http`, `NEXT_PUBLIC_API_URL`) e rodar o fluxo na Devnet real. Checklist em `docs/decisoes-e-dependencias.md`.
+- **10/10:** `/demo/reset` com seed, hash de imagem (PNG/JPEG) e hospedagem do backend. Checklist em `docs/decisoes-e-dependencias.md`.
 - **11/10:** acabamento visual, roteiro da demo e deploy do frontend (Vercel).
 - **12/10:** só correções críticas e submissão.
 
