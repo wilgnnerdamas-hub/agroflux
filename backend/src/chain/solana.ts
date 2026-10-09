@@ -29,6 +29,9 @@ export interface ChainGateway {
   sendMemo(memo: string, opts: SendOptions): Promise<Confirmed>;
   // Consulta uma assinatura já enviada. Devolve null se ela não estiver confirmada.
   checkSignature(signature: string): Promise<Confirmed | null>;
+  // Busca a transação e devolve o texto do memo. null se a transação não existir ou tiver falhado.
+  // Lança ChainUnavailableError se a rede não responder.
+  fetchMemo(signature: string): Promise<{ memo: string | null } | null>;
 }
 
 export class ChainUnavailableError extends Error {}
@@ -157,6 +160,23 @@ export function createSolanaGateway(rpcUrl: string, feePayerSecret: string | nul
         await sleep(POLL_MS);
       }
       throw new ChainFailure("TIMEOUT", signature);
+    },
+
+    async fetchMemo(signature) {
+      let tx;
+      try {
+        tx = await withTimeout(
+          connection.getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 }),
+          RPC_TIMEOUT_MS * 2,
+        );
+      } catch {
+        throw new ChainUnavailableError("Não foi possível consultar a Solana Devnet agora.");
+      }
+      if (!tx || tx.meta?.err) return null;
+      const { message } = tx.transaction;
+      const keys = message.staticAccountKeys;
+      const ix = message.compiledInstructions.find((i) => keys[i.programIdIndex]?.equals(memoProgram));
+      return { memo: ix ? Buffer.from(ix.data).toString("utf8") : null };
     },
 
     async checkSignature(signature) {

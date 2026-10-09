@@ -18,7 +18,7 @@ export const newId = (prefix: string) => `${prefix}_${randomBytes(8).toString("h
 export const sha256Hex = (bytes: Buffer | string) => createHash("sha256").update(bytes).digest("hex");
 const now = () => new Date().toISOString();
 
-const EXT: Record<string, string> = { "application/pdf": ".pdf", "image/png": ".png", "image/jpeg": ".jpg" };
+export const EXT: Record<string, string> = { "application/pdf": ".pdf", "image/png": ".png", "image/jpeg": ".jpg" };
 
 export function emptyChain(): ChainRecord {
   return {

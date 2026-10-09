@@ -1,11 +1,13 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ChainGateway } from "./chain/solana.js";
 import { ApiError } from "./errors.js";
+import { listOffers, selectOffer } from "./offers.js";
 import type { Registrar } from "./registration.js";
 import { createReceivable, getReceivable, listReceivables, type UploadedDocument } from "./receivables.js";
 import type { Store } from "./store.js";
 import type { Health } from "./types.js";
 import { detectMime, validateReceivableInput } from "./validation.js";
+import { verifyReceivable } from "./verification.js";
 
 export const API_VERSION = "1.0.0";
 const FILE_MESSAGE = "Envie um PDF, PNG ou JPEG de até 5 MB.";
@@ -17,6 +19,7 @@ export interface RouteDeps {
 }
 
 type IdParams = { Params: { id: string } };
+type OfferParams = { Params: { id: string; offerId: string } };
 
 async function readMultipart(req: FastifyRequest) {
   if (!req.isMultipart()) {
@@ -77,4 +80,12 @@ export async function routes(api: FastifyInstance, { store, chain, registrar }: 
     const receivable = await registrar.register(req.params.id, key);
     return reply.status(202).send({ receivable });
   });
+
+  api.get<IdParams>("/receivables/:id/verification", async (req) => verifyReceivable(store, chain, req.params.id));
+
+  api.get<IdParams>("/receivables/:id/offers", async (req) => listOffers(store, req.params.id));
+
+  api.post<OfferParams>("/receivables/:id/offers/:offerId/select", async (req) =>
+    selectOffer(store, req.params.id, req.params.offerId),
+  );
 }

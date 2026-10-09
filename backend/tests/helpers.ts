@@ -22,16 +22,30 @@ export const validInput = () => ({
 // Assinatura de teste: não existe na Solana.
 export const TEST_SIGNATURE = "TestSig1111111111111111111111111111111111111111111111111111111111";
 
-export const fakeChain = (over: Partial<ChainGateway> = {}): ChainGateway => ({
-  health: async () => ({ reachable: true, feePayerBalanceLamports: 1_000_000_000 }),
-  ping: async () => {},
-  sendMemo: async (_memo, opts) => {
-    opts.onSubmitted?.(TEST_SIGNATURE);
-    return { signature: TEST_SIGNATURE, slot: 4242, blockTime: "2026-10-09T15:00:00.000Z" };
-  },
-  checkSignature: async () => null,
-  ...over,
-});
+// Dublê da Solana: guarda o memo "enviado" para o fetchMemo devolver depois.
+export const fakeChain = (over: Partial<ChainGateway> = {}): ChainGateway => {
+  const ledger = new Map<string, string>();
+  return {
+    health: async () => ({ reachable: true, feePayerBalanceLamports: 1_000_000_000 }),
+    ping: async () => {},
+    sendMemo: async (memo, opts) => {
+      opts.onSubmitted?.(TEST_SIGNATURE);
+      ledger.set(TEST_SIGNATURE, memo);
+      return { signature: TEST_SIGNATURE, slot: 4242, blockTime: "2026-10-09T15:00:00.000Z" };
+    },
+    checkSignature: async () => null,
+    fetchMemo: async (sig) => (ledger.has(sig) ? { memo: ledger.get(sig)! } : null),
+    ...over,
+  };
+};
+
+// Cria um recebível e leva até `registered` com o dublê.
+export async function createRegistered(built: Awaited<ReturnType<typeof makeApp>>) {
+  const r = await createOne(built.app);
+  await built.app.inject({ method: "POST", url: `/api/v1/receivables/${r.id}/register` });
+  await settle(built.registrar);
+  return r as { id: string };
+}
 
 export async function makeApp(chain: ChainGateway = fakeChain(), opts: { dataDir?: string; confirmTimeoutMs?: number } = {}) {
   const dataDir = opts.dataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "agroflux-test-"));

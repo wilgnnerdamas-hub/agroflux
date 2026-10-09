@@ -76,6 +76,11 @@ export class Store {
     fs.writeFileSync(path.join(this.uploadsDir, `${documentId}${ext}`), bytes);
   }
 
+  readUpload(documentId: string, ext: string): Buffer | null {
+    const file = path.join(this.uploadsDir, `${documentId}${ext}`);
+    return fs.existsSync(file) ? fs.readFileSync(file) : null;
+  }
+
   reset() {
     this.db = empty();
     fs.rmSync(this.uploadsDir, { recursive: true, force: true });
