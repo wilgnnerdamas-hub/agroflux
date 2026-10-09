@@ -21,9 +21,8 @@ documento com hash, estado atual e histórico de eventos verificáveis na **Sola
 - `docs/decisoes-e-dependencias.md`: decisões do frontend e o que cada frente precisa da outra.
 
 ## Equipe e frentes
-- Gestão, produto e UX: wilgnner.
-- **Frontend: este agente** (`frontend/`).
-- Backend e blockchain: outras pessoas (`backend/`).
+- Gestão, produto e UX: wilgnner, que também responde por frontend e backend.
+- Este agente apoia nas duas frentes (`frontend/` e `backend/`).
 
 ## Regras de execução
 1. Inspecione o repositório antes de editar. Preserve a stack e as convenções existentes.
@@ -40,12 +39,19 @@ documento com hash, estado atual e histórico de eventos verificáveis na **Sola
 - Frontend pronto no modo mock: dashboard (`/`), cadastro (`/recebiveis/novo`), passaporte (`/recebiveis/[id]`), ofertas simuladas (`/recebiveis/[id]/ofertas`).
 - Estados de carregamento, sucesso, erro e pendência em todas as telas; layout responsivo.
 - Teste e2e do fluxo completo passando (desktop e celular) contra o dublê `frontend/tests/fake-backend.mjs`, que é só para testes.
-- Backend ainda não existe.
+- Backend implementado (passos 1–6): health, cadastro, lista, passaporte, registro on-chain, verificação e ofertas. 32 testes (`npm test` em `backend/`).
+- Front integrado ao backend real em modo `http`; o fluxo vai até o registro, que falha com `INSUFFICIENT_FUNDS` porque a carteira da Devnet está sem SOL.
+- Repositório público: https://github.com/wilgnnerdamas-hub/agroflux
 
 ## Próximos passos
 - **10/10:** integrar com a API real (`NEXT_PUBLIC_API_MODE=http`, `NEXT_PUBLIC_API_URL`) e rodar o fluxo na Devnet real. Checklist em `docs/decisoes-e-dependencias.md`.
 - **11/10:** acabamento visual, roteiro da demo e deploy do frontend (Vercel).
 - **12/10:** só correções críticas e submissão.
+
+## Comandos do backend (dentro de `backend/`)
+- `npm install`, `npm run dev` (http://localhost:4000/api/v1), `npm test`, `npm run typecheck`
+- `npm run wallet:new` grava a secret só em `backend/.env`; `npm run wallet:airdrop` pede SOL de teste.
+- `.env` (fora do git): `SOLANA_RPC_URL` (Helius, com api-key), `SOLANA_FEE_PAYER_SECRET`, `FRONTEND_ORIGIN`.
 
 ## Comandos (dentro de `frontend/`)
 - `npm install`, `npm run dev` (http://localhost:3000), `npm run build`, `npm run lint`

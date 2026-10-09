@@ -1,6 +1,6 @@
 # Decisões técnicas e dependências entre as frentes
 
-As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este arquivo registra as decisões do frontend e o que cada frente precisa da outra.
+As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este arquivo registra as decisões do frontend e do backend e o que cada frente precisa da outra.
 
 ## Decisões do frontend
 
@@ -15,6 +15,19 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | F7 | 09/10 | `Idempotency-Key` reaproveitada enquanto a tentativa de registro não termina. | Clique duplo não gera duas transações. |
 | F8 | 09/10 | Testes e2e rodam contra um build de produção e um dublê de teste do backend. | O servidor de desenvolvimento do Next compila rotas sob demanda e deixava o teste instável. |
 
+## Decisões do backend
+
+| # | Data | Decisão | Motivo |
+|---|---|---|---|
+| B1 | 09/10 | Node + TypeScript + Fastify 5 (`@fastify/multipart`, `@fastify/cors`), rodando via `tsx`. | Mesma linguagem do front, multipart e limite de tamanho prontos. |
+| B2 | 09/10 | Persistência em `data/db.json` (escrita atômica) e uploads em `data/uploads/`, fora do git. | Sem banco para instalar no prazo do hackathon. `/demo/reset` recria os dados. |
+| B3 | 09/10 | `@solana/web3.js` 1.x com uma instrução SPL Memo assinada pela carteira pagadora. | D2 do contrato; API estável para memo simples. |
+| B4 | 09/10 | RPC da Devnet pela Helius (`SOLANA_RPC_URL` com api-key, só no `.env`). | O RPC público limita por IP (429) e é instável em semana de hackathon. |
+| B5 | 09/10 | Tipo do arquivo detectado pelo conteúdo (assinatura de PDF/PNG/JPEG), não pelo tipo declarado. | Um arquivo renomeado não passa como PDF. |
+| B6 | 09/10 | Assinatura enviada é guardada internamente antes do envio. Nova tentativa após `TIMEOUT` confere essa assinatura antes de enviar outra; pendentes são retomados ao reiniciar. | Evita duas transações para o mesmo recebível e recebível preso em pendente. |
+| B7 | 09/10 | Verificação lê o memo dos dados da instrução e recalcula o hash do arquivo guardado e o payload canônico. | Detecta adulteração do arquivo ou divergência on-chain. |
+| B8 | 09/10 | Ofertas: 3 financiadores fixos, taxa e tarifa derivadas de um hash do recebível (determinístico), geradas uma vez e persistidas. | §3.7: mesma entrada, mesmas ofertas. |
+
 ## O frontend depende de
 
 | De quem | O quê | Quando |
@@ -26,8 +39,9 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 
 ## Pendências de integração (10/10)
 
-- [ ] Backend no ar localmente; trocar `.env.development.local` para `http`.
-- [ ] Rodar o fluxo completo contra a API real e a Devnet real.
-- [ ] Conferir se o hash do navegador bate com o do backend para PDF e imagem.
-- [ ] Testar o caso de falha com a carteira da Devnet sem saldo (`INSUFFICIENT_FUNDS`).
+- [x] Backend no ar localmente; trocar `.env.development.local` para `http`. (09/10)
+- [ ] Rodar o fluxo completo contra a API real e a Devnet real. **Bloqueado: carteira `GsvBgHVej6pvz4zKLC1rSMLX9KWfH3V69ZKTPFyRS8oV` sem SOL** (faucet público com 429, Helius com 500, faucet.solana.com recusou a conta do GitHub).
+- [ ] Conferir se o hash do navegador bate com o do backend para PDF e imagem. PDF confere (09/10); falta imagem.
+- [x] Testar o caso de falha com a carteira da Devnet sem saldo (`INSUFFICIENT_FUNDS`). Tela de falha e botão de nova tentativa ok (09/10).
+- [ ] `/demo/reset` com seed (precisa de saldo para a transação real do seed).
 - [ ] Deploy do frontend (Vercel) apontando para a URL pública do backend.
