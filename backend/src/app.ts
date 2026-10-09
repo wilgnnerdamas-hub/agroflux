@@ -4,6 +4,7 @@ import multipart from "@fastify/multipart";
 import type { Config } from "./config.js";
 import type { ChainGateway } from "./chain/solana.js";
 import { errorHandler } from "./errors.js";
+import { Registrar } from "./registration.js";
 import { routes } from "./routes.js";
 import { Store } from "./store.js";
 
@@ -13,9 +14,10 @@ export interface AppDeps {
   config: Config;
   chain: ChainGateway;
   store?: Store;
+  confirmTimeoutMs?: number;
 }
 
-export async function buildApp({ config, chain, store = new Store(config.dataDir) }: AppDeps) {
+export async function buildApp({ config, chain, store = new Store(config.dataDir), confirmTimeoutMs }: AppDeps) {
   const app = Fastify({
     logger: process.env.NODE_ENV === "test" ? false : { level: "info" },
   });
@@ -35,6 +37,9 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
     reply.status(404).send({ error: { code: "NOT_FOUND", message: "Rota não encontrada.", details: {} } });
   });
 
-  await app.register(routes, { prefix: "/api/v1", store, chain });
-  return app;
+  const registrar = new Registrar(store, chain, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
+  registrar.resumePending();
+
+  await app.register(routes, { prefix: "/api/v1", store, chain, registrar });
+  return { app, registrar, store };
 }

@@ -4,7 +4,7 @@ import { createSolanaGateway } from "./chain/solana.js";
 
 const config = loadConfig();
 const chain = createSolanaGateway(config.solanaRpcUrl, config.feePayerSecret);
-const app = await buildApp({ config, chain });
+const { app } = await buildApp({ config, chain });
 
 if (!config.feePayerSecret) {
   app.log.warn("SOLANA_FEE_PAYER_SECRET não definida: o registro na Devnet vai falhar. Rode `npm run wallet:new`.");

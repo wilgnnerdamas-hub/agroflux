@@ -8,9 +8,12 @@ export interface DbShape {
   seq: number;
   receivables: Record<string, Receivable>;
   offers: Record<string, Offer[]>;
+  // Estado interno, fora do contrato: Idempotency-Key → id do recebível, e última assinatura enviada por recebível.
+  idempotency: Record<string, string>;
+  submissions: Record<string, string>;
 }
 
-const empty = (): DbShape => ({ seq: 0, receivables: {}, offers: {} });
+const empty = (): DbShape => ({ seq: 0, receivables: {}, offers: {}, idempotency: {}, submissions: {} });
 
 export class Store {
   private db: DbShape;
@@ -48,6 +51,24 @@ export class Store {
 
   putOffers(id: string, offers: Offer[]) {
     this.db.offers[id] = offers;
+    this.save();
+  }
+
+  getIdempotency(key: string): string | undefined {
+    return this.db.idempotency[key];
+  }
+
+  putIdempotency(key: string, receivableId: string) {
+    this.db.idempotency[key] = receivableId;
+    this.save();
+  }
+
+  getSubmission(receivableId: string): string | undefined {
+    return this.db.submissions[receivableId];
+  }
+
+  putSubmission(receivableId: string, signature: string) {
+    this.db.submissions[receivableId] = signature;
     this.save();
   }
 

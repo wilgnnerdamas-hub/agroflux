@@ -19,17 +19,36 @@ export const validInput = () => ({
   documentKind: "test_invoice",
 });
 
+// Assinatura de teste: não existe na Solana.
+export const TEST_SIGNATURE = "TestSig1111111111111111111111111111111111111111111111111111111111";
+
 export const fakeChain = (over: Partial<ChainGateway> = {}): ChainGateway => ({
   health: async () => ({ reachable: true, feePayerBalanceLamports: 1_000_000_000 }),
+  ping: async () => {},
+  sendMemo: async (_memo, opts) => {
+    opts.onSubmitted?.(TEST_SIGNATURE);
+    return { signature: TEST_SIGNATURE, slot: 4242, blockTime: "2026-10-09T15:00:00.000Z" };
+  },
+  checkSignature: async () => null,
   ...over,
 });
 
-export async function makeApp(chain: ChainGateway = fakeChain()) {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "agroflux-test-"));
+export async function makeApp(chain: ChainGateway = fakeChain(), opts: { dataDir?: string; confirmTimeoutMs?: number } = {}) {
+  const dataDir = opts.dataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "agroflux-test-"));
   const config = loadConfig({ FRONTEND_ORIGIN: "http://localhost:3000", DATA_DIR: dataDir });
-  const app = await buildApp({ config, chain });
-  return { app, dataDir };
+  const built = await buildApp({ config, chain, confirmTimeoutMs: opts.confirmTimeoutMs });
+  return { ...built, dataDir };
 }
+
+type Built = Awaited<ReturnType<typeof makeApp>>;
+
+export async function createOne(app: Built["app"]) {
+  const res = await app.inject({ method: "POST", url: "/api/v1/receivables", payload: form(validInput()) });
+  return res.json();
+}
+
+// Espera as tentativas de registro em andamento terminarem.
+export const settle = (registrar: Built["registrar"]) => Promise.all([...registrar.inflight.values()]);
 
 export function form(data: unknown, file: Buffer | null = PDF, filename = "nf-teste.pdf", type = "application/pdf") {
   const fd = new FormData();

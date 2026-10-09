@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ChainGateway } from "./chain/solana.js";
 import { ApiError } from "./errors.js";
+import type { Registrar } from "./registration.js";
 import { createReceivable, getReceivable, listReceivables, type UploadedDocument } from "./receivables.js";
 import type { Store } from "./store.js";
 import type { Health } from "./types.js";
@@ -12,6 +13,7 @@ const FILE_MESSAGE = "Envie um PDF, PNG ou JPEG de até 5 MB.";
 export interface RouteDeps {
   store: Store;
   chain: ChainGateway;
+  registrar: Registrar;
 }
 
 type IdParams = { Params: { id: string } };
@@ -33,7 +35,7 @@ async function readMultipart(req: FastifyRequest) {
   return { data, document };
 }
 
-export async function routes(api: FastifyInstance, { store, chain }: RouteDeps) {
+export async function routes(api: FastifyInstance, { store, chain, registrar }: RouteDeps) {
   api.get("/health", async (): Promise<Health> => {
     const solana = await chain.health();
     return { status: "ok", version: API_VERSION, cluster: "devnet", solana };
@@ -68,4 +70,11 @@ export async function routes(api: FastifyInstance, { store, chain }: RouteDeps) 
   });
 
   api.get<IdParams>("/receivables/:id", async (req) => getReceivable(store, req.params.id));
+
+  api.post<IdParams>("/receivables/:id/register", async (req, reply) => {
+    const header = req.headers["idempotency-key"];
+    const key = (Array.isArray(header) ? header[0] : header)?.trim() || undefined;
+    const receivable = await registrar.register(req.params.id, key);
+    return reply.status(202).send({ receivable });
+  });
 }
