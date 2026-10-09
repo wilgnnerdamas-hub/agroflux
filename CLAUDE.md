@@ -18,7 +18,8 @@ documento com hash, estado atual e histórico de eventos verificáveis na **Sola
 
 ## Fonte de verdade
 - **`docs/api-contract.md` (v1.0)**: campos, estados, endpoints, erros e formato on-chain. Não altere sem o OK da gestão do projeto.
-- `docs/decisoes-e-dependencias.md`: decisões do frontend e o que cada frente precisa da outra.
+- `docs/decisoes-e-dependencias.md`: decisões do frontend e do backend e checklist de integração.
+- `docs/novas-funcoes-v1.1.md`: escopo aprovado das funções A e B (base do contrato v1.1, ainda não escrito).
 
 ## Equipe e frentes
 - Gestão, produto e UX: wilgnner, que também responde por frontend e backend.
@@ -43,10 +44,38 @@ documento com hash, estado atual e histórico de eventos verificáveis na **Sola
 - Fluxo completo da demo funcionando de ponta a ponta com front + backend reais na Devnet real (09/10). Carteira com ~5 SOL.
 - Repositório público: https://github.com/wilgnnerdamas-hub/agroflux
 
-## Próximos passos
-- **10/10:** `/demo/reset` com seed, hash de imagem (PNG/JPEG) e hospedagem do backend. Checklist em `docs/decisoes-e-dependencias.md`.
-- **11/10:** acabamento visual, roteiro da demo e deploy do frontend (Vercel).
-- **12/10:** só correções críticas e submissão.
+## Próximos passos (fila em ordem)
+Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidação): especificação, regras e cortes em
+**`docs/novas-funcoes-v1.1.md`**. Nada de A ou B antes do contrato v1.1 aprovado.
+
+**09/10 (noite) e 10/10 de manhã: fechar o fluxo principal e criar uma rede de segurança**
+1. Push dos commits de documentação pendentes.
+2. `/demo/reset` com seed (1 recebível `registered` com tx real + 1 `created`).
+3. Conferir o hash de imagem (PNG/JPEG) entre navegador e backend.
+4. Hospedar o backend (escolher Render, Railway ou Fly) e fazer o deploy do front na Vercel em modo `http`.
+   Com isso, uma demo do fluxo principal fica no ar antes de mexer nas funções novas.
+
+**10/10: contrato e preparação**
+5. Escrever a proposta do contrato v1.1 (A + B) em `docs/api-contract.md` e **PARAR** para a aprovação da gestão
+   (diff + lista de arquivos). Levar a proposta para a decisão em aberto: a confirmação do sacado é obrigatória antes da seleção de oferta?
+6. Em paralelo, sem depender do contrato: instalar Rust, Solana CLI e Anchor no WSL (Ubuntu) e criar as carteiras
+   "distribuidor demo" e "financiador demo" (secrets só no `.env`).
+
+**10/10 (tarde) até 11/10 às 12h: função A, confirmação do sacado**
+7. Backend: endpoints, token de uso único (7 dias), eventos e memo `debtor_confirmed`.
+8. Frontend: página `/confirmar/[token]` (celular), selo no passaporte, mock sem assinatura e e2e no dublê.
+
+**11/10 até 18h: função B, cessão tokenizada + liquidação atômica**
+9. Blockchain: mint `tBRL-DEMO`, mint Token-2022 por recebível, programa Anchor de escrow com testes
+   (incluindo o caso de falha) e deploy na Devnet.
+10. Backend: `POST /assignment` (202 + polling) e máquina de estados.
+11. Frontend: botão, card "Cessão tokenizada" e faixa de aviso, atrás de `NEXT_PUBLIC_FEATURE_ASSIGNMENT`.
+    **Corte às 18h:** se não estiver estável, a flag fica `false`, a gestão é avisada e o tema vira roadmap no pitch.
+
+**11/10 à noite: demo**
+12. Acabamento visual, roteiro da demo e novo deploy.
+
+**12/10: só correções críticas e submissão.**
 
 ## Comandos do backend (dentro de `backend/`)
 - `npm install`, `npm run dev` (http://localhost:4000/api/v1), `npm test`, `npm run typecheck`
