@@ -26,4 +26,6 @@ export interface AgroFluxApi {
   getConfirmation(token: string): Promise<ConfirmationSummary>;
   confirmDebtor(token: string): Promise<ConfirmationSummary>;
   declineDebtor(token: string): Promise<ConfirmationSummary>;
+  // v1.1: cessão tokenizada (§5.14). 202; o frontend acompanha por polling.
+  requestAssignment(id: string, idempotencyKey: string): Promise<Receivable>;
 }

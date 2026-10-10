@@ -4,6 +4,8 @@ import multipart from "@fastify/multipart";
 import type { Config } from "./config.js";
 import type { ChainGateway } from "./chain/solana.js";
 import { errorHandler } from "./errors.js";
+import { AssignmentService } from "./assignment.js";
+import { createAssignmentGateway, type AssignmentGateway } from "./chain/assignment.js";
 import { ConfirmationService } from "./confirmation.js";
 import { Registrar } from "./registration.js";
 import { routes } from "./routes.js";
@@ -16,9 +18,11 @@ export interface AppDeps {
   chain: ChainGateway;
   store?: Store;
   confirmTimeoutMs?: number;
+  // Dublê da cessão nos testes. Em produção é criado a partir do config.
+  assignmentGateway?: AssignmentGateway;
 }
 
-export async function buildApp({ config, chain, store = new Store(config.dataDir), confirmTimeoutMs }: AppDeps) {
+export async function buildApp({ config, chain, store = new Store(config.dataDir), confirmTimeoutMs, assignmentGateway }: AppDeps) {
   const app = Fastify({
     logger: process.env.NODE_ENV === "test" ? false : { level: "info" },
   });
@@ -43,6 +47,22 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
   const confirmations = new ConfirmationService(store, chain, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
   confirmations.resumePending();
 
-  await app.register(routes, { prefix: "/api/v1", store, chain, registrar, confirmations, demoResetEnabled: config.demoResetEnabled, assignmentEnabled: config.assignmentEnabled });
-  return { app, registrar, confirmations, store };
+  // Função B só liga com ASSIGNMENT_ENABLED=true e a configuração completa (§5.14).
+  let assignments: AssignmentService | null = null;
+  if (config.assignmentEnabled) {
+    const gateway =
+      assignmentGateway ??
+      (config.assignment && config.feePayerSecret
+        ? createAssignmentGateway({ rpcUrl: config.solanaRpcUrl, feePayerSecret: config.feePayerSecret, ...config.assignment })
+        : null);
+    if (gateway) {
+      assignments = new AssignmentService(store, gateway, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
+      assignments.resumePending();
+    } else {
+      app.log.warn("ASSIGNMENT_ENABLED=true, mas faltam DEMO_DISTRIBUTOR_SECRET, DEMO_FUNDER_SECRET, TBRL_MINT ou ESCROW_PROGRAM_ID. Cessão desligada.");
+    }
+  }
+
+  await app.register(routes, { prefix: "/api/v1", store, chain, registrar, confirmations, assignments, demoResetEnabled: config.demoResetEnabled });
+  return { app, registrar, confirmations, assignments, store };
 }

@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { buildApp } from "../src/app.js";
+import type { AssignmentGateway } from "../src/chain/assignment.js";
 import type { ChainGateway } from "../src/chain/solana.js";
 import { loadConfig } from "../src/config.js";
 
@@ -67,11 +68,11 @@ export async function createRegistered(built: Awaited<ReturnType<typeof makeApp>
 
 export async function makeApp(
   chain: ChainGateway = fakeChain(),
-  opts: { dataDir?: string; confirmTimeoutMs?: number; env?: Record<string, string> } = {},
+  opts: { dataDir?: string; confirmTimeoutMs?: number; env?: Record<string, string>; assignmentGateway?: AssignmentGateway } = {},
 ) {
   const dataDir = opts.dataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "agroflux-test-"));
   const config = loadConfig({ FRONTEND_ORIGIN: "http://localhost:3000", DATA_DIR: dataDir, ...opts.env });
-  const built = await buildApp({ config, chain, confirmTimeoutMs: opts.confirmTimeoutMs });
+  const built = await buildApp({ config, chain, confirmTimeoutMs: opts.confirmTimeoutMs, assignmentGateway: opts.assignmentGateway });
   return { ...built, dataDir };
 }
 

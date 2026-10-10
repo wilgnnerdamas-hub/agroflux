@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ChainGateway } from "./chain/solana.js";
 import { ApiError } from "./errors.js";
 import { listOffers, selectOffer } from "./offers.js";
+import type { AssignmentService } from "./assignment.js";
 import type { ConfirmationService } from "./confirmation.js";
 import type { Registrar } from "./registration.js";
 import { resetDemo } from "./seed.js";
@@ -19,8 +20,8 @@ export interface RouteDeps {
   chain: ChainGateway;
   registrar: Registrar;
   confirmations: ConfirmationService;
+  assignments: AssignmentService | null;
   demoResetEnabled: boolean;
-  assignmentEnabled: boolean;
 }
 
 type IdParams = { Params: { id: string } };
@@ -49,10 +50,10 @@ async function readMultipart(req: FastifyRequest) {
   return { data, document };
 }
 
-export async function routes(api: FastifyInstance, { store, chain, registrar, confirmations, demoResetEnabled, assignmentEnabled }: RouteDeps) {
+export async function routes(api: FastifyInstance, { store, chain, registrar, confirmations, assignments, demoResetEnabled }: RouteDeps) {
   api.get("/health", async (): Promise<Health> => {
     const solana = await chain.health();
-    return { status: "ok", version: API_VERSION, cluster: "devnet", solana, features: { debtorConfirmation: true, assignment: assignmentEnabled } };
+    return { status: "ok", version: API_VERSION, cluster: "devnet", solana, features: { debtorConfirmation: true, assignment: assignments !== null } };
   });
 
   api.get("/receivables", async () => listReceivables(store));
@@ -113,6 +114,14 @@ export async function routes(api: FastifyInstance, { store, chain, registrar, co
     reply.status(202).send(confirmations.confirm(req.params.token)),
   );
   api.post<TokenParams>("/confirmations/:token/decline", async (req) => confirmations.decline(req.params.token));
+
+  // v1.1: cessão tokenizada (§5.14). Só existe com a função B ligada; sem isso, cai no 404 padrão.
+  if (assignments) {
+    api.post<IdParams>("/receivables/:id/assignment", async (req, reply) => {
+      const receivable = await assignments.request(req.params.id, idempotencyKey(req));
+      return reply.status(202).send({ receivable });
+    });
+  }
 
   // Só existe com DEMO_RESET_ENABLED=true; sem isso, cai no 404 padrão.
   if (demoResetEnabled) {

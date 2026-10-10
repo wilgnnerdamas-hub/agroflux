@@ -1,0 +1,471 @@
+{
+  "address": "B3PdnyjFAJua4FbzdfotdZLN3S6LfAXKwavbJNkLxRXa",
+  "metadata": {
+    "name": "agroflux_escrow",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "settle",
+      "discriminator": [
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Paga taxas e aluguel das contas novas (carteira do backend)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "distributor",
+          "docs": [
+            "Carteira de demonstração \"distribuidor demo\"."
+          ],
+          "signer": true
+        },
+        {
+          "name": "funder",
+          "docs": [
+            "Carteira de demonstração \"financiador demo\"."
+          ],
+          "signer": true
+        },
+        {
+          "name": "asset_mint",
+          "docs": [
+            "Token da cessão: Token-2022, supply 1, decimals 0."
+          ]
+        },
+        {
+          "name": "settlement_mint",
+          "docs": [
+            "Moeda de teste tBRL-DEMO (2 casas decimais)."
+          ]
+        },
+        {
+          "name": "distributor_asset",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "distributor"
+              },
+              {
+                "kind": "account",
+                "path": "asset_token_program"
+              },
+              {
+                "kind": "account",
+                "path": "asset_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "funder_asset",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "funder"
+              },
+              {
+                "kind": "account",
+                "path": "asset_token_program"
+              },
+              {
+                "kind": "account",
+                "path": "asset_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "funder_settlement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "funder"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_token_program"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "distributor_settlement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "distributor"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_token_program"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "settlement",
+          "docs": [
+            "Registro da liquidação. `init` falha se o token já foi liquidado."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  116,
+                  116,
+                  108,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_token_program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        },
+        {
+          "name": "settlement_token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Settlement",
+      "discriminator": [
+        55,
+        11,
+        219,
+        33,
+        36,
+        136,
+        40,
+        182
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "Settled",
+      "discriminator": [
+        232,
+        210,
+        40,
+        17,
+        142,
+        124,
+        145,
+        238
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidAmount",
+      "msg": "O valor da liquidação precisa ser maior que zero."
+    },
+    {
+      "code": 6001,
+      "name": "AssetNotUnique",
+      "msg": "O token da cessão precisa ter supply 1 e 0 casas decimais."
+    },
+    {
+      "code": 6002,
+      "name": "MintAuthorityNotRevoked",
+      "msg": "A autoridade de mint do token da cessão precisa estar removida."
+    },
+    {
+      "code": 6003,
+      "name": "InvalidSettlementMint",
+      "msg": "A moeda de liquidação precisa ter 2 casas decimais."
+    },
+    {
+      "code": 6004,
+      "name": "AssetNotHeld",
+      "msg": "O distribuidor não detém o token da cessão."
+    },
+    {
+      "code": 6005,
+      "name": "SameParty",
+      "msg": "Distribuidor e financiador precisam ser carteiras diferentes."
+    }
+  ],
+  "types": [
+    {
+      "name": "Settled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "settlement_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "distributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "funder",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "settled_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Settlement",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "settlement_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "distributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "funder",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "settled_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

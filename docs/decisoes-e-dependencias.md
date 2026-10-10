@@ -18,6 +18,7 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | F10 | 10/10 | O link de confirmação fica guardado só na aba (`sessionStorage`); depois de recarregar, a tela oferece "Gerar novo link". | O token só vem na resposta que o gera (§5.10) e não fica no servidor. |
 | F11 | 10/10 | O passaporte se atualiza a cada 3 s, por até 15 min, enquanto espera a resposta do sacado ou o memo da confirmação. | O sacado responde em outro aparelho; a demo mostra a mudança sem recarregar. |
 | F12 | 10/10 | As ofertas aparecem antes da confirmação, mas os botões de seleção ficam desligados, com um aviso e um atalho para a confirmação. | G1, com a proposta 2 do v1.1. |
+| F13 | 10/10 | Card "Cessão tokenizada" e quinta etapa "Cessão liquidada" atrás de `NEXT_PUBLIC_FEATURE_ASSIGNMENT`; com a flag ligada, o card só aparece se o `health` disser `features.assignment: true` (ou se a cessão já existir). A faixa de aviso fica no topo do card. | Regra 3 do v1.1: sem escrow pronto, a função não aparece. |
 
 ## Decisões da gestão
 
@@ -43,6 +44,9 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | B11 | 09/10 | Ancoragem de memo extraída para `chain/anchor.ts` e usada pelo registro e pela confirmação do sacado (chaves separadas no store: `<id>` e `dc:<id>`). | Uma só implementação testada de envio, reaproveitamento após TIMEOUT e retomada após reinício. |
 | B12 | 09/10 | Tokens de confirmação guardados só como hash SHA-256, com estado `active`/`used`/`revoked`; um link novo revoga os anteriores. | O token nunca fica no passaporte nem no `db.json` (§10 do v1.1). |
 | B13 | 09/10 | Migração ao carregar: dados gravados pela v1.0 ganham `debtorConfirmation` e `assignment` em `none`. | A produção no Railway já tem dados da v1.0. |
+| B14 | 10/10 | Escrow Anchor 0.32.2 em `blockchain/` com uma instrução `settle`: confere os termos, transfere o token da cessão (Token-2022) e o tBRL-DEMO (SPL Token) na mesma instrução, e cria um PDA de registro por token (impede liquidar duas vezes). Sem conferência prévia de saldo no programa, para os testes provarem a reversão. | §6.4; 4 testes (`anchor test`), incluindo financiador sem saldo sem nenhuma perna executada. |
+| B15 | 10/10 | Backend monta a instrução `settle` à mão (discriminador da IDL em `blockchain/idl/`), sem depender do cliente Anchor. Cria o token da cessão com metadados (`name`, `symbol` AGFX, `payloadHash`), revoga mint e autoridade de metadados. Assinaturas de cada etapa guardadas antes do envio (`as-mint:`, `as-settle:`) e conferidas numa nova tentativa. | Mesmo padrão do B6; nova tentativa reaproveita o token. |
+| B16 | 10/10 | A função B só liga com `ASSIGNMENT_ENABLED=true` e as quatro variáveis (`DEMO_DISTRIBUTOR_SECRET`, `DEMO_FUNDER_SECRET`, `TBRL_MINT`, `ESCROW_PROGRAM_ID`); preenchidas por `npm run setup:assignment`. Gateway real testado contra validador local (`scripts/localnet-assignment.ts`). | Secrets só no `.env`/Railway; produção continua desligada até o deploy do escrow. |
 
 ## O frontend depende de
 

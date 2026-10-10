@@ -1,0 +1,26 @@
+{
+  "license": "ISC",
+  "scripts": {
+    "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
+    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
+  },
+  "dependencies": {
+    "@anchor-lang/core": "^0.32.2",
+    "@solana/spl-token": "^0.4.13",
+    "@solana/spl-token-metadata": "^0.1.6",
+    "@solana/web3.js": "^1.98.4"
+  },
+  "devDependencies": {
+    "chai": "^4.3.4",
+    "mocha": "^9.0.3",
+    "ts-mocha": "^10.0.0",
+    "@types/bn.js": "^5.1.0",
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^9.0.0",
+    "typescript": "^5.7.3",
+    "prettier": "^2.6.2"
+  },
+  "name": "agroflux-escrow",
+  "private": true,
+  "description": "AgroFlux: programa Anchor de escrow da cess\u00e3o tokenizada (simula\u00e7\u00e3o na Devnet)"
+}

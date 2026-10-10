@@ -1,9 +1,12 @@
 import { Check } from "lucide-react";
 import type { Receivable } from "@/lib/types";
+import { FEATURE_ASSIGNMENT } from "@/lib/features";
 import { cx } from "./ui";
 
 // v1.1: a confirmação do sacado vem antes da oferta (decisão G1).
-const STEPS = ["Cadastrado", "Registrado na Devnet", "Confirmado pelo sacado", "Oferta simulada"] as const;
+const STEPS = ["Cadastrado", "Registrado na Devnet", "Confirmado pelo sacado", "Oferta simulada"];
+// Função B: quinta etapa só com a flag ligada.
+const STEPS_WITH_ASSIGNMENT = [...STEPS, "Cessão liquidada"];
 
 function progress(r: Pick<Receivable, "status" | "debtorConfirmation">): { done: number; current: number; failed: boolean } {
   const dc = r.debtorConfirmation;
@@ -19,18 +22,22 @@ function progress(r: Pick<Receivable, "status" | "debtorConfirmation">): { done:
       return { done: 2, current: 2, failed: dc.status === "declined" || dc.chain?.status === "failed" };
     }
     case "offer_selected":
-    case "assignment_pending":
-    case "assigned":
-    case "assignment_failed":
       return { done: 4, current: 4, failed: false };
+    case "assignment_pending":
+      return { done: 4, current: 4, failed: false };
+    case "assignment_failed":
+      return { done: 4, current: 4, failed: true };
+    case "assigned":
+      return { done: 5, current: 5, failed: false };
   }
 }
 
 export function FlowSteps({ receivable }: { receivable: Pick<Receivable, "status" | "debtorConfirmation"> }) {
   const p = progress(receivable);
+  const steps = FEATURE_ASSIGNMENT ? STEPS_WITH_ASSIGNMENT : STEPS;
   return (
-    <ol className="grid grid-cols-2 gap-x-2 gap-y-3 sm:grid-cols-4" aria-label="Etapas da demonstração">
-      {STEPS.map((label, i) => {
+    <ol className={cx("grid grid-cols-2 gap-x-2 gap-y-3", FEATURE_ASSIGNMENT ? "sm:grid-cols-5" : "sm:grid-cols-4")} aria-label="Etapas da demonstração">
+      {steps.map((label, i) => {
         const done = i < p.done;
         const current = i === p.current && !done;
         return (

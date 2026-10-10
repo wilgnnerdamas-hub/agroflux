@@ -13,6 +13,8 @@ import { Alert, ButtonLink, Card, CardTitle, DescList, ErrorState, LoadingBlock,
 import { DebtorConfirmationBadge, ReceivableStatusBadge, SimulatedBadge } from "@/components/status";
 import { ChainCard } from "@/components/ChainCard";
 import { DebtorConfirmationCard } from "@/components/DebtorConfirmationCard";
+import { AssignmentCard, useAssignmentAvailable } from "@/components/AssignmentCard";
+import { FEATURE_ASSIGNMENT } from "@/lib/features";
 import { Timeline } from "@/components/Timeline";
 import { FlowSteps } from "@/components/FlowSteps";
 
@@ -21,6 +23,9 @@ const POLL_MAX_MS = 75_000;
 // v1.1: enquanto espera o sacado responder (no celular dele), a tela se atualiza sozinha.
 const DEBTOR_POLL_MS = 3000;
 const DEBTOR_POLL_MAX_MS = 15 * 60_000;
+// v1.1, função B: polling da cessão (§5.14), mesmo ritmo do registro.
+const ASSIGNMENT_POLL_MAX_MS = 3 * 60_000;
+const ASSIGNMENT_STATES: Receivable["status"][] = ["offer_selected", "assignment_pending", "assigned", "assignment_failed"];
 
 function SelectedOfferCard({ receivable }: { receivable: Receivable }) {
   const [offer, setOffer] = useState<Offer | null | "error">(null);
@@ -97,6 +102,18 @@ function Passport() {
     return () => clearInterval(t);
   }, [dcWaiting, reload]);
 
+  const assignmentPending = r?.status === "assignment_pending";
+  useEffect(() => {
+    if (!assignmentPending) return;
+    const started = Date.now();
+    const t = setInterval(() => {
+      if (Date.now() - started > ASSIGNMENT_POLL_MAX_MS) return clearInterval(t);
+      void reload(true);
+    }, POLL_MS);
+    return () => clearInterval(t);
+  }, [assignmentPending, reload]);
+  const assignmentAvailable = useAssignmentAvailable();
+
   const refreshNow = () => {
     pollStart.current = Date.now();
     setPollTimedOut(false);
@@ -131,6 +148,9 @@ function Passport() {
   // Dados anteriores à v1.1 podem ter oferta selecionada sem confirmação: nesse caso o card não aparece.
   const showDebtorCard = offersReady && (r.status === "registered" || dc.status !== "none");
   const doc = r.documents[0];
+  // Função B: atrás da flag; com a flag ligada, aparece se o backend tiver a cessão ou se ela já existir neste recebível.
+  const showAssignment =
+    FEATURE_ASSIGNMENT && ASSIGNMENT_STATES.includes(r.status) && (assignmentAvailable === true || r.assignment.status !== "none");
 
   return (
     <>
@@ -185,7 +205,9 @@ function Passport() {
               <DebtorConfirmationCard receivable={r} onUpdated={(next) => setState({ status: "success", data: next })} />
             )}
 
-            {r.status === "offer_selected" && r.selectedOfferId && <SelectedOfferCard receivable={r} />}
+            {ASSIGNMENT_STATES.includes(r.status) && r.selectedOfferId && <SelectedOfferCard receivable={r} />}
+
+            {showAssignment && <AssignmentCard receivable={r} onUpdated={(next) => setState({ status: "success", data: next })} />}
 
             <Card>
               <CardTitle>Dados da operação</CardTitle>

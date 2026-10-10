@@ -96,6 +96,18 @@ test("fluxo completo da demonstração", async ({ page }, info) => {
   await expect(page.getByText(/Oferta simulada de Financiador Simulado A selecionada/)).toBeVisible();
   await page.screenshot({ path: shots("08-final", p), fullPage: true });
 
+  // v1.1, função B: cessão tokenizada + liquidação atômica (atrás de NEXT_PUBLIC_FEATURE_ASSIGNMENT)
+  const asCard = page.getByTestId("assignment-card");
+  await expect(asCard.getByTestId("assignment-notice")).toContainText("Não é oferta de investimento nem cessão jurídica");
+  await expect(asCard.getByText("carteiras de demonstração, controladas pelo backend")).toBeVisible();
+  await asCard.getByRole("button", { name: "Formalizar cessão (simulação na Devnet)" }).click();
+  await expect(asCard.getByText("Assinatura da liquidação atômica")).toBeVisible({ timeout: 20_000 });
+  await expect(asCard.getByText(/tBRL-DEMO/).first()).toBeVisible();
+  await expect(asCard.getByRole("link", { name: /Ver liquidação no Solana Explorer/ })).toBeVisible();
+  await expect(page.getByText("Liquidação atômica confirmada na Solana Devnet (simulação, tBRL-DEMO sem valor)")).toBeVisible();
+  await expect(page.getByText("Cessão liquidada").first()).toBeVisible();
+  await page.screenshot({ path: shots("08b-cessao", p), fullPage: true });
+
   // Dashboard reflete o estado
   await page.getByRole("link", { name: "Recebíveis" }).first().click();
   await expect(page.getByText("AGF-0001").filter({ visible: true }).first()).toBeVisible();

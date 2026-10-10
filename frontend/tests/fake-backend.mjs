@@ -7,6 +7,8 @@ import { createHash, randomUUID } from "node:crypto";
 
 const PORT = Number(process.env.FAKE_BACKEND_PORT ?? 4010);
 const CONFIRM_MS = Number(process.env.FAKE_CONFIRM_MS ?? 1500);
+// v1.1, função B: cessão tokenizada com mint e liquidação FAKE (nada vai para a Solana).
+const ASSIGNMENT = process.env.FAKE_ASSIGNMENT === "true";
 const FAIL_FIRST_REGISTER = process.env.FAKE_FAIL_FIRST_REGISTER === "1";
 const db = new Map();
 const tokens = new Map(); // token → { receivableId, used, revoked }
@@ -52,11 +54,11 @@ const server = createServer(async (req, res) => {
   const p = url.pathname.replace(/^\/api\/v1/, "");
   const m = (re) => p.match(re);
   try {
-    if (req.method === "GET" && p === "/health") return send(res, 200, { status: "ok", version: "fake-test", cluster: "devnet", solana: { reachable: true, feePayerBalanceLamports: 2_000_000_000 }, features: { debtorConfirmation: true, assignment: false } });
+    if (req.method === "GET" && p === "/health") return send(res, 200, { status: "ok", version: "fake-test", cluster: "devnet", solana: { reachable: true, feePayerBalanceLamports: 2_000_000_000 }, features: { debtorConfirmation: true, assignment: ASSIGNMENT } });
     if (req.method === "POST" && p === "/__reset") { db.clear(); tokens.clear(); n = 0; failedOnce = false; return send(res, 204); }
     if (req.method === "GET" && p === "/receivables") {
       const items = [...db.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(summary);
-      return send(res, 200, { items, totals: { count: items.length, amountCents: items.reduce((s, i) => s + i.amountCents, 0), registeredCount: items.filter((i) => ["registered", "offer_selected"].includes(i.status)).length, pendingCount: items.filter((i) => i.status === "registration_pending").length, offerSelectedCount: items.filter((i) => i.status === "offer_selected").length, debtorConfirmedCount: items.filter((i) => i.debtorConfirmation.status === "confirmed").length, assignedCount: 0 } });
+      return send(res, 200, { items, totals: { count: items.length, amountCents: items.reduce((s, i) => s + i.amountCents, 0), registeredCount: items.filter((i) => ["registered", "offer_selected"].includes(i.status)).length, pendingCount: items.filter((i) => i.status === "registration_pending").length, offerSelectedCount: items.filter((i) => i.status === "offer_selected").length, debtorConfirmedCount: items.filter((i) => i.debtorConfirmation.status === "confirmed").length, assignedCount: items.filter((i) => i.status === "assigned").length } });
     }
     if (req.method === "POST" && p === "/receivables") {
       const chunks = [];
@@ -122,7 +124,7 @@ const server = createServer(async (req, res) => {
     if ((mm = m(/^\/receivables\/([^/]+)\/offers$/)) && req.method === "GET") {
       const r = db.get(mm[1]);
       if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
-      if (!["registered", "offer_selected"].includes(r.status)) return err(res, 409, "INVALID_STATE", "As ofertas simuladas ficam disponíveis após a confirmação na Devnet.");
+      if (!["registered", "offer_selected", "assignment_pending", "assigned", "assignment_failed"].includes(r.status)) return err(res, 409, "INVALID_STATE", "As ofertas simuladas ficam disponíveis após a confirmação na Devnet.");
       return send(res, 200, { isSimulated: true, disclaimer: "Ofertas fictícias geradas para demonstração. Não há financiador real, proposta vinculante ou movimentação financeira.", items: offersFor(r) });
     }
     if ((mm = m(/^\/receivables\/([^/]+)\/offers\/([^/]+)\/select$/)) && req.method === "POST") {
@@ -141,6 +143,34 @@ const server = createServer(async (req, res) => {
       r.events.push(ev("offer_selected", `Oferta simulada de ${o.funder.name} selecionada`, { offerId: o.id, funderName: o.funder.name, netAmountCents: o.netAmountCents }));
       r.updatedAt = now();
       return send(res, 200, r);
+    }
+    // v1.1: cessão tokenizada (§5.14), só com FAKE_ASSIGNMENT=true
+    if (ASSIGNMENT && (mm = m(/^\/receivables\/([^/]+)\/assignment$/)) && req.method === "POST") {
+      const r = db.get(mm[1]);
+      if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
+      if (!["offer_selected", "assignment_failed"].includes(r.status)) return err(res, 409, "INVALID_STATE", "A cessão fica disponível depois da seleção de uma oferta simulada.");
+      const o = offersFor(r).find((x) => x.id === r.selectedOfferId);
+      r.status = "assignment_pending";
+      r.assignment = { ...r.assignment, status: "pending", offerId: o.id, settlementAmount: o.netAmountCents, settlementMint: "FAKE_TBRL_MINT", distributorWallet: "FAKEDistributorWallet1111", funderWallet: "FAKEFunderWallet11111111", escrowProgramId: "FAKE_ESCROW", submittedAt: now(), error: null };
+      r.events.push(ev("assignment_requested", "Cessão tokenizada solicitada (simulação na Devnet)", { offerId: o.id, settlementAmount: o.netAmountCents }));
+      r.updatedAt = now();
+      setTimeout(() => {
+        const mint = `FAKE_ASSET_MINT_${r.id}`;
+        const sig = `FAKE_TEST_MINT_SIGNATURE_${r.id}_NAO_EXISTE_NA_SOLANA`;
+        const url = `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
+        r.assignment = { ...r.assignment, tokenMint: mint, mintSignature: sig, explorerUrls: { tokenMint: `https://explorer.solana.com/address/${mint}?cluster=devnet`, mint: url, settlement: null } };
+        r.events.push(ev("assignment_token_minted", "Token da cessão criado na Solana Devnet (Token-2022, supply 1)", { tokenMint: mint, signature: sig }, { actor: "system", onChain: true, chain: { signature: sig, explorerUrl: url } }));
+        r.updatedAt = now();
+      }, CONFIRM_MS / 2);
+      setTimeout(() => {
+        const sig = `FAKE_TEST_SETTLEMENT_SIGNATURE_${r.id}_NAO_EXISTE_NA_SOLANA`;
+        const url = `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
+        r.status = "assigned";
+        r.assignment = { ...r.assignment, status: "settled", settlementSignature: sig, settledAt: now(), explorerUrls: { ...r.assignment.explorerUrls, settlement: url } };
+        r.events.push(ev("assignment_settled", "Liquidação atômica confirmada na Solana Devnet (simulação, tBRL-DEMO sem valor)", { signature: sig, settlementAmount: r.assignment.settlementAmount, settlementAsset: "tBRL-DEMO" }, { actor: "system", onChain: true, chain: { signature: sig, explorerUrl: url } }));
+        r.updatedAt = now();
+      }, CONFIRM_MS);
+      return send(res, 202, { receivable: r });
     }
     // v1.1: confirmação do sacado
     if ((mm = m(/^\/receivables\/([^/]+)\/debtor-confirmation$/)) && req.method === "POST") {

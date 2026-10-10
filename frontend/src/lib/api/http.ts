@@ -87,5 +87,12 @@ export function createHttpApi(baseUrl: string): AgroFluxApi {
     getConfirmation: (token) => request<ConfirmationSummary>(`/confirmations/${encodeURIComponent(token)}`),
     confirmDebtor: (token) => request<ConfirmationSummary>(`/confirmations/${encodeURIComponent(token)}/confirm`, { method: "POST" }),
     declineDebtor: (token) => request<ConfirmationSummary>(`/confirmations/${encodeURIComponent(token)}/decline`, { method: "POST" }),
+    async requestAssignment(id, idempotencyKey) {
+      const r = await request<{ receivable: Receivable }>(`/receivables/${encodeURIComponent(id)}/assignment`, {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+      return r.receivable;
+    },
   };
 }

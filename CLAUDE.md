@@ -58,18 +58,18 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
 
 **10/10: contrato e preparação**
 5. ~~Contrato v1.1 (A + B)~~ (aprovado em 09/10).
-6. Em paralelo, sem depender do contrato: instalar Rust, Solana CLI e Anchor no WSL (Ubuntu) e criar as carteiras
-   "distribuidor demo" e "financiador demo" (secrets só no `.env`).
+6. ~~Ferramental no WSL~~ (feito em 10/10: Rust 1.99, Solana CLI 4.3, Anchor 0.32.2, Node 22).
+   Carteiras "distribuidor demo" e "financiador demo": `npm run setup:assignment` (falta rodar).
 
 **10/10 (tarde) até 11/10 às 12h: função A, confirmação do sacado**
 7. ~~Backend da função A~~ (feito em 09/10; 51 testes; testado na Devnet real).
-8. ~~Frontend da função A~~ (feito em 10/10; e2e 6/6 no dublê; fluxo real na Devnet ok). Falta o push para produção.
+8. ~~Frontend da função A~~ (feito e em produção em 10/10; fluxo v1.1 testado em produção, desktop e celular).
 
 **11/10 até 18h: função B, cessão tokenizada + liquidação atômica**
-9. Blockchain: mint `tBRL-DEMO`, mint Token-2022 por recebível, programa Anchor de escrow com testes
-   (incluindo o caso de falha) e deploy na Devnet.
-10. Backend: `POST /assignment` (202 + polling) e máquina de estados.
-11. Frontend: botão, card "Cessão tokenizada" e faixa de aviso, atrás de `NEXT_PUBLIC_FEATURE_ASSIGNMENT`.
+9. Blockchain: ~~programa de escrow com testes~~ (4/4 em `anchor test`, 10/10). **Falta o deploy na Devnet**
+   (carteira de deploy no WSL precisa de ~3,4 SOL) e `npm run setup:assignment -- --escrow <PROGRAM_ID>`.
+10. ~~Backend: `POST /assignment`~~ (10/10; 60 testes; gateway real ok no validador local).
+11. ~~Frontend: card "Cessão tokenizada"~~ (10/10; e2e 6/6). Falta ligar as flags após o deploy do escrow.
     **Corte às 18h:** se não estiver estável, a flag fica `false`, a gestão é avisada e o tema vira roadmap no pitch.
 
 **11/10 à noite: demo**
@@ -81,6 +81,10 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
 - `npm install`, `npm run dev` (http://localhost:4000/api/v1), `npm test`, `npm run typecheck`
 - `npm run wallet:new` grava a secret só em `backend/.env`; `npm run wallet:airdrop` pede SOL de teste.
 - `.env` (fora do git): `SOLANA_RPC_URL` (Helius, com api-key), `SOLANA_FEE_PAYER_SECRET`, `FRONTEND_ORIGIN`.
+
+## Blockchain (`blockchain/`, compilado no WSL)
+- Código-fonte no repo; build e testes numa cópia em `~/agroflux-escrow` no Ubuntu (rsync, sem `target/`).
+- `anchor build`, `anchor test` (validador local). Keypair do programa e carteira de deploy só no WSL.
 
 ## Comandos (dentro de `frontend/`)
 - `npm install`, `npm run dev` (http://localhost:3000), `npm run build`, `npm run lint`

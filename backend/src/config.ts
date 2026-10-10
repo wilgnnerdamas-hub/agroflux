@@ -10,6 +10,8 @@ export interface Config {
   dataDir: string;
   demoResetEnabled: boolean;
   assignmentEnabled: boolean;
+  // Função B (§6.4): carteiras de demonstração, mint tBRL-DEMO e programa de escrow. Secrets só no .env.
+  assignment: { distributorSecret: string; funderSecret: string; settlementMint: string; escrowProgramId: string } | null;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -24,5 +26,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dataDir: path.resolve(env.DATA_DIR || "./data"),
     demoResetEnabled: env.DEMO_RESET_ENABLED === "true",
     assignmentEnabled: env.ASSIGNMENT_ENABLED === "true",
+    assignment:
+      env.DEMO_DISTRIBUTOR_SECRET && env.DEMO_FUNDER_SECRET && env.TBRL_MINT && env.ESCROW_PROGRAM_ID
+        ? {
+            distributorSecret: env.DEMO_DISTRIBUTOR_SECRET.trim(),
+            funderSecret: env.DEMO_FUNDER_SECRET.trim(),
+            settlementMint: env.TBRL_MINT.trim(),
+            escrowProgramId: env.ESCROW_PROGRAM_ID.trim(),
+          }
+        : null,
   };
 }

@@ -329,6 +329,12 @@ export function createMockApi(): AgroFluxApi {
       save();
       return clone({ token, confirmationPath: `/confirmar/${token}`, expiresAt, receivable: r });
     },
+    // O mock nunca cria token nem liquida (rota inexistente sem o backend real).
+    async requestAssignment() {
+      await delay();
+      throw new ApiError("NOT_FOUND", "A cessão tokenizada só existe com o backend real e a função ligada.", 404);
+    },
+
     async retryDebtorConfirmationRegister() {
       await delay();
       throw new ApiError("INVALID_STATE", "Não há registro de confirmação com falha para repetir.", 409);
