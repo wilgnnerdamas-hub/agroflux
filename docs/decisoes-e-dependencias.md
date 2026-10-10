@@ -54,5 +54,5 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 - [x] Testar o caso de falha com a carteira da Devnet sem saldo (`INSUFFICIENT_FUNDS`). Tela de falha e botão de nova tentativa ok (09/10).
 - [x] `/demo/reset` com seed (09/10): 1 recebível `registered` com tx real na Devnet (verificação 4/4) + 1 `created`, em ~2,5 s. Ligar com `DEMO_RESET_ENABLED=true`.
 - [x] Backend no Railway: `https://agroflux-production.up.railway.app/api/v1` (09/10). Health com saldo, `/demo/reset` e fluxo completo pela API na Devnet real.
-- [x] Dados persistem após reiniciar o serviço no Railway (volume em `/data`) (09/10).
-- [ ] Deploy do frontend (Vercel) apontando para a URL pública do backend; `FRONTEND_ORIGIN` no Railway com a URL da Vercel.
+- [ ] Dados persistem após **redeploy** no Railway (volume em `/data`). O teste de 09/10 com "Restart" não valia: o restart mantém o mesmo container. No redeploy seguinte, os dados se perderam. O log de inicialização agora mostra o diretório de dados.
+- [x] Frontend na Vercel: `https://agroflux-ruby.vercel.app` (09/10), com CORS liberado no Railway. Fluxo completo da demo pelo navegador em produção, no desktop e no celular, na Devnet real.
