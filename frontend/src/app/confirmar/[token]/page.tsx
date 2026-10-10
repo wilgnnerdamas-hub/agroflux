@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { CheckCircle2, Landmark, ShieldAlert, XCircle } from "lucide-react";
+import { CheckCircle2, Landmark, XCircle } from "lucide-react";
 import { api, toApiError } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
@@ -11,19 +11,6 @@ import type { ConfirmationSummary } from "@/lib/types";
 import { Alert, Button, Card, DescList, ErrorState, LoadingBlock } from "@/components/ui";
 
 // §5.11 e §5.12 (v1.2: aceite do título na registradora simulada). Página pública, pensada para o celular do sacado.
-function SimulationNotice({ text }: { text: string }) {
-  const { t } = useI18n();
-  return (
-    <div className="mb-5 flex gap-3 rounded-lg border border-sim/30 bg-sim-soft p-4" role="note">
-      <ShieldAlert className="h-5 w-5 shrink-0 text-sim" aria-hidden />
-      <div>
-        <p className="text-sm font-bold text-sim">{text}</p>
-        <p className="mt-0.5 text-sm text-ink/80">{t.confirm.noticeExtra}</p>
-      </div>
-    </div>
-  );
-}
-
 function Result({ s }: { s: ConfirmationSummary }) {
   const { t } = useI18n();
   if (s.status === "confirmed") return <Alert tone="ok" title={t.confirm.okTitle}>{t.confirm.okText}</Alert>;
@@ -32,7 +19,7 @@ function Result({ s }: { s: ConfirmationSummary }) {
 }
 
 export default function ConfirmPage() {
-  const { t, errorMessage, locale } = useI18n();
+  const { t, errorMessage } = useI18n();
   const c = t.confirm;
   const { token } = useParams<{ token: string }>();
   const { state, setState } = useAsync(() => api.getConfirmation(token), [token]);
@@ -91,7 +78,6 @@ export default function ConfirmPage() {
 
   return (
     <>
-      <SimulationNotice text={locale === "pt" ? s.disclaimer : t.debtor.noIdentity} />
       <h1 className="text-xl font-bold tracking-tight">{c.title}</h1>
       <p className="mt-1 text-sm text-muted">{c.lead(s.distributor.name, s.reference)}</p>
 

@@ -92,7 +92,7 @@ describe("GET /api/v1/receivables e /:id", () => {
       id: b.id, reference: "AGF-0002", status: "created", debtor: b.debtor, product: b.product,
       amountCents: 200_000, currency: "BRL", dueDate: b.dueDate, chain: { status: "none" }, selectedOfferId: null,
       debtorConfirmation: { status: "none" }, assignment: { status: "none" },
-      registry: { registryId: "REG-DEMO-000002" }, listing: { status: "none" }, createdAt: b.createdAt,
+      registry: { registryId: "REG-DEMO-000002" }, listing: { status: "none" }, offerCount: 0, createdAt: b.createdAt,
     });
     expect(list.totals).toEqual({ count: 2, amountCents: 15_200_000, registeredCount: 0, pendingCount: 0, offerSelectedCount: 0, debtorConfirmedCount: 0, assignedCount: 0, publishedCount: 0 });
 

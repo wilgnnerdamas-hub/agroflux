@@ -186,6 +186,8 @@ describe("propostas do financiador e marketplace (v1.2)", () => {
 
     const sel = await built.app.inject({ method: "POST", url: `/api/v1/receivables/${id}/offers/${offer.id}/select` });
     expect(sel.json().status).toBe("offer_selected");
+    const listed = (await built.app.inject({ method: "GET", url: "/api/v1/receivables" })).json();
+    expect(listed.items[0].offerCount).toBe(3);
     // Fora de `published`: sem novas propostas e fora do marketplace.
     expect((await propose(built, id, { funderId: "fnd_a", monthlyRateBps: 130, feesCents: 0 })).json().error.code).toBe("INVALID_STATE");
     expect((await built.app.inject({ method: "GET", url: "/api/v1/marketplace" })).json().items).toHaveLength(0);

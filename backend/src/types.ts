@@ -243,6 +243,7 @@ export interface ReceivableSummary {
   assignment: { status: AssignmentStatus };
   registry: { registryId: string | null };
   listing: { status: Listing["status"] };
+  offerCount: number;
   createdAt: string;
 }
 

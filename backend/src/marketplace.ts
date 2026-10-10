@@ -18,7 +18,7 @@ export function marketplace(store: Store, funderId?: string): Marketplace {
       const offers = (store.getOffers(r.id) ?? []).filter((o) => o.status === "available");
       const best = offers.reduce<(typeof offers)[number] | null>((b, o) => (!b || o.netAmountCents > b.netAmountCents ? o : b), null);
       return {
-        receivable: { ...toSummary(r), cropSeason: r.cropSeason, issueDate: r.issueDate, termDays: r.termDays },
+        receivable: { ...toSummary(r, offers.length), cropSeason: r.cropSeason, issueDate: r.issueDate, termDays: r.termDays },
         registryId: r.registry.registryId,
         debtorAccepted: r.debtorConfirmation.status === "confirmed" && r.debtorConfirmation.chain?.status === "confirmed",
         offerCount: offers.length,

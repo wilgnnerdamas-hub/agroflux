@@ -1,10 +1,10 @@
 "use client";
 
 import { FileText } from "lucide-react";
-import { formatBytes, formatDate, formatMoney } from "@/lib/format";
+import { formatBytes, formatDate, formatMoney, shorten } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import type { Receivable } from "@/lib/types";
-import { Card, CardTitle, DescList, FieldLabel, MonoValue } from "../ui";
+import { Card, CardTitle, CopyButton, DescList, FieldLabel, InfoTip } from "../ui";
 
 /** Resumo do recebível: o essencial da operação, a registradora e o documento, num só cartão. */
 export function ReceivableSummary({ receivable: r, showDebtor = true }: { receivable: Receivable; showDebtor?: boolean }) {
@@ -20,7 +20,6 @@ export function ReceivableSummary({ receivable: r, showDebtor = true }: { receiv
           { label: t.passport.due, value: `${formatDate(r.dueDate)} · ${t.common.days(r.termDays)}` },
           ...(showDebtor ? [{ label: t.passport.debtor, value: `${r.debtor.alias} · ${r.debtor.state}` }] : []),
           { label: t.passport.product, value: `${t.status.product[r.product.category]} — ${r.product.description}` },
-          { label: t.passport.distributor, value: r.distributor.name },
           { label: t.passport.season, value: `${r.cropSeason} · ${t.passport.issue} ${formatDate(r.issueDate)}` },
           ...(reg.registryId ? [{ label: t.passport.registry, value: <span className="font-mono text-xs">{reg.registryId}</span> }] : []),
           { label: t.passport.creditor, value: reg.creditor.name },
@@ -33,12 +32,16 @@ export function ReceivableSummary({ receivable: r, showDebtor = true }: { receiv
             <span className="break-all">{doc.filename}</span>
             <span className="text-xs font-normal text-muted">· {t.status.documentKind[doc.kind]} · {formatBytes(doc.sizeBytes)}</span>
           </p>
-          <FieldLabel>{t.passport.docHash}</FieldLabel>
-          <MonoValue value={doc.sha256} />
-          <p className="mt-2 text-xs text-muted">{t.passport.docPrivate}</p>
+          <div className="flex items-center gap-1">
+            <FieldLabel>{t.passport.docHash}</FieldLabel>
+            <span className="-mt-1"><InfoTip>{t.passport.docPrivate}</InfoTip></span>
+          </div>
+          <div className="flex items-center gap-1 rounded-md bg-subtle px-2.5 py-1">
+            <code className="min-w-0 flex-1 truncate font-mono text-xs" title={doc.sha256}>{shorten(doc.sha256, 16, 12)}</code>
+            <CopyButton value={doc.sha256} />
+          </div>
         </div>
       )}
-      <p className="mt-4 text-xs text-muted">{t.passport.fictitious}</p>
     </Card>
   );
 }

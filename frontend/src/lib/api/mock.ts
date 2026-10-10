@@ -177,6 +177,7 @@ function summary(r: Receivable): ReceivableSummary {
     assignment: { status: r.assignment.status },
     registry: { registryId: r.registry.registryId },
     listing: { status: r.listing.status },
+    offerCount: 0,
     createdAt: r.createdAt,
   };
 }

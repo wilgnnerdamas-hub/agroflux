@@ -1,24 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Ban, Coins, Landmark, Loader2, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Ban, Coins, Landmark, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 import { api, toApiError } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import type { Receivable } from "@/lib/types";
 import { Alert, Badge, Button, Card, CardTitle, DescList, ExplorerLink, FieldLabel, MonoValue, type Tone } from "../ui";
 import { useReceivableAction, type StepProps } from "./shared";
-
-/** Faixa fixa da cessão (§6.4): simulado, sem valor, sem validação jurídica. */
-export function AssignmentNotice() {
-  const { t } = useI18n();
-  return (
-    <div className="flex gap-3 rounded-lg border border-sim/30 bg-sim-soft p-3.5" role="note" data-testid="assignment-notice">
-      <ShieldAlert className="h-5 w-5 shrink-0 text-sim" aria-hidden />
-      <p className="text-sm font-medium text-sim">{t.assignment.notice}</p>
-    </div>
-  );
-}
 
 /** A cessão está ligada no backend (health.features.assignment)? */
 export function useAssignmentAvailable() {
@@ -52,9 +41,8 @@ export function AssignmentStep({ receivable, onUpdated }: StepProps) {
       <CardTitle icon={<Coins className="h-4 w-4 text-sim" aria-hidden />} aside={<Badge tone={TONE[a.status]}>{t.status.assignment[a.status]}</Badge>}>
         {t.assignment.title}
       </CardTitle>
-      <AssignmentNotice />
 
-      <div className="mt-4 space-y-4" aria-live="polite">
+      <div className="space-y-4" aria-live="polite">
         {a.status === "none" && (
           <>
             <p className="text-sm text-muted">{t.assignment.intro}</p>
@@ -90,7 +78,6 @@ export function AssignmentStep({ receivable, onUpdated }: StepProps) {
           />
         )}
       </div>
-      <p className="mt-4 text-xs text-muted">{t.assignment.walletsNote}</p>
     </Card>
   );
 }
@@ -165,8 +152,7 @@ export function AssignedSummary({ receivable, onUpdated, proofAvailable }: StepP
       <CardTitle icon={<ShieldCheck className="h-4 w-4 text-sim" aria-hidden />} aside={<Badge tone="sim">{t.status.assignment.settled}</Badge>}>
         {t.assignment.doneTitle}
       </CardTitle>
-      <AssignmentNotice />
-      <p className="mt-4 text-sm text-ink">{t.assignment.doneText(a.funderName ?? "—")}</p>
+      <p className="text-sm text-ink">{t.assignment.doneText(a.funderName ?? "—")}</p>
       <div className="mt-4">
         <DescList
           items={[

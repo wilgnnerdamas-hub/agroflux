@@ -337,7 +337,6 @@ export default function NewReceivablePage() {
           <Button type="submit" className="w-full" loading={submitting} disabled={hash.status === "hashing"}>
             {submitting ? f.submitting : f.submit}
           </Button>
-          <p className="text-center text-xs text-muted">{f.footnote}</p>
         </aside>
       </form>
     </>

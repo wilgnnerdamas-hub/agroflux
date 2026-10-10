@@ -8,12 +8,12 @@ import { Badge, type Tone } from "./ui";
 const RECEIVABLE_TONE: Record<ReceivableStatus, Tone> = {
   created: "neutral",
   registration_pending: "warn",
-  registered: "ok",
+  registered: "neutral",
   registration_failed: "bad",
   published: "info",
-  offer_selected: "sim",
+  offer_selected: "info",
   assignment_pending: "warn",
-  assigned: "sim",
+  assigned: "ok",
   assignment_failed: "bad",
 };
 

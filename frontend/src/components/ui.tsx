@@ -300,3 +300,28 @@ export function Collapsible({
 export function FieldLabel({ children }: { children: ReactNode }) {
   return <p className="mb-1 text-xs font-medium uppercase tracking-wide text-faint">{children}</p>;
 }
+
+/** Dica curta atrás de um ícone ⓘ (abre ao tocar ou focar; fecha ao sair). Para detalhes que não precisam ficar na tela. */
+export function InfoTip({ children, label }: { children: ReactNode; label?: string }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex align-middle">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => setOpen(false)}
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-faint hover:text-ink"
+        aria-label={label ?? t.common.info}
+        aria-expanded={open}
+      >
+        <Info className="h-4 w-4" aria-hidden />
+      </button>
+      {open && (
+        <span role="tooltip" className="absolute left-1/2 top-6 z-30 w-64 -translate-x-1/2 rounded-lg border border-border bg-surface p-3 text-xs font-normal normal-case leading-relaxed tracking-normal text-ink shadow-lg">
+          {children}
+        </span>
+      )}
+    </span>
+  );
+}

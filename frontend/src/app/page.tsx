@@ -125,7 +125,6 @@ export default function LandingPage() {
         </Link>
       </section>
 
-      <p className="rounded-lg border border-sim/30 bg-sim-soft p-4 text-sm font-medium text-sim" role="note">{l.disclaimer}</p>
     </div>
   );
 }

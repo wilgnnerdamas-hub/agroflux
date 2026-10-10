@@ -178,7 +178,6 @@ export function DebtorStep({ receivable, onUpdated }: StepProps) {
       )}
 
       {error && <Alert tone="bad" className="mt-4">{error}</Alert>}
-      <p className="mt-4 text-xs text-muted">{t.debtor.noIdentity}</p>
     </Card>
   );
 }

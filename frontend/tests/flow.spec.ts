@@ -27,6 +27,12 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("passaporte digital");
   await page.screenshot({ path: shots("00-landing", p), fullPage: true });
+  // Avisos da demo concentrados na faixa fixa e no painel "Sobre a demo".
+  await expect(page.getByTestId("demo-strip")).toContainText("dados e valores simulados");
+  await page.getByRole("button", { name: "Sobre a demo" }).click();
+  await expect(page.getByTestId("about-drawer")).toContainText("regras da CVM");
+  await page.getByRole("button", { name: "Fechar" }).click();
+  await expect(page.getByTestId("about-drawer")).toHaveCount(0);
   await page.getByRole("link", { name: "Entrar como distribuidora" }).first().click();
   await expect(page.getByText("Nenhum recebível cadastrado")).toBeVisible();
   await expect(page.getByText("Backend conectado")).toBeVisible();
@@ -45,7 +51,7 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
   // Passaporte: registradora simulada e hash conferem.
   await expect(page.getByRole("heading", { level: 1 })).toContainText("AGF-0001");
   await expect(page.getByText("REG-DEMO-000001").first()).toBeVisible();
-  await expect(page.getByText(browserHash)).toBeVisible();
+  await expect(page.locator(`code[title="${browserHash}"]`)).toBeVisible();
   await page.screenshot({ path: shots("01-passaporte-criado", p), fullPage: true });
 
   // Registro na Devnet.
@@ -99,6 +105,8 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
 
   // A distribuidora vê a terceira proposta e aceita a do Financiador Demo A.
   await expect(proposals.getByTestId("offer-card")).toHaveCount(3, { timeout: 15_000 });
+  await expect(proposals.getByTestId("offer-card").filter({ hasText: "Financiador Demo A" })).toContainText("FIDC (simulado)");
+  await page.screenshot({ path: shots("05b-propostas", p), fullPage: true });
   const cardA = proposals.getByTestId("offer-card").filter({ hasText: "Financiador Demo A" });
   await cardA.getByRole("button", { name: "Aceitar proposta" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
@@ -106,8 +114,7 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
 
   // Cessão tokenizada + liquidação atômica.
   const as = page.getByTestId("assignment-step");
-  await expect(as.getByTestId("assignment-notice")).toContainText("Não é oferta de investimento nem cessão jurídica");
-  await as.getByRole("button", { name: "Formalizar cessão (simulação na Devnet)" }).click();
+  await as.getByRole("button", { name: "Formalizar cessão (Devnet)" }).click();
   const done = page.getByTestId("assigned-summary");
   await expect(done).toBeVisible({ timeout: 20_000 });
   await expect(done).toContainText("Financiador Demo A");
@@ -125,6 +132,11 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
   await expect(page.getByTestId("record-proof")).toBeVisible();
   await page.getByTestId("onchain-records").getByRole("button", { name: "Verificar na rede" }).click();
   await expect(page.getByText("Documento travado on-chain contra segunda cessão")).toBeVisible();
+
+  // Painel: o próximo passo mostra que acabou.
+  await page.getByRole("link", { name: "Recebíveis" }).first().click();
+  await expect(page.getByText("Concluído").filter({ visible: true }).first()).toBeVisible();
+  await page.screenshot({ path: shots("06b-painel", p), fullPage: true });
 
   // O sacado, reabrindo o link, vê para quem pagar.
   await debtor.reload();
@@ -202,4 +214,30 @@ test("versão em inglês", async ({ page }) => {
 test("recebível inexistente mostra erro claro", async ({ page }) => {
   await page.goto("/recebiveis/rcv_naoexiste");
   await expect(page.getByText("Recebível não encontrado").first()).toBeVisible();
+});
+
+test("painel mostra próximo passo e proposta nova", async ({ page, request }) => {
+  const fd = { data: JSON.stringify({ debtor: { alias: "Produtor Demo 06", state: "PR" }, product: { category: "seed", description: "Semente (demo)" }, cropSeason: "2026/27", amountCents: 5_000_000, issueDate: "2026-10-01", dueDate: "2027-02-15", documentKind: "test_invoice" }), document: { name: "nf.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 painel") } };
+  const r = await (await request.post(`${API}/receivables`, { multipart: fd })).json();
+  await request.post(`${API}/receivables/${r.id}/register`);
+  await expect.poll(async () => (await (await request.get(`${API}/receivables/${r.id}`)).json()).status, { timeout: 15_000 }).toBe("registered");
+  const link = await (await request.post(`${API}/receivables/${r.id}/debtor-confirmation`)).json();
+  await request.post(`${API}/confirmations/${link.token}/confirm`);
+  await expect.poll(async () => (await (await request.get(`${API}/receivables/${r.id}`)).json()).debtorConfirmation.chain?.status, { timeout: 15_000 }).toBe("confirmed");
+  await request.post(`${API}/receivables/${r.id}/publish`, { data: { acceptTerms: true, termsVersion: "coobrigacao-demo-v1" } });
+
+  await page.goto("/distribuidor");
+  const row = page.getByText("Escolher proposta (2)").filter({ visible: true });
+  await expect(row).toBeVisible();
+  await expect(page.getByText("nova").filter({ visible: true }).first()).toBeVisible();
+
+  // Ao abrir o passaporte, as propostas contam como vistas; uma nova proposta volta a acender o selo.
+  await page.goto(`/recebiveis/${r.id}`);
+  await expect(page.getByTestId("offer-card")).toHaveCount(2);
+  await page.goto("/distribuidor");
+  await expect(page.getByText("Escolher proposta (2)").filter({ visible: true })).toBeVisible();
+  await expect(page.getByText("nova").filter({ visible: true })).toHaveCount(0);
+  await request.post(`${API}/receivables/${r.id}/offers`, { data: { funderId: "fnd_a", monthlyRateBps: 120, feesCents: 0 } });
+  await expect(page.getByText("Escolher proposta (3)").filter({ visible: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("nova").filter({ visible: true }).first()).toBeVisible();
 });

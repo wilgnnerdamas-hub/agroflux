@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw, Wallet } from "lucide-react";
+import { Loader2, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDate, formatMoney, formatRateBps } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { INTERACTIVE_FUNDER_ID } from "@/lib/labels";
 import { useAsync } from "@/lib/useAsync";
 import type { PortfolioItem } from "@/lib/types";
-import { Badge, Button, ButtonLink, Card, CardTitle, EmptyState, ErrorState, ExplorerLink, LoadingBlock, PageHeader } from "@/components/ui";
-import { SimulationBanner } from "@/components/passport/ProposalsPanel";
+import { Badge, ButtonLink, Card, CardTitle, EmptyState, ErrorState, ExplorerLink, LoadingBlock, PageHeader } from "@/components/ui";
 import { domainOf, RefDateSlider, toMs, YieldChart, type YieldPosition } from "@/components/YieldChart";
 
 const position = (i: PortfolioItem): YieldPosition => ({
@@ -46,17 +45,8 @@ export default function PortfolioPage() {
 
   return (
     <>
-      <PageHeader
-        title={f.portfolioTitle}
-        subtitle={f.portfolioSubtitle}
-        actions={
-          <Button variant="secondary" onClick={() => reload(true)}>
-            <RefreshCw className="h-4 w-4" aria-hidden /> {t.common.refresh}
-          </Button>
-        }
-      />
+      <PageHeader title={f.portfolioTitle} subtitle={f.portfolioSubtitle} />
       <div className="space-y-6">
-        <SimulationBanner title={t.common.simulation} text={t.assignment.notice} />
         {!data && state.status === "loading" && <Card><LoadingBlock lines={4} /></Card>}
         {!data && state.status === "error" && <ErrorState message={state.error.message} onRetry={() => reload()} />}
 

@@ -10,7 +10,7 @@ import { useI18n } from "@/lib/i18n";
 import { INTERACTIVE_FUNDER_ID } from "@/lib/labels";
 import { useAsync } from "@/lib/useAsync";
 import type { Offer } from "@/lib/types";
-import { Alert, Badge, Button, ButtonLink, Card, CardTitle, ErrorState, LoadingBlock, PageHeader, cx } from "@/components/ui";
+import { Alert, Button, ButtonLink, Card, CardTitle, ErrorState, LoadingBlock, PageHeader, cx } from "@/components/ui";
 import { ReceivableStatusBadge } from "@/components/status";
 import { ReceivableSummary } from "@/components/passport/ReceivableSummary";
 import { OnChainRecords } from "@/components/passport/OnChainRecords";
@@ -150,7 +150,7 @@ export default function FunderReceivablePage() {
         subtitle={f.analysisTitle}
       />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="min-w-0 space-y-6">
+        <div className="order-2 min-w-0 space-y-6 lg:order-1">
           <ReceivableSummary receivable={r} />
           <div>
             <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-faint">
@@ -160,9 +160,9 @@ export default function FunderReceivablePage() {
           </div>
         </div>
 
-        <div className="space-y-6">
+        <div className="order-1 space-y-6 lg:sticky lg:top-20 lg:order-2 lg:self-start">
           <Card>
-            <CardTitle aside={<Badge tone="sim">{t.common.simulation}</Badge>}>{f.proposalTitle}</CardTitle>
+            <CardTitle>{f.proposalTitle}</CardTitle>
             {open ? (
               <ProposalForm receivableId={r.id} gross={r.amountCents} termDays={r.termDays} dueDate={r.dueDate} mine={mine} onSent={() => void reload(true)} />
             ) : won ? (

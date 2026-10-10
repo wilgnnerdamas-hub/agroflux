@@ -5,12 +5,12 @@ import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { ArrowLeft, History } from "lucide-react";
 import { api } from "@/lib/api";
-import { formatDateTime } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { FEATURE_ASSIGNMENT } from "@/lib/features";
 import { useI18n } from "@/lib/i18n";
 import { useAsync } from "@/lib/useAsync";
 import type { Receivable } from "@/lib/types";
-import { Alert, Badge, Card, Collapsible, ErrorState, LoadingBlock, PageHeader } from "@/components/ui";
+import { Alert, Card, Collapsible, ErrorState, LoadingBlock, PageHeader } from "@/components/ui";
 import { ReceivableStatusBadge } from "@/components/status";
 import { FlowSteps } from "@/components/FlowSteps";
 import { Timeline } from "@/components/Timeline";
@@ -172,10 +172,16 @@ function Passport() {
           </span>
         }
         subtitle={
-          <span className="flex flex-wrap items-center gap-2">
-            {t.passport.subtitle(formatDateTime(r.updatedAt))}
-            {r.registry.registryId && <Badge tone="info">{r.registry.registryId}</Badge>}
+          <span>
+            {r.debtor.alias} · {t.status.product[r.product.category]}
+            {r.registry.registryId && <span className="text-faint"> · {r.registry.registryId}</span>}
           </span>
+        }
+        actions={
+          <div className="text-right">
+            <p className="text-2xl font-bold tabular-nums text-ink">{formatMoney(r.amountCents)}</p>
+            <p className="text-xs text-muted">{t.passport.due} {formatDate(r.dueDate)}</p>
+          </div>
         }
       />
 
@@ -187,14 +193,15 @@ function Passport() {
           <FlowSteps receivable={r} />
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        {/* Propostas precisam de largura para comparar: nesse passo, o resumo desce para baixo. */}
+        <div className={r.status === "published" ? "grid gap-6" : "grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]"}>
           <section aria-labelledby="next-action" className="min-w-0 space-y-3">
             <h2 id="next-action" className="text-xs font-semibold uppercase tracking-wide text-faint">
               {r.status === "assigned" ? t.passport.done : t.passport.nextAction}
             </h2>
             <NextAction r={r} onUpdated={onUpdated} pollTimedOut={pollTimedOut} refresh={refresh} assignmentAvailable={assignmentAvailable} />
           </section>
-          <div className="lg:pt-7">
+          <div className={r.status === "published" ? "" : "lg:pt-7"}>
             <ReceivableSummary receivable={r} />
           </div>
         </div>

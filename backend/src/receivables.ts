@@ -193,7 +193,7 @@ export function getReceivable(store: Store, id: string): Receivable {
   return r;
 }
 
-const toSummary = (r: Receivable): ReceivableSummary => ({
+const toSummary = (r: Receivable, offerCount = 0): ReceivableSummary => ({
   id: r.id,
   reference: r.reference,
   status: r.status,
@@ -208,6 +208,7 @@ const toSummary = (r: Receivable): ReceivableSummary => ({
   assignment: { status: r.assignment.status },
   registry: { registryId: r.registry.registryId },
   listing: { status: r.listing.status },
+  offerCount,
   createdAt: r.createdAt,
 });
 export { toSummary };
@@ -217,7 +218,7 @@ const REGISTERED: Receivable["status"][] = ["registered", "published", "offer_se
 export function listReceivables(store: Store): ReceivableList {
   const all = store.all().sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
   return {
-    items: all.slice(0, 100).map(toSummary),
+    items: all.slice(0, 100).map((r) => toSummary(r, store.getOffers(r.id)?.length ?? 0)),
     totals: {
       count: all.length,
       amountCents: all.reduce((s, r) => s + r.amountCents, 0),

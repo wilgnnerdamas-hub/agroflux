@@ -55,11 +55,11 @@ Ordem do fluxo com a v1.2: cadastro (+ registradora) → registro na Devnet → 
 | R1 | O backend é a fonte de verdade de todos os dados e estados. |
 | R2 | Só vão para a blockchain **hashes e identificadores técnicos**. Nada de documentos, nomes, CPF, CNPJ ou valores. |
 | R3 | Toda transação é assinada **somente no backend**. Nenhuma chave privada vai para o frontend ou para arquivos versionados. |
-| R4 | Toda oferta é simulada (`isSimulated: true`), e a interface deve dizer isso de forma visível. |
+| R4 | Toda oferta é simulada (`isSimulated: true`), e a interface deve dizer isso de forma visível. **[v1.2]** Basta o título da seção ("Propostas (simuladas)") mais a faixa global da R8. |
 | R5 | O frontend nunca exibe uma assinatura Solana que não tenha vindo do backend. |
 | R6 | Nenhum texto apresenta o recebível como juridicamente validado ou o financiamento como garantido. |
 | R7 | **[v1.1]** A liquidação só existe se for **atômica** (as duas pernas na mesma transação, pelo programa de escrow). Transferências separadas nunca são apresentadas como liquidação. Sem o escrow pronto, a função B não aparece. |
-| R8 | **[v1.1]** Toda tela nova deixa claro: simulado, rede de testes, sem valor e sem validação jurídica. |
+| R8 | **[v1.1]** Toda tela nova deixa claro: simulado, rede de testes, sem valor e sem validação jurídica. **[v1.2]** Cumprido por uma faixa fixa no topo de todas as telas, com link para o painel "Sobre a demo", que reúne todos os avisos (inclusive o texto do §6.4). Cartões e listas não repetem o aviso. |
 | R9 | **[v1.2]** A registradora é **simulada** e é sempre rotulada assim. Nenhum texto sugere registro em registradora real, aceite jurídico ou coobrigação válida. |
 
 ---
@@ -214,7 +214,7 @@ O backend gera **3 ofertas** determinísticas (mesma entrada, mesmas ofertas), c
 
 **[v1.1]** Mais dois campos: `debtorConfirmation.status` e `assignment.status`.
 
-**[v1.2]** Mais dois: `registry.registryId` e `listing.status`.
+**[v1.2]** Mais três: `registry.registryId`, `listing.status` e `offerCount` (número de propostas do recebível).
 
 ### 3.9 `DebtorConfirmation` (confirmação do sacado) **[v1.1]**
 
@@ -966,7 +966,7 @@ Por recebível:
 
 **[v1.2]** A liquidação passa a usar a carteira do financiador vencedor e a trava por documento do §6.5.
 
-A interface mostra a faixa fixa: "Simulação em rede de testes. Token e moeda sem valor. Não é oferta de investimento nem cessão jurídica. Uma operação real exigiria adequação às regras da CVM e registro do título em registradora." Ela também diz que as carteiras do distribuidor e do financiador são de demonstração, controladas pelo backend.
+A interface mostra (**[v1.2]** no painel "Sobre a demo", ligado à faixa fixa do topo, R8) o aviso: "Simulação em rede de testes. Token e moeda sem valor. Não é oferta de investimento nem cessão jurídica. Uma operação real exigiria adequação às regras da CVM e registro do título em registradora." Ela também diz que as carteiras do distribuidor e do financiador são de demonstração, controladas pelo backend.
 
 ### 6.5 Trava on-chain por documento **[v1.2]**
 
@@ -1197,4 +1197,4 @@ Enquanto a API não estiver pronta, o frontend pode rodar com `NEXT_PUBLIC_API_M
 |---|---|---|
 | 1.0 | 09/10/2026 | Versão inicial. |
 | 1.1 | 09/10/2026 | Aprovada pela gestão. Confirmação do sacado (§3.9, §4.5, §5.10–5.13, §6.3), cessão tokenizada (§3.10, §4.6, §4.7, §5.14, §6.4), confirmação obrigatória antes da seleção (G1), `features` no health e novos totais. |
-| 1.2 | 10/10/2026 | Definida pela gestão. Registradora simulada (§3.11), publicação com termo de coobrigação (§3.12, §5.16–5.17, §6.6), propostas e financiadores demo (§3.13, §5.18–5.21), trava por documento e prova de recusa (§3.10.1, §5.22, §6.5), verificação da cessão (§6.7), transparência (§5.23), estado `published` e `DUPLICATE_DOCUMENT`. |
+| 1.2 | 10/10/2026 | (Ajuste do mesmo dia: avisos de simulação concentrados na faixa fixa e no painel "Sobre a demo"; `offerCount` no resumo da lista.) Definida pela gestão. Registradora simulada (§3.11), publicação com termo de coobrigação (§3.12, §5.16–5.17, §6.6), propostas e financiadores demo (§3.13, §5.18–5.21), trava por documento e prova de recusa (§3.10.1, §5.22, §6.5), verificação da cessão (§6.7), transparência (§5.23), estado `published` e `DUPLICATE_DOCUMENT`. |

@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { formatDate, formatMoney, formatMoneyCompact } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
+import { InfoTip } from "./ui";
 
 const DAY = 86_400_000;
 export const toMs = (isoOrDate: string) => (/^\d{4}-\d{2}-\d{2}$/.test(isoOrDate) ? Date.parse(`${isoOrDate}T12:00:00Z`) : Date.parse(isoOrDate));
@@ -115,7 +116,7 @@ export function YieldChart({ positions, refMs, title }: { positions: YieldPositi
       <figcaption className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-5 rounded-sm bg-brand/30" aria-hidden /> {t.funder.realized}</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-5 rounded-sm border border-dashed border-brand bg-brand/5" aria-hidden /> {t.funder.projected}</span>
-        <span>{t.funder.chartNote}</span>
+        <InfoTip>{t.funder.chartNote}</InfoTip>
       </figcaption>
     </figure>
   );
