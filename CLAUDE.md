@@ -80,12 +80,13 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
     coluna de confirmação) e roteiro em `docs/roteiro-demo.md`. Falta: gravação de reserva.
 
 **10/10 (noite): refinamento v1.2** (contrato `docs/api-contract.md` v1.2, decisão G3)
-13. Escrow com trava por documento (5/5 no `anchor test`; falta atualizar o programa na Devnet).
+13. Escrow com trava por documento (5/5 no `anchor test`; atualizado na Devnet no mesmo endereço em 10/10).
 14. Backend v1.2: registradora simulada, publicação com termo, propostas, financiadores B e C, prova de recusa,
     verificação da cessão, transparência (76 testes; gateway real ok no validador local).
 15. Frontend v1.2: landing, entrar como distribuidora/financiador, passaporte enxuto, telas do financiador com gráfico,
-    transparência, QR de aceite, PT/EN (e2e 10/10). Falta: deploy (Railway precisa de `DEMO_FUNDER_B_SECRET` e
-    `DEMO_FUNDER_C_SECRET`), roteiro novo da demo e gravação.
+    transparência, QR de aceite, PT/EN (e2e 10/10).
+    **v1.2 em produção (10/10):** fluxo completo testado na Devnet real (verificação 11/11, prova de recusa on-chain);
+    roteiro novo em `docs/roteiro-demo.md`. Falta: gravação de reserva.
 
 **12/10: só correções críticas e submissão.**
 
