@@ -44,7 +44,7 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | Backend | API em `/api/v1` seguindo o contrato v1.0, com CORS liberado para a origem do frontend | 10/10 |
 | Backend | `GET /health` com `feePayerBalanceLamports` | 10/10 |
 | Backend + Blockchain | `GET /receivables/:id/verification` | 10/10 |
-| Backend | URL pública da API para o deploy da demo | 11/10 |
+| Backend | URL pública da API para o deploy da demo | ✔ 09/10: `https://agroflux-production.up.railway.app/api/v1` |
 
 ## Pendências de integração (10/10)
 
@@ -53,4 +53,6 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 - [ ] Conferir se o hash do navegador bate com o do backend para PDF e imagem. PDF confere (09/10); falta imagem.
 - [x] Testar o caso de falha com a carteira da Devnet sem saldo (`INSUFFICIENT_FUNDS`). Tela de falha e botão de nova tentativa ok (09/10).
 - [x] `/demo/reset` com seed (09/10): 1 recebível `registered` com tx real na Devnet (verificação 4/4) + 1 `created`, em ~2,5 s. Ligar com `DEMO_RESET_ENABLED=true`.
-- [ ] Deploy do frontend (Vercel) apontando para a URL pública do backend.
+- [x] Backend no Railway: `https://agroflux-production.up.railway.app/api/v1` (09/10). Health com saldo, `/demo/reset` e fluxo completo pela API na Devnet real.
+- [ ] Conferir se os dados persistem após reiniciar o serviço (volume em `/data`).
+- [ ] Deploy do frontend (Vercel) apontando para a URL pública do backend; `FRONTEND_ORIGIN` no Railway com a URL da Vercel.

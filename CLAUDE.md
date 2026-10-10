@@ -43,6 +43,7 @@ documento com hash, estado atual e histórico de eventos verificáveis na **Sola
 - Backend implementado (passos 1–6): health, cadastro, lista, passaporte, registro on-chain, verificação e ofertas. 32 testes (`npm test` em `backend/`).
 - Fluxo completo da demo funcionando de ponta a ponta com front + backend reais na Devnet real (09/10). Carteira com ~5 SOL.
 - Repositório público: https://github.com/wilgnnerdamas-hub/agroflux
+- Backend em produção (Railway): https://agroflux-production.up.railway.app/api/v1 — fluxo completo e `/demo/reset` testados na Devnet real (09/10).
 
 ## Próximos passos (fila em ordem)
 Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidação): especificação, regras e cortes em
@@ -52,7 +53,7 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
 1. Push dos commits de documentação pendentes.
 2. ~~`/demo/reset` com seed~~ (feito em 09/10).
 3. Conferir o hash de imagem (PNG/JPEG) entre navegador e backend.
-4. Hospedar o backend no **Railway** (decisão G2) e fazer o deploy do front na Vercel em modo `http`.
+4. ~~Backend no Railway~~ (feito em 09/10). Falta: conferir se os dados persistem após reiniciar (volume), deploy do front na Vercel em modo `http` e trocar `FRONTEND_ORIGIN` no Railway pela URL da Vercel.
    Com isso, uma demo do fluxo principal fica no ar antes de mexer nas funções novas.
 
 **10/10: contrato e preparação**
