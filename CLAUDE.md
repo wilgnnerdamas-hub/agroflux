@@ -71,8 +71,8 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
    (tBRL-DEMO `8ncLEzjpEpHnEXExg2pSk8ByMRxytCtpmMwDf2BGtovn`). Fluxo real local com liquidação atômica ok.
 10. ~~Backend: `POST /assignment`~~ (10/10; 60 testes; gateway real ok no validador local).
 11. ~~Frontend: card "Cessão tokenizada"~~ (10/10; e2e 6/6).
-    **Falta (gestão):** copiar `DEMO_DISTRIBUTOR_SECRET`, `DEMO_FUNDER_SECRET`, `TBRL_MINT`, `ESCROW_PROGRAM_ID` do
-    `backend/.env` para o Railway + `ASSIGNMENT_ENABLED=true`; na Vercel, `NEXT_PUBLIC_FEATURE_ASSIGNMENT=true` e redeploy.
+    **Função B ligada em produção (10/10):** Railway com `ASSIGNMENT_ENABLED=true` e as 4 variáveis; Vercel com
+    `NEXT_PUBLIC_FEATURE_ASSIGNMENT=true`. Fluxo completo com liquidação atômica testado em produção (desktop e celular).
     **Corte às 18h:** se não estiver estável, a flag fica `false`, a gestão é avisada e o tema vira roadmap no pitch.
 
 **11/10 à noite: demo**
