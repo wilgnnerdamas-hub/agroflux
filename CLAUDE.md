@@ -59,17 +59,20 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
 **10/10: contrato e preparação**
 5. ~~Contrato v1.1 (A + B)~~ (aprovado em 09/10).
 6. ~~Ferramental no WSL~~ (feito em 10/10: Rust 1.99, Solana CLI 4.3, Anchor 0.32.2, Node 22).
-   Carteiras "distribuidor demo" e "financiador demo": `npm run setup:assignment` (falta rodar).
+   Carteiras "distribuidor demo" e "financiador demo" criadas por `npm run setup:assignment` (10/10).
 
 **10/10 (tarde) até 11/10 às 12h: função A, confirmação do sacado**
 7. ~~Backend da função A~~ (feito em 09/10; 51 testes; testado na Devnet real).
 8. ~~Frontend da função A~~ (feito e em produção em 10/10; fluxo v1.1 testado em produção, desktop e celular).
 
 **11/10 até 18h: função B, cessão tokenizada + liquidação atômica**
-9. Blockchain: ~~programa de escrow com testes~~ (4/4 em `anchor test`, 10/10). **Falta o deploy na Devnet**
-   (carteira de deploy no WSL precisa de ~3,4 SOL) e `npm run setup:assignment -- --escrow <PROGRAM_ID>`.
+9. ~~Blockchain~~ (10/10): escrow 4/4 em `anchor test` e publicado na Devnet
+   (`ESCROW_PROGRAM_ID=B3PdnyjFAJua4FbzdfotdZLN3S6LfAXKwavbJNkLxRXa`); `setup:assignment` rodado
+   (tBRL-DEMO `8ncLEzjpEpHnEXExg2pSk8ByMRxytCtpmMwDf2BGtovn`). Fluxo real local com liquidação atômica ok.
 10. ~~Backend: `POST /assignment`~~ (10/10; 60 testes; gateway real ok no validador local).
-11. ~~Frontend: card "Cessão tokenizada"~~ (10/10; e2e 6/6). Falta ligar as flags após o deploy do escrow.
+11. ~~Frontend: card "Cessão tokenizada"~~ (10/10; e2e 6/6).
+    **Falta (gestão):** copiar `DEMO_DISTRIBUTOR_SECRET`, `DEMO_FUNDER_SECRET`, `TBRL_MINT`, `ESCROW_PROGRAM_ID` do
+    `backend/.env` para o Railway + `ASSIGNMENT_ENABLED=true`; na Vercel, `NEXT_PUBLIC_FEATURE_ASSIGNMENT=true` e redeploy.
     **Corte às 18h:** se não estiver estável, a flag fica `false`, a gestão é avisada e o tema vira roadmap no pitch.
 
 **11/10 à noite: demo**
