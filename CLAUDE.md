@@ -52,8 +52,8 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
 **09/10 (noite) e 10/10 de manhã: fechar o fluxo principal e criar uma rede de segurança**
 1. Push dos commits de documentação pendentes.
 2. ~~`/demo/reset` com seed~~ (feito em 09/10).
-3. Conferir o hash de imagem (PNG/JPEG) entre navegador e backend.
-4. ~~Backend no Railway~~ (feito em 09/10). Falta: conferir se os dados persistem após reiniciar (volume), deploy do front na Vercel em modo `http` e trocar `FRONTEND_ORIGIN` no Railway pela URL da Vercel.
+3. ~~Hash de imagem PNG/JPEG~~ (confere, 09/10).
+4. ~~Backend no Railway~~ (feito em 09/10). Volume persiste. Falta: deploy do front na Vercel em modo `http` e trocar `FRONTEND_ORIGIN` no Railway pela URL da Vercel.
    Com isso, uma demo do fluxo principal fica no ar antes de mexer nas funções novas.
 
 **10/10: contrato e preparação**

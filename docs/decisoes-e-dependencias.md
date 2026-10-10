@@ -50,9 +50,9 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 
 - [x] Backend no ar localmente; trocar `.env.development.local` para `http`. (09/10)
 - [x] Rodar o fluxo completo contra a API real e a Devnet real. (09/10, tx `bN39u67wVjhCzggQfyaw9CCDuYPX1768JvL76ovaXQQgKQjDY16CCJe5FHeXXwAxjbTL4pLkPDTPKsR6vnz11aR`, confirmada em ~2 s, verificação 4/4.) Carteira `GsvBgHVej6pvz4zKLC1rSMLX9KWfH3V69ZKTPFyRS8oV` abastecida pelo faucet.solana.com.
-- [ ] Conferir se o hash do navegador bate com o do backend para PDF e imagem. PDF confere (09/10); falta imagem.
+- [x] Conferir se o hash do navegador bate com o do backend para PDF e imagem. PDF, PNG e JPEG conferem (09/10).
 - [x] Testar o caso de falha com a carteira da Devnet sem saldo (`INSUFFICIENT_FUNDS`). Tela de falha e botão de nova tentativa ok (09/10).
 - [x] `/demo/reset` com seed (09/10): 1 recebível `registered` com tx real na Devnet (verificação 4/4) + 1 `created`, em ~2,5 s. Ligar com `DEMO_RESET_ENABLED=true`.
 - [x] Backend no Railway: `https://agroflux-production.up.railway.app/api/v1` (09/10). Health com saldo, `/demo/reset` e fluxo completo pela API na Devnet real.
-- [ ] Conferir se os dados persistem após reiniciar o serviço (volume em `/data`).
+- [x] Dados persistem após reiniciar o serviço no Railway (volume em `/data`) (09/10).
 - [ ] Deploy do frontend (Vercel) apontando para a URL pública do backend; `FRONTEND_ORIGIN` no Railway com a URL da Vercel.
