@@ -4,7 +4,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { ApiError, notFound } from "./errors.js";
 import type { Store } from "./store.js";
 import type {
+  Assignment,
   ChainRecord,
+  DebtorConfirmation,
   CreateReceivableInput,
   EventType,
   Receivable,
@@ -33,6 +35,33 @@ export function emptyChain(): ChainRecord {
     payloadHash: null,
     submittedAt: null,
     confirmedAt: null,
+    error: null,
+  };
+}
+
+// v1.1: blocos iniciais da confirmação do sacado e da cessão.
+export function emptyDebtorConfirmation(): DebtorConfirmation {
+  return { status: "none", isSimulated: true, requestedAt: null, expiresAt: null, respondedAt: null, chain: null };
+}
+
+export function emptyAssignment(): Assignment {
+  return {
+    status: "none",
+    isSimulated: true,
+    cluster: "devnet",
+    offerId: null,
+    tokenMint: null,
+    settlementMint: null,
+    settlementAsset: "tBRL-DEMO",
+    settlementAmount: null,
+    distributorWallet: null,
+    funderWallet: null,
+    escrowProgramId: null,
+    mintSignature: null,
+    settlementSignature: null,
+    explorerUrls: { tokenMint: null, mint: null, settlement: null },
+    submittedAt: null,
+    settledAt: null,
     error: null,
   };
 }
@@ -106,6 +135,8 @@ export function createReceivable(
       makeEvent("document_attached", "Documento de teste anexado", { documentId, sha256, filename: doc.filename }),
     ],
     selectedOfferId: null,
+    debtorConfirmation: emptyDebtorConfirmation(),
+    assignment: emptyAssignment(),
     createdAt,
     updatedAt: createdAt,
   };
@@ -130,8 +161,12 @@ const toSummary = (r: Receivable): ReceivableSummary => ({
   dueDate: r.dueDate,
   chain: { status: r.chain.status },
   selectedOfferId: r.selectedOfferId,
+  debtorConfirmation: { status: r.debtorConfirmation.status },
+  assignment: { status: r.assignment.status },
   createdAt: r.createdAt,
 });
+
+const REGISTERED: Receivable["status"][] = ["registered", "offer_selected", "assignment_pending", "assigned", "assignment_failed"];
 
 export function listReceivables(store: Store): ReceivableList {
   const all = store.all().sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
@@ -140,9 +175,11 @@ export function listReceivables(store: Store): ReceivableList {
     totals: {
       count: all.length,
       amountCents: all.reduce((s, r) => s + r.amountCents, 0),
-      registeredCount: all.filter((r) => r.status === "registered" || r.status === "offer_selected").length,
+      registeredCount: all.filter((r) => REGISTERED.includes(r.status)).length,
       pendingCount: all.filter((r) => r.status === "registration_pending").length,
       offerSelectedCount: all.filter((r) => r.status === "offer_selected").length,
+      debtorConfirmedCount: all.filter((r) => r.debtorConfirmation.status === "confirmed").length,
+      assignedCount: all.filter((r) => r.status === "assigned").length,
     },
   };
 }

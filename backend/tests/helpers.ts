@@ -25,19 +25,37 @@ export const TEST_SIGNATURE = "TestSig111111111111111111111111111111111111111111
 // Dublê da Solana: guarda o memo "enviado" para o fetchMemo devolver depois.
 export const fakeChain = (over: Partial<ChainGateway> = {}): ChainGateway => {
   const ledger = new Map<string, string>();
+  let sent = 0;
   return {
     health: async () => ({ reachable: true, feePayerBalanceLamports: 1_000_000_000 }),
     ping: async () => {},
+    // O primeiro envio usa TEST_SIGNATURE; os seguintes, assinaturas de teste distintas.
     sendMemo: async (memo, opts) => {
-      opts.onSubmitted?.(TEST_SIGNATURE);
-      ledger.set(TEST_SIGNATURE, memo);
-      return { signature: TEST_SIGNATURE, slot: 4242, blockTime: "2026-10-09T15:00:00.000Z" };
+      const signature = sent++ === 0 ? TEST_SIGNATURE : `TestSig${sent}`.padEnd(TEST_SIGNATURE.length, "1");
+      opts.onSubmitted?.(signature);
+      ledger.set(signature, memo);
+      return { signature, slot: 4242, blockTime: "2026-10-09T15:00:00.000Z" };
     },
     checkSignature: async () => null,
     fetchMemo: async (sig) => (ledger.has(sig) ? { memo: ledger.get(sig)! } : null),
     ...over,
   };
 };
+
+// Pede o link e confirma como sacado, esperando o memo da confirmação.
+export async function confirmDebtor(built: Awaited<ReturnType<typeof makeApp>>, id: string) {
+  const req = (await built.app.inject({ method: "POST", url: `/api/v1/receivables/${id}/debtor-confirmation` })).json();
+  await built.app.inject({ method: "POST", url: `/api/v1/confirmations/${req.token}/confirm` });
+  await built.confirmations.settle();
+  return req.token as string;
+}
+
+// Cria, registra e confirma pelo sacado: pronto para selecionar oferta.
+export async function createConfirmed(built: Awaited<ReturnType<typeof makeApp>>) {
+  const r = await createRegistered(built);
+  await confirmDebtor(built, r.id);
+  return r;
+}
 
 // Cria um recebível e leva até `registered` com o dublê.
 export async function createRegistered(built: Awaited<ReturnType<typeof makeApp>>) {

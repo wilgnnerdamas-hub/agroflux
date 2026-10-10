@@ -62,7 +62,7 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
    "distribuidor demo" e "financiador demo" (secrets só no `.env`).
 
 **10/10 (tarde) até 11/10 às 12h: função A, confirmação do sacado**
-7. Backend: endpoints, token de uso único (7 dias), eventos e memo `debtor_confirmed`.
+7. ~~Backend da função A~~ (feito em 09/10; 51 testes; testado na Devnet real).
 8. Frontend: página `/confirmar/[token]` (celular), selo no passaporte, mock sem assinatura e e2e no dublê.
 
 **11/10 até 18h: função B, cessão tokenizada + liquidação atômica**

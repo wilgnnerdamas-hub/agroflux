@@ -9,6 +9,7 @@ export interface Config {
   feePayerSecret: string | null;
   dataDir: string;
   demoResetEnabled: boolean;
+  assignmentEnabled: boolean;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -22,5 +23,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     feePayerSecret: env.SOLANA_FEE_PAYER_SECRET?.trim() || null,
     dataDir: path.resolve(env.DATA_DIR || "./data"),
     demoResetEnabled: env.DEMO_RESET_ENABLED === "true",
+    assignmentEnabled: env.ASSIGNMENT_ENABLED === "true",
   };
 }

@@ -36,6 +36,9 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | B8 | 09/10 | Ofertas: 3 financiadores fixos, taxa e tarifa derivadas de um hash do recebível (determinístico), geradas uma vez e persistidas. | §3.7: mesma entrada, mesmas ofertas. |
 | B9 | 09/10 | `/demo/reset` espera a confirmação real do exemplo registrado e responde 503 se ela falhar. O registro em andamento ignora recebíveis apagados pelo reset. | A demo nunca começa com um exemplo "registrado" sem transação, e o reset não derruba o servidor. |
 | B10 | 09/10 | `tsx` em `dependencies`; `npm start` é o comando de produção no Railway, com raiz em `backend/` e volume persistente montado em `DATA_DIR`. | O Railway pode descartar as dependências de desenvolvimento, e sem volume o `db.json` e os uploads se perdem a cada deploy. |
+| B11 | 09/10 | Ancoragem de memo extraída para `chain/anchor.ts` e usada pelo registro e pela confirmação do sacado (chaves separadas no store: `<id>` e `dc:<id>`). | Uma só implementação testada de envio, reaproveitamento após TIMEOUT e retomada após reinício. |
+| B12 | 09/10 | Tokens de confirmação guardados só como hash SHA-256, com estado `active`/`used`/`revoked`; um link novo revoga os anteriores. | O token nunca fica no passaporte nem no `db.json` (§10 do v1.1). |
+| B13 | 09/10 | Migração ao carregar: dados gravados pela v1.0 ganham `debtorConfirmation` e `assignment` em `none`. | A produção no Railway já tem dados da v1.0. |
 
 ## O frontend depende de
 

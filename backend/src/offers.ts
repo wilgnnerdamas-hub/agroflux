@@ -80,6 +80,17 @@ export function selectOffer(store: Store, id: string, offerId: string): Receivab
   // Idempotente: a mesma oferta de novo não cria outro evento.
   if (r.selectedOfferId === offer.id) return r;
   if (r.selectedOfferId) throw new ApiError(409, "OFFER_ALREADY_SELECTED", "Já existe outra oferta simulada selecionada.");
+  // G1 (v1.1): a seleção exige a confirmação do sacado registrada on-chain.
+  const dc = r.debtorConfirmation;
+  if (dc.status !== "confirmed" || dc.chain?.status !== "confirmed") {
+    throw new ApiError(
+      409,
+      "DEBTOR_CONFIRMATION_REQUIRED",
+      dc.status === "confirmed"
+        ? "A confirmação do sacado ainda está sendo registrada na Devnet."
+        : "Antes de selecionar uma oferta, o sacado precisa confirmar o recebível.",
+    );
+  }
   if (r.status !== "registered" || offer.status !== "available") throw invalidState();
 
   for (const o of offers) o.status = o.id === offer.id ? "selected" : "unavailable";

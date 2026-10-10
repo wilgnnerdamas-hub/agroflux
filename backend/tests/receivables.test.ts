@@ -24,6 +24,8 @@ describe("POST /api/v1/receivables", () => {
     expect(r.chain).toMatchObject({ status: "none", cluster: "devnet", signature: null });
     expect(r.events.map((e: { type: string }) => e.type)).toEqual(["receivable_created", "document_attached"]);
     expect(r.selectedOfferId).toBeNull();
+    expect(r.debtorConfirmation).toEqual({ status: "none", isSimulated: true, requestedAt: null, expiresAt: null, respondedAt: null, chain: null });
+    expect(r.assignment).toMatchObject({ status: "none", isSimulated: true, cluster: "devnet", settlementAsset: "tBRL-DEMO", tokenMint: null });
     // Arquivo guardado de forma privada.
     expect(fs.readdirSync(path.join(dataDir, "uploads"))).toHaveLength(1);
   });
@@ -88,13 +90,34 @@ describe("GET /api/v1/receivables e /:id", () => {
     expect(list.items.map((i: { id: string }) => i.id)).toEqual([b.id, a.id]);
     expect(list.items[0]).toEqual({
       id: b.id, reference: "AGF-0002", status: "created", debtor: b.debtor, product: b.product,
-      amountCents: 200_000, currency: "BRL", dueDate: b.dueDate, chain: { status: "none" }, selectedOfferId: null, createdAt: b.createdAt,
+      amountCents: 200_000, currency: "BRL", dueDate: b.dueDate, chain: { status: "none" }, selectedOfferId: null,
+      debtorConfirmation: { status: "none" }, assignment: { status: "none" }, createdAt: b.createdAt,
     });
-    expect(list.totals).toEqual({ count: 2, amountCents: 15_200_000, registeredCount: 0, pendingCount: 0, offerSelectedCount: 0 });
+    expect(list.totals).toEqual({ count: 2, amountCents: 15_200_000, registeredCount: 0, pendingCount: 0, offerSelectedCount: 0, debtorConfirmedCount: 0, assignedCount: 0 });
 
     const one = await app.inject({ method: "GET", url: `/api/v1/receivables/${a.id}` });
     expect(one.json()).toEqual(a);
     const missing = await app.inject({ method: "GET", url: "/api/v1/receivables/rcv_nao_existe" });
     expect(missing.statusCode).toBe(404);
+  });
+});
+
+describe("migração de dados da v1.0", () => {
+  it("completa debtorConfirmation e assignment ao carregar um db.json antigo", async () => {
+    const { app, dataDir } = await makeApp();
+    const created = (await app.inject({ method: "POST", url: "/api/v1/receivables", payload: form(validInput()) })).json();
+    const file = path.join(dataDir, "db.json");
+    const db = JSON.parse(fs.readFileSync(file, "utf8"));
+    delete db.receivables[created.id].debtorConfirmation;
+    delete db.receivables[created.id].assignment;
+    delete db.confirmationTokens;
+    fs.writeFileSync(file, JSON.stringify(db));
+
+    const { app: app2 } = await makeApp(undefined, { dataDir });
+    const r = (await app2.inject({ method: "GET", url: `/api/v1/receivables/${created.id}` })).json();
+    expect(r.debtorConfirmation.status).toBe("none");
+    expect(r.assignment.status).toBe("none");
+    const list = (await app2.inject({ method: "GET", url: "/api/v1/receivables" })).json();
+    expect(list.items[0].debtorConfirmation).toEqual({ status: "none" });
   });
 });

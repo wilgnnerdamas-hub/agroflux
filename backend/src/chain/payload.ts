@@ -25,3 +25,20 @@ export const payloadHash = (r: Receivable) => createHash("sha256").update(canoni
 export function buildMemo(r: Receivable, ph = payloadHash(r)): string {
   return JSON.stringify({ app: "agroflux", v: 1, evt: "receivable_registered", rid: r.id, doc: r.documents[0].sha256, ph });
 }
+
+// v1.1 (§6.3): payload canônico e memo da confirmação do sacado.
+export function confirmationPayload(r: Receivable, confirmedAt: string): string {
+  return JSON.stringify({
+    confirmedAt,
+    receivableId: r.id,
+    receivablePayloadHash: r.chain.payloadHash,
+    response: "confirmed",
+  });
+}
+
+export const confirmationHash = (r: Receivable, confirmedAt: string) =>
+  createHash("sha256").update(confirmationPayload(r, confirmedAt)).digest("hex");
+
+export function buildConfirmationMemo(r: Receivable, ch: string): string {
+  return JSON.stringify({ app: "agroflux", v: 1, evt: "debtor_confirmed", rid: r.id, ch });
+}

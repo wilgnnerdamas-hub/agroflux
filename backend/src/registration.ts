@@ -1,5 +1,6 @@
 // Registro do recebível na Solana Devnet (§5.5 e §6 do contrato).
 // created | registration_failed ──register──▶ registration_pending ──▶ registered | registration_failed
+import { anchorMemo, resumeAnchor } from "./chain/anchor.js";
 import { buildMemo, explorerTxUrl, MEMO_PROGRAM_ID, payloadHash } from "./chain/payload.js";
 import { CHAIN_ERROR_MESSAGES, ChainFailure, ChainUnavailableError, type ChainGateway, type Confirmed } from "./chain/solana.js";
 import { chainUnavailable, invalidState } from "./errors.js";
@@ -8,9 +9,7 @@ import type { Store } from "./store.js";
 import type { ChainErrorCode, Receivable } from "./types.js";
 
 export const CONFIRM_TIMEOUT_MS = 60_000;
-const RESUME_POLL_MS = 2_000;
 const now = () => new Date().toISOString();
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function assertCanRegister(r: Receivable) {
   if (r.status !== "created" && r.status !== "registration_failed") {
@@ -92,16 +91,8 @@ export class Registrar {
   private async run(id: string) {
     const { store, chain } = this;
     try {
-      // Uma tentativa anterior pode ter dado TIMEOUT e entrado na rede depois: confere antes de enviar outra.
-      const previous = store.getSubmission(id);
-      const landed = previous ? await chain.checkSignature(previous).catch(() => null) : null;
-      const confirmed =
-        landed ??
-        (await chain.sendMemo(getReceivable(store, id).chain.memo!, {
-          timeoutMs: this.timeoutMs,
-          onSubmitted: (sig) => store.putSubmission(id, sig),
-        }));
-      this.markConfirmed(id, confirmed);
+      const memo = getReceivable(store, id).chain.memo!;
+      this.markConfirmed(id, await anchorMemo(store, chain, id, memo, this.timeoutMs));
     } catch (e) {
       if (!(e instanceof ChainFailure)) this.log("Erro inesperado no registro on-chain", e);
       const f = e instanceof ChainFailure ? e : new ChainFailure("TX_FAILED");
@@ -116,14 +107,9 @@ export class Registrar {
   }
 
   private async resume(id: string) {
-    const signature = this.store.getSubmission(id);
-    const deadline = Date.now() + this.timeoutMs;
-    while (signature && Date.now() < deadline) {
-      const confirmed = await this.chain.checkSignature(signature).catch(() => null);
-      if (confirmed) return this.markConfirmed(id, confirmed);
-      await sleep(RESUME_POLL_MS);
-    }
-    this.markFailed(id, "TIMEOUT", signature ?? null);
+    const { confirmed, signature } = await resumeAnchor(this.store, this.chain, id, this.timeoutMs);
+    if (confirmed) this.markConfirmed(id, confirmed);
+    else this.markFailed(id, "TIMEOUT", signature);
   }
 
   // Os dois métodos abaixo ignoram recebíveis que sumiram (por exemplo, apagados por /demo/reset no meio da tentativa).

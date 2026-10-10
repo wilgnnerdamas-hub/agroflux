@@ -2,6 +2,7 @@
 // Escrita atômica: grava num arquivo temporário e renomeia.
 import fs from "node:fs";
 import path from "node:path";
+import { emptyAssignment, emptyDebtorConfirmation } from "./receivables.js";
 import type { Offer, Receivable } from "./types.js";
 
 export interface DbShape {
@@ -11,9 +12,26 @@ export interface DbShape {
   // Estado interno, fora do contrato: Idempotency-Key → id do recebível, e última assinatura enviada por recebível.
   idempotency: Record<string, string>;
   submissions: Record<string, string>;
+  // v1.1: hash do token de confirmação → estado do link. O token em si nunca é guardado.
+  confirmationTokens: Record<string, ConfirmationToken>;
 }
 
-const empty = (): DbShape => ({ seq: 0, receivables: {}, offers: {}, idempotency: {}, submissions: {} });
+export interface ConfirmationToken {
+  receivableId: string;
+  expiresAt: string;
+  state: "active" | "used" | "revoked";
+}
+
+const empty = (): DbShape => ({ seq: 0, receivables: {}, offers: {}, idempotency: {}, submissions: {}, confirmationTokens: {} });
+
+// Dados gravados pela v1.0 não têm os blocos da v1.1: completa ao carregar.
+function migrate(db: DbShape): DbShape {
+  for (const r of Object.values(db.receivables)) {
+    r.debtorConfirmation ??= emptyDebtorConfirmation();
+    r.assignment ??= emptyAssignment();
+  }
+  return db;
+}
 
 export class Store {
   private db: DbShape;
@@ -24,7 +42,7 @@ export class Store {
     this.file = path.join(dataDir, "db.json");
     this.uploadsDir = path.join(dataDir, "uploads");
     fs.mkdirSync(this.uploadsDir, { recursive: true });
-    this.db = fs.existsSync(this.file) ? { ...empty(), ...JSON.parse(fs.readFileSync(this.file, "utf8")) } : empty();
+    this.db = fs.existsSync(this.file) ? migrate({ ...empty(), ...JSON.parse(fs.readFileSync(this.file, "utf8")) }) : empty();
   }
 
   nextReference(): string {
@@ -69,6 +87,24 @@ export class Store {
 
   putSubmission(receivableId: string, signature: string) {
     this.db.submissions[receivableId] = signature;
+    this.save();
+  }
+
+  getConfirmationToken(hash: string): ConfirmationToken | undefined {
+    return this.db.confirmationTokens[hash];
+  }
+
+  // Grava o link novo e revoga os links ativos anteriores do mesmo recebível.
+  putConfirmationToken(hash: string, token: ConfirmationToken) {
+    for (const t of Object.values(this.db.confirmationTokens)) {
+      if (t.receivableId === token.receivableId && t.state === "active") t.state = "revoked";
+    }
+    this.db.confirmationTokens[hash] = token;
+    this.save();
+  }
+
+  markConfirmationToken(hash: string, state: ConfirmationToken["state"]) {
+    this.db.confirmationTokens[hash].state = state;
     this.save();
   }
 

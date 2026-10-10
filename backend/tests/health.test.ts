@@ -8,9 +8,10 @@ describe("GET /api/v1/health", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       status: "ok",
-      version: "1.0.0",
+      version: "1.1.0",
       cluster: "devnet",
       solana: { reachable: true, feePayerBalanceLamports: 1_000_000_000 },
+      features: { debtorConfirmation: true, assignment: false },
     });
   });
 

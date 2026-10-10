@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ChainGateway } from "./chain/solana.js";
 import { ApiError } from "./errors.js";
 import { listOffers, selectOffer } from "./offers.js";
+import type { ConfirmationService } from "./confirmation.js";
 import type { Registrar } from "./registration.js";
 import { resetDemo } from "./seed.js";
 import { createReceivable, getReceivable, listReceivables, type UploadedDocument } from "./receivables.js";
@@ -10,18 +11,26 @@ import type { Health } from "./types.js";
 import { detectMime, validateReceivableInput } from "./validation.js";
 import { verifyReceivable } from "./verification.js";
 
-export const API_VERSION = "1.0.0";
+export const API_VERSION = "1.1.0";
 const FILE_MESSAGE = "Envie um PDF, PNG ou JPEG de até 5 MB.";
 
 export interface RouteDeps {
   store: Store;
   chain: ChainGateway;
   registrar: Registrar;
+  confirmations: ConfirmationService;
   demoResetEnabled: boolean;
+  assignmentEnabled: boolean;
 }
 
 type IdParams = { Params: { id: string } };
 type OfferParams = { Params: { id: string; offerId: string } };
+type TokenParams = { Params: { token: string } };
+
+const idempotencyKey = (req: FastifyRequest) => {
+  const header = req.headers["idempotency-key"];
+  return (Array.isArray(header) ? header[0] : header)?.trim() || undefined;
+};
 
 async function readMultipart(req: FastifyRequest) {
   if (!req.isMultipart()) {
@@ -40,10 +49,10 @@ async function readMultipart(req: FastifyRequest) {
   return { data, document };
 }
 
-export async function routes(api: FastifyInstance, { store, chain, registrar, demoResetEnabled }: RouteDeps) {
+export async function routes(api: FastifyInstance, { store, chain, registrar, confirmations, demoResetEnabled, assignmentEnabled }: RouteDeps) {
   api.get("/health", async (): Promise<Health> => {
     const solana = await chain.health();
-    return { status: "ok", version: API_VERSION, cluster: "devnet", solana };
+    return { status: "ok", version: API_VERSION, cluster: "devnet", solana, features: { debtorConfirmation: true, assignment: assignmentEnabled } };
   });
 
   api.get("/receivables", async () => listReceivables(store));
@@ -90,6 +99,20 @@ export async function routes(api: FastifyInstance, { store, chain, registrar, de
   api.post<OfferParams>("/receivables/:id/offers/:offerId/select", async (req) =>
     selectOffer(store, req.params.id, req.params.offerId),
   );
+
+  // v1.1: confirmação do sacado (§5.10–5.13).
+  api.post<IdParams>("/receivables/:id/debtor-confirmation", async (req, reply) =>
+    reply.status(201).send(confirmations.request(req.params.id)),
+  );
+  api.post<IdParams>("/receivables/:id/debtor-confirmation/register", async (req, reply) => {
+    const receivable = await confirmations.retryRegister(req.params.id, idempotencyKey(req));
+    return reply.status(202).send({ receivable });
+  });
+  api.get<TokenParams>("/confirmations/:token", async (req) => confirmations.getSummary(req.params.token));
+  api.post<TokenParams>("/confirmations/:token/confirm", async (req, reply) =>
+    reply.status(202).send(confirmations.confirm(req.params.token)),
+  );
+  api.post<TokenParams>("/confirmations/:token/decline", async (req) => confirmations.decline(req.params.token));
 
   // Só existe com DEMO_RESET_ENABLED=true; sem isso, cai no 404 padrão.
   if (demoResetEnabled) {

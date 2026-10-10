@@ -1,5 +1,5 @@
 // GET /receivables/:id/verification (§5.6): confere a transação na Devnet contra os dados guardados.
-import { payloadHash } from "./chain/payload.js";
+import { confirmationHash, payloadHash } from "./chain/payload.js";
 import { ChainUnavailableError, type ChainGateway } from "./chain/solana.js";
 import { chainUnavailable, invalidState } from "./errors.js";
 import { EXT, getReceivable, sha256Hex } from "./receivables.js";
@@ -50,6 +50,30 @@ export async function verifyReceivable(store: Store, chain: ChainGateway, id: st
       label: "Hash dos dados do recebível confere",
     },
   ];
+
+  // v1.1 (§6.3): confere também a confirmação do sacado, quando houver uma registrada.
+  const dc = r.debtorConfirmation;
+  if (dc.status === "confirmed" && dc.chain?.status === "confirmed" && dc.chain.signature) {
+    let dcMemo: string | null = null;
+    try {
+      dcMemo = (await chain.fetchMemo(dc.chain.signature))?.memo ?? null;
+    } catch (e) {
+      if (e instanceof ChainUnavailableError) throw chainUnavailable("Não foi possível verificar agora. Tente novamente.");
+      throw e;
+    }
+    const expected = dc.respondedAt ? confirmationHash(r, dc.respondedAt) : null;
+    let ch: unknown;
+    try {
+      ch = dcMemo ? JSON.parse(dcMemo).ch : undefined;
+    } catch {
+      ch = undefined;
+    }
+    checks.push({
+      name: "debtor_confirmation_matches",
+      passed: dcMemo !== null && dcMemo === dc.chain.memo && ch === expected && expected === dc.chain.confirmationHash,
+      label: "Confirmação do sacado confere on-chain",
+    });
+  }
 
   return { verified: checks.every((c) => c.passed), checkedAt: new Date().toISOString(), signature, checks };
 }

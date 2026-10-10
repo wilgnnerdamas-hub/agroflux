@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ChainUnavailableError } from "../src/chain/solana.js";
 import { netAmount, offerTerms } from "../src/offers.js";
 import type { Offer, Receivable } from "../src/types.js";
-import { createOne, createRegistered, fakeChain, makeApp, TEST_SIGNATURE } from "./helpers.js";
+import { createConfirmed, createOne, createRegistered, fakeChain, makeApp, TEST_SIGNATURE } from "./helpers.js";
 
 type App = Awaited<ReturnType<typeof makeApp>>["app"];
 const verify = (app: App, id: string) => app.inject({ method: "GET", url: `/api/v1/receivables/${id}/verification` });
@@ -110,9 +110,19 @@ describe("ofertas simuladas", () => {
     expect(events[0].data).toEqual({ offerIds: first.items.map((o: Offer) => o.id) });
   });
 
-  it("seleciona uma oferta, é idempotente e bloqueia outra", async () => {
+  it("G1: sem a confirmação do sacado, a seleção responde 409 DEBTOR_CONFIRMATION_REQUIRED", async () => {
     const built = await makeApp();
     const { id } = await createRegistered(built);
+    const items: Offer[] = (await offers(built.app, id)).json().items;
+    const res = await select(built.app, id, items[0].id);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.code).toBe("DEBTOR_CONFIRMATION_REQUIRED");
+    expect((await get(built.app, id)).status).toBe("registered");
+  });
+
+  it("seleciona uma oferta, é idempotente e bloqueia outra", async () => {
+    const built = await makeApp();
+    const { id } = await createConfirmed(built);
     const items: Offer[] = (await offers(built.app, id)).json().items;
     const [a, b] = items;
 

@@ -4,6 +4,7 @@ import multipart from "@fastify/multipart";
 import type { Config } from "./config.js";
 import type { ChainGateway } from "./chain/solana.js";
 import { errorHandler } from "./errors.js";
+import { ConfirmationService } from "./confirmation.js";
 import { Registrar } from "./registration.js";
 import { routes } from "./routes.js";
 import { Store } from "./store.js";
@@ -39,7 +40,9 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
 
   const registrar = new Registrar(store, chain, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
   registrar.resumePending();
+  const confirmations = new ConfirmationService(store, chain, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
+  confirmations.resumePending();
 
-  await app.register(routes, { prefix: "/api/v1", store, chain, registrar, demoResetEnabled: config.demoResetEnabled });
-  return { app, registrar, store };
+  await app.register(routes, { prefix: "/api/v1", store, chain, registrar, confirmations, demoResetEnabled: config.demoResetEnabled, assignmentEnabled: config.assignmentEnabled });
+  return { app, registrar, confirmations, store };
 }
