@@ -1,28 +1,35 @@
 import { Check } from "lucide-react";
-import type { ReceivableStatus } from "@/lib/types";
+import type { Receivable } from "@/lib/types";
 import { cx } from "./ui";
 
-const STEPS = ["Cadastrado", "Registrado na Devnet", "Oferta simulada"] as const;
+// v1.1: a confirmação do sacado vem antes da oferta (decisão G1).
+const STEPS = ["Cadastrado", "Registrado na Devnet", "Confirmado pelo sacado", "Oferta simulada"] as const;
 
-function progress(status: ReceivableStatus): { done: number; current: number; failed: boolean } {
-  switch (status) {
+function progress(r: Pick<Receivable, "status" | "debtorConfirmation">): { done: number; current: number; failed: boolean } {
+  const dc = r.debtorConfirmation;
+  switch (r.status) {
     case "created":
-      return { done: 1, current: 1, failed: false };
     case "registration_pending":
       return { done: 1, current: 1, failed: false };
     case "registration_failed":
       return { done: 1, current: 1, failed: true };
-    case "registered":
-      return { done: 2, current: 2, failed: false };
+    case "registered": {
+      const confirmed = dc.status === "confirmed" && dc.chain?.status === "confirmed";
+      if (confirmed) return { done: 3, current: 3, failed: false };
+      return { done: 2, current: 2, failed: dc.status === "declined" || dc.chain?.status === "failed" };
+    }
     case "offer_selected":
-      return { done: 3, current: 3, failed: false };
+    case "assignment_pending":
+    case "assigned":
+    case "assignment_failed":
+      return { done: 4, current: 4, failed: false };
   }
 }
 
-export function FlowSteps({ status }: { status: ReceivableStatus }) {
-  const p = progress(status);
+export function FlowSteps({ receivable }: { receivable: Pick<Receivable, "status" | "debtorConfirmation"> }) {
+  const p = progress(receivable);
   return (
-    <ol className="grid grid-cols-3 gap-2" aria-label="Etapas da demonstração">
+    <ol className="grid grid-cols-2 gap-x-2 gap-y-3 sm:grid-cols-4" aria-label="Etapas da demonstração">
       {STEPS.map((label, i) => {
         const done = i < p.done;
         const current = i === p.current && !done;

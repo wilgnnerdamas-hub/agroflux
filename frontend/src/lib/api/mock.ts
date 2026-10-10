@@ -1,5 +1,5 @@
 // MODO MOCK — somente desenvolvimento (§12 do contrato).
-// Regras: mesmos tipos e estados do contrato; NUNCA gera assinatura, slot ou link do Explorer.
+// Regras: mesmos tipos e estados do contrato; NUNCA gera assinatura, slot, mint, liquidação ou link do Explorer.
 // O registro fica em "pendente" (aguardando backend) ou falha, se o cenário de falha estiver ligado.
 import type { AgroFluxApi } from "./client";
 import { ApiError } from "./errors";
@@ -7,7 +7,10 @@ import { sha256File } from "../hash";
 import { daysBetween } from "../format";
 import { validateReceivable, validateFile } from "../validation";
 import type {
+  Assignment,
   ChainRecord,
+  ConfirmationSummary,
+  DebtorConfirmation,
   CreateReceivableInput,
   EventType,
   Receivable,
@@ -44,6 +47,22 @@ function emptyChain(): ChainRecord {
   };
 }
 
+function emptyDebtorConfirmation(): DebtorConfirmation {
+  return { status: "none", isSimulated: true, requestedAt: null, expiresAt: null, respondedAt: null, chain: null };
+}
+
+function emptyAssignment(): Assignment {
+  return {
+    status: "none", isSimulated: true, cluster: "devnet", offerId: null, tokenMint: null, settlementMint: null,
+    settlementAsset: "tBRL-DEMO", settlementAmount: null, distributorWallet: null, funderWallet: null, escrowProgramId: null,
+    mintSignature: null, settlementSignature: null, explorerUrls: { tokenMint: null, mint: null, settlement: null },
+    submittedAt: null, settledAt: null, error: null,
+  };
+}
+
+// Links de confirmação do mock: token → id do recebível (só em memória).
+const mockTokens = new Map<string, { receivableId: string; expiresAt: string; used: boolean }>();
+
 function event(type: EventType, description: string, data: Record<string, unknown> = {}, actor: ReceivableEvent["actor"] = "demo_user"): ReceivableEvent {
   return { id: id("evt"), type, occurredAt: new Date().toISOString(), actor, description, onChain: false, chain: null, data };
 }
@@ -76,6 +95,8 @@ function seed(): Receivable[] {
         { ...event("document_attached", "Documento de teste anexado", { sha256: docHash }), occurredAt: now },
       ],
       selectedOfferId: null,
+      debtorConfirmation: emptyDebtorConfirmation(),
+      assignment: emptyAssignment(),
       createdAt: now,
       updatedAt: now,
     };
@@ -91,6 +112,11 @@ function load(): Receivable[] {
   try {
     const raw = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
     store = raw ? (JSON.parse(raw) as Receivable[]) : seed();
+    // Dados salvos antes da v1.1 não têm os blocos novos.
+    for (const r of store) {
+      r.debtorConfirmation ??= emptyDebtorConfirmation();
+      r.assignment ??= emptyAssignment();
+    }
   } catch {
     store = seed();
   }
@@ -125,8 +151,33 @@ function summary(r: Receivable): ReceivableSummary {
     dueDate: r.dueDate,
     chain: { status: r.chain.status },
     selectedOfferId: r.selectedOfferId,
+    debtorConfirmation: { status: r.debtorConfirmation.status },
+    assignment: { status: r.assignment.status },
     createdAt: r.createdAt,
   };
+}
+
+function confirmationSummary(r: Receivable, expiresAt: string): ConfirmationSummary {
+  return {
+    isSimulated: true,
+    disclaimer: "Simulação — sem verificação de identidade do sacado.",
+    reference: r.reference,
+    distributor: r.distributor,
+    product: r.product,
+    amountCents: r.amountCents,
+    currency: r.currency,
+    dueDate: r.dueDate,
+    status: r.debtorConfirmation.status,
+    expiresAt,
+  };
+}
+
+function findToken(token: string, forAnswer: boolean) {
+  const t = mockTokens.get(token);
+  if (!t) throw new ApiError("NOT_FOUND", "Link de confirmação não encontrado.", 404);
+  if (Date.parse(t.expiresAt) < Date.now()) throw new ApiError("CONFIRMATION_LINK_EXPIRED", "Este link de confirmação venceu.", 410);
+  if (forAnswer && t.used) throw new ApiError("CONFIRMATION_ALREADY_ANSWERED", "Este link de confirmação já foi usado.", 409);
+  return { t, r: find(t.receivableId) };
 }
 
 export function resetMockStore() {
@@ -139,7 +190,13 @@ export function createMockApi(): AgroFluxApi {
     mode: "mock",
     async health() {
       await delay(150, 300);
-      return { status: "ok", version: "mock", cluster: "devnet", solana: { reachable: false, feePayerBalanceLamports: null } };
+      return {
+        status: "ok",
+        version: "mock",
+        cluster: "devnet",
+        solana: { reachable: false, feePayerBalanceLamports: null },
+        features: { debtorConfirmation: true, assignment: false },
+      };
     },
     async listReceivables() {
       await delay();
@@ -149,9 +206,11 @@ export function createMockApi(): AgroFluxApi {
         totals: {
           count: items.length,
           amountCents: items.reduce((s, i) => s + i.amountCents, 0),
-          registeredCount: items.filter((i) => i.status === "registered" || i.status === "offer_selected").length,
+          registeredCount: items.filter((i) => i.chain.status === "confirmed").length,
           pendingCount: items.filter((i) => i.status === "registration_pending").length,
           offerSelectedCount: items.filter((i) => i.status === "offer_selected").length,
+          debtorConfirmedCount: items.filter((i) => i.debtorConfirmation.status === "confirmed").length,
+          assignedCount: items.filter((i) => i.status === "assigned").length,
         },
       });
     },
@@ -197,6 +256,8 @@ export function createMockApi(): AgroFluxApi {
           event("document_attached", "Documento de teste anexado", { documentId: doc.id, sha256: sha, filename: file.name }),
         ],
         selectedOfferId: null,
+        debtorConfirmation: emptyDebtorConfirmation(),
+        assignment: emptyAssignment(),
         createdAt: now,
         updatedAt: now,
       };
@@ -248,6 +309,61 @@ export function createMockApi(): AgroFluxApi {
       await delay();
       find(rid);
       throw new ApiError("INVALID_STATE", "As ofertas simuladas ficam disponíveis após a confirmação na Devnet.", 409);
+    },
+    // v1.1. No mock o recebível nunca chega a `registered`, então o pedido de link responde INVALID_STATE,
+    // como o backend responderia. As respostas do sacado nunca geram assinatura.
+    async requestDebtorConfirmation(rid) {
+      await delay();
+      const r = find(rid);
+      if (r.status !== "registered" || r.debtorConfirmation.status === "confirmed") {
+        throw new ApiError("INVALID_STATE", "A confirmação do sacado fica disponível depois do registro na Devnet.", 409);
+      }
+      const token = id("tok");
+      const now = new Date().toISOString();
+      const expiresAt = new Date(Date.now() + 7 * 86_400_000).toISOString();
+      for (const t of mockTokens.values()) if (t.receivableId === rid) t.expiresAt = now;
+      mockTokens.set(token, { receivableId: rid, expiresAt, used: false });
+      r.debtorConfirmation = { ...emptyDebtorConfirmation(), status: "requested", requestedAt: now, expiresAt };
+      r.events.push(event("debtor_confirmation_requested", "Confirmação solicitada ao sacado (simulação)", { expiresAt }));
+      r.updatedAt = now;
+      save();
+      return clone({ token, confirmationPath: `/confirmar/${token}`, expiresAt, receivable: r });
+    },
+    async retryDebtorConfirmationRegister() {
+      await delay();
+      throw new ApiError("INVALID_STATE", "Não há registro de confirmação com falha para repetir.", 409);
+    },
+    async getConfirmation(token) {
+      await delay();
+      const { t, r } = findToken(token, false);
+      return clone(confirmationSummary(r, t.expiresAt));
+    },
+    async confirmDebtor(token) {
+      await delay();
+      const { t, r } = findToken(token, true);
+      t.used = true;
+      const now = new Date().toISOString();
+      // Fica pendente: no mock não existe memo real para confirmar.
+      r.debtorConfirmation = {
+        ...r.debtorConfirmation,
+        status: "confirmed",
+        respondedAt: now,
+        chain: { status: "pending", signature: null, explorerUrl: null, memo: null, confirmationHash: null, error: null },
+      };
+      r.updatedAt = now;
+      save();
+      return clone(confirmationSummary(r, t.expiresAt));
+    },
+    async declineDebtor(token) {
+      await delay();
+      const { t, r } = findToken(token, true);
+      t.used = true;
+      const now = new Date().toISOString();
+      r.debtorConfirmation = { ...r.debtorConfirmation, status: "declined", respondedAt: now };
+      r.events.push(event("debtor_declined", "Sacado recusou o recebível (simulação)", {}, "system"));
+      r.updatedAt = now;
+      save();
+      return clone(confirmationSummary(r, t.expiresAt));
     },
   };
 }

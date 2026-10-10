@@ -1,6 +1,15 @@
 import type { AgroFluxApi } from "./client";
 import { ApiError } from "./errors";
-import type { CreateReceivableInput, Health, OfferList, Receivable, ReceivableList, Verification } from "../types";
+import type {
+  ConfirmationSummary,
+  CreateReceivableInput,
+  DebtorConfirmationRequest,
+  Health,
+  OfferList,
+  Receivable,
+  ReceivableList,
+  Verification,
+} from "../types";
 
 const TIMEOUT_MS = 20_000;
 
@@ -66,5 +75,17 @@ export function createHttpApi(baseUrl: string): AgroFluxApi {
         `/receivables/${encodeURIComponent(id)}/offers/${encodeURIComponent(offerId)}/select`,
         { method: "POST" },
       ),
+    requestDebtorConfirmation: (id) =>
+      request<DebtorConfirmationRequest>(`/receivables/${encodeURIComponent(id)}/debtor-confirmation`, { method: "POST" }),
+    async retryDebtorConfirmationRegister(id, idempotencyKey) {
+      const r = await request<{ receivable: Receivable }>(`/receivables/${encodeURIComponent(id)}/debtor-confirmation/register`, {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+      return r.receivable;
+    },
+    getConfirmation: (token) => request<ConfirmationSummary>(`/confirmations/${encodeURIComponent(token)}`),
+    confirmDebtor: (token) => request<ConfirmationSummary>(`/confirmations/${encodeURIComponent(token)}/confirm`, { method: "POST" }),
+    declineDebtor: (token) => request<ConfirmationSummary>(`/confirmations/${encodeURIComponent(token)}/decline`, { method: "POST" }),
   };
 }

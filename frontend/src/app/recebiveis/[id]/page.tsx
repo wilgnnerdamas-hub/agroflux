@@ -10,13 +10,17 @@ import { formatBytes, formatDate, formatDateTime, formatMoney } from "@/lib/form
 import { DOCUMENT_KIND_LABEL, FUNDER_TYPE_LABEL, PRODUCT_CATEGORY_LABEL } from "@/lib/labels";
 import type { Offer, Receivable } from "@/lib/types";
 import { Alert, ButtonLink, Card, CardTitle, DescList, ErrorState, LoadingBlock, MonoValue, PageHeader } from "@/components/ui";
-import { ReceivableStatusBadge, SimulatedBadge } from "@/components/status";
+import { DebtorConfirmationBadge, ReceivableStatusBadge, SimulatedBadge } from "@/components/status";
 import { ChainCard } from "@/components/ChainCard";
+import { DebtorConfirmationCard } from "@/components/DebtorConfirmationCard";
 import { Timeline } from "@/components/Timeline";
 import { FlowSteps } from "@/components/FlowSteps";
 
 const POLL_MS = 2000;
 const POLL_MAX_MS = 75_000;
+// v1.1: enquanto espera o sacado responder (no celular dele), a tela se atualiza sozinha.
+const DEBTOR_POLL_MS = 3000;
+const DEBTOR_POLL_MAX_MS = 15 * 60_000;
 
 function SelectedOfferCard({ receivable }: { receivable: Receivable }) {
   const [offer, setOffer] = useState<Offer | null | "error">(null);
@@ -82,6 +86,17 @@ function Passport() {
     return () => clearInterval(t);
   }, [pending, pollTimedOut, reload]);
 
+  const dcWaiting = r?.debtorConfirmation.status === "requested" || r?.debtorConfirmation.chain?.status === "pending";
+  useEffect(() => {
+    if (!dcWaiting) return;
+    const started = Date.now();
+    const t = setInterval(() => {
+      if (Date.now() - started > DEBTOR_POLL_MAX_MS) return clearInterval(t);
+      void reload(true);
+    }, DEBTOR_POLL_MS);
+    return () => clearInterval(t);
+  }, [dcWaiting, reload]);
+
   const refreshNow = () => {
     pollStart.current = Date.now();
     setPollTimedOut(false);
@@ -110,7 +125,11 @@ function Passport() {
   }
   if (!r) return null;
 
-  const offersReady = r.status === "registered" || r.status === "offer_selected";
+  const offersReady = r.chain.status === "confirmed";
+  const dc = r.debtorConfirmation;
+  const dcConfirmed = dc.status === "confirmed" && dc.chain?.status === "confirmed";
+  // Dados anteriores à v1.1 podem ter oferta selecionada sem confirmação: nesse caso o card não aparece.
+  const showDebtorCard = offersReady && (r.status === "registered" || dc.status !== "none");
   const doc = r.documents[0];
 
   return (
@@ -121,12 +140,13 @@ function Passport() {
           <span className="flex flex-wrap items-center gap-3">
             {r.reference}
             <ReceivableStatusBadge status={r.status} />
+            {dc.status === "confirmed" && <DebtorConfirmationBadge status="confirmed" />}
           </span>
         }
         subtitle={`Passaporte digital · atualizado em ${formatDateTime(r.updatedAt)}`}
         actions={
           offersReady && (
-            <ButtonLink href={`/recebiveis/${r.id}/ofertas`} variant={r.status === "registered" ? "primary" : "secondary"}>
+            <ButtonLink href={`/recebiveis/${r.id}/ofertas`} variant={r.status === "registered" && dcConfirmed ? "primary" : "secondary"}>
               {r.status === "registered" ? "Ver ofertas simuladas" : "Rever ofertas simuladas"} <ArrowRight className="h-4 w-4" aria-hidden />
             </ButtonLink>
           )
@@ -149,7 +169,7 @@ function Passport() {
         )}
 
         <Card className="py-4 sm:py-5">
-          <FlowSteps status={r.status} />
+          <FlowSteps receivable={r} />
         </Card>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
@@ -160,6 +180,10 @@ function Passport() {
               pollingTimedOut={pollTimedOut}
               onRefresh={refreshNow}
             />
+
+            {showDebtorCard && (
+              <DebtorConfirmationCard receivable={r} onUpdated={(next) => setState({ status: "success", data: next })} />
+            )}
 
             {r.status === "offer_selected" && r.selectedOfferId && <SelectedOfferCard receivable={r} />}
 

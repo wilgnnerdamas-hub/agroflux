@@ -47,8 +47,33 @@ function ConnectionBadge() {
   );
 }
 
+// v1.1: página pública do sacado (/confirmar/[token]). Sem navegação interna da distribuidora.
+function PublicShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="border-b border-border bg-surface">
+        <div className="mx-auto flex max-w-xl items-center gap-2 px-4 py-3 font-bold text-ink">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-white">
+            <Sprout className="h-5 w-5" aria-hidden />
+          </span>
+          AgroFlux
+          <Badge tone="chain" className="ml-auto">Solana Devnet</Badge>
+        </div>
+      </header>
+      <main className="mx-auto w-full max-w-xl flex-1 px-4 py-6">{children}</main>
+      <footer className="border-t border-border bg-surface">
+        <p className="mx-auto max-w-xl px-4 py-4 text-xs leading-relaxed text-muted">
+          <strong className="text-ink">Ambiente de demonstração.</strong> Recebível fictício, sem validação jurídica. A
+          confirmação é simulada e não verifica a identidade de quem responde.
+        </p>
+      </footer>
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  if (pathname.startsWith("/confirmar/")) return <PublicShell>{children}</PublicShell>;
   const nav = [
     { href: "/", label: "Recebíveis", active: pathname === "/" || (pathname.startsWith("/recebiveis/") && pathname !== "/recebiveis/novo") },
     { href: "/recebiveis/novo", label: "Novo recebível", active: pathname === "/recebiveis/novo" },

@@ -14,6 +14,10 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | F6 | 09/10 | Polling de `GET /receivables/:id` a cada 2 s por até 75 s enquanto o registro está pendente. | §5.5 do contrato. |
 | F7 | 09/10 | `Idempotency-Key` reaproveitada enquanto a tentativa de registro não termina. | Clique duplo não gera duas transações. |
 | F8 | 09/10 | Testes e2e rodam contra um build de produção e um dublê de teste do backend. | O servidor de desenvolvimento do Next compila rotas sob demanda e deixava o teste instável. |
+| F9 | 10/10 | Página pública `/confirmar/[token]` com um shell próprio (sem a navegação da distribuidora), pensada para o celular. | Quem abre é o sacado, não a distribuidora. |
+| F10 | 10/10 | O link de confirmação fica guardado só na aba (`sessionStorage`); depois de recarregar, a tela oferece "Gerar novo link". | O token só vem na resposta que o gera (§5.10) e não fica no servidor. |
+| F11 | 10/10 | O passaporte se atualiza a cada 3 s, por até 15 min, enquanto espera a resposta do sacado ou o memo da confirmação. | O sacado responde em outro aparelho; a demo mostra a mudança sem recarregar. |
+| F12 | 10/10 | As ofertas aparecem antes da confirmação, mas os botões de seleção ficam desligados, com um aviso e um atalho para a confirmação. | G1, com a proposta 2 do v1.1. |
 
 ## Decisões da gestão
 

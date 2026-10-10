@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Building2, Handshake, Lock } from "lucide-react";
+import { ArrowLeft, Building2, Handshake, Lock, UserCheck } from "lucide-react";
 import { api, toApiError } from "@/lib/api";
 import { useAsync } from "@/lib/useAsync";
 import { formatDateTime, formatMoney, formatRateBps } from "@/lib/format";
@@ -139,7 +139,7 @@ export default function OffersPage() {
       const receivable = await api.getReceivable(id);
       let offers: OfferList | null = null;
       let offersError: ReturnType<typeof toApiError> | null = null;
-      if (receivable.status === "registered" || receivable.status === "offer_selected") {
+      if (receivable.chain.status === "confirmed") {
         try {
           offers = await api.listOffers(id);
         } catch (e) {
@@ -165,7 +165,10 @@ export default function OffersPage() {
       const ae = toApiError(e);
       setSelectError(ae.message);
       setBusy(false);
-      if (ae.code === "OFFER_ALREADY_SELECTED" || ae.code === "INVALID_STATE") void reload(true);
+      if (ae.code === "OFFER_ALREADY_SELECTED" || ae.code === "INVALID_STATE" || ae.code === "DEBTOR_CONFIRMATION_REQUIRED") {
+        setChoosing(null);
+        void reload(true);
+      }
     }
   }
 
@@ -201,7 +204,11 @@ export default function OffersPage() {
   if (!d) return null;
 
   const { receivable: r, offers, offersError } = d;
-  const ready = r.status === "registered" || r.status === "offer_selected";
+  const ready = r.chain.status === "confirmed";
+  // G1 (v1.1): a seleção exige a confirmação do sacado registrada on-chain.
+  const dc = r.debtorConfirmation;
+  const dcConfirmed = dc.status === "confirmed" && dc.chain?.status === "confirmed";
+  const needsConfirmation = r.status === "registered" && !dcConfirmed;
   const items = offers?.items ?? [];
   const bestNet = Math.max(...items.filter((o) => o.status === "available").map((o) => o.netAmountCents), -1);
 
@@ -238,7 +245,24 @@ export default function OffersPage() {
 
       {ready && items.length > 0 && (
         <>
-          {r.status === "offer_selected" && (
+          {needsConfirmation && (
+            <Alert
+              tone="warn"
+              title="Falta a confirmação do sacado"
+              className="mb-4"
+              action={
+                <ButtonLink href={`/recebiveis/${r.id}`} variant="secondary">
+                  <UserCheck className="h-4 w-4" aria-hidden /> Ir para a confirmação
+                </ButtonLink>
+              }
+            >
+              {dc.status === "confirmed"
+                ? "O sacado confirmou e o registro na Devnet está em andamento. Assim que terminar, a seleção fica liberada."
+                : "Você pode ver as condições simuladas, mas só poderá selecionar uma oferta depois que o sacado confirmar o recebível."}
+            </Alert>
+          )}
+          {selectError && !choosing && <Alert tone="bad" className="mb-4">{selectError}</Alert>}
+          {r.status !== "registered" && r.selectedOfferId && (
             <Alert tone="ok" title="Você já selecionou uma oferta simulada" className="mb-4">
               As demais ficaram indisponíveis nesta demonstração.
             </Alert>
@@ -249,7 +273,7 @@ export default function OffersPage() {
                 key={o.id}
                 offer={o}
                 best={o.netAmountCents === bestNet}
-                disabled={r.status !== "registered"}
+                disabled={r.status !== "registered" || !dcConfirmed}
                 onSelect={(offer) => { setSelectError(null); setChoosing(offer); }}
               />
             ))}

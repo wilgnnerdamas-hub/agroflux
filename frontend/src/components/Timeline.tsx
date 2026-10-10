@@ -11,6 +11,14 @@ const DOT: Record<ReceivableEvent["type"], string> = {
   chain_registration_failed: "bg-bad",
   offers_generated: "bg-sim",
   offer_selected: "bg-sim",
+  debtor_confirmation_requested: "bg-warn",
+  debtor_confirmed: "bg-chain",
+  debtor_confirmation_chain_failed: "bg-bad",
+  debtor_declined: "bg-bad",
+  assignment_requested: "bg-warn",
+  assignment_token_minted: "bg-chain",
+  assignment_settled: "bg-chain",
+  assignment_failed: "bg-bad",
 };
 
 export function Timeline({ events }: { events: ReceivableEvent[] }) {

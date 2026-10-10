@@ -63,7 +63,7 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
 
 **10/10 (tarde) até 11/10 às 12h: função A, confirmação do sacado**
 7. ~~Backend da função A~~ (feito em 09/10; 51 testes; testado na Devnet real).
-8. Frontend: página `/confirmar/[token]` (celular), selo no passaporte, mock sem assinatura e e2e no dublê.
+8. ~~Frontend da função A~~ (feito em 10/10; e2e 6/6 no dublê; fluxo real na Devnet ok). Falta o push para produção.
 
 **11/10 até 18h: função B, cessão tokenizada + liquidação atômica**
 9. Blockchain: mint `tBRL-DEMO`, mint Token-2022 por recebível, programa Anchor de escrow com testes

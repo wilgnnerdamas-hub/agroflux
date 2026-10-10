@@ -4,14 +4,11 @@ import { useState } from "react";
 import { CheckCircle2, ExternalLink, Loader2, RefreshCw, ShieldCheck, XCircle, Link2 } from "lucide-react";
 import { api, API_MODE, toApiError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { newIdempotencyKey } from "@/lib/idempotency";
 import type { Receivable, Verification } from "@/lib/types";
 import { Alert, Button, Card, CardTitle, DescList, MonoValue } from "./ui";
 import { ChainStatusBadge } from "./status";
 
-function newIdempotencyKey(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
-  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
-}
 
 type VerifyState =
   | { status: "idle" }
