@@ -17,7 +17,7 @@ documento com hash, estado atual e histórico de eventos verificáveis na **Sola
 6. Selecionar uma oferta simulada e atualizar o histórico.
 
 ## Fonte de verdade
-- **`docs/api-contract.md` (v1.0)**: campos, estados, endpoints, erros e formato on-chain. Não altere sem o OK da gestão do projeto.
+- **`docs/api-contract.md` (v1.1)**: campos, estados, endpoints, erros e formato on-chain. Não altere sem o OK da gestão do projeto.
 - `docs/decisoes-e-dependencias.md`: decisões do frontend e do backend e checklist de integração.
 - `docs/novas-funcoes-v1.1.md`: escopo aprovado das funções A e B (base do contrato v1.1, ainda não escrito).
 
@@ -47,7 +47,7 @@ documento com hash, estado atual e histórico de eventos verificáveis na **Sola
 
 ## Próximos passos (fila em ordem)
 Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidação): especificação, regras e cortes em
-**`docs/novas-funcoes-v1.1.md`**. Nada de A ou B antes do contrato v1.1 aprovado.
+**`docs/novas-funcoes-v1.1.md`**. Contrato v1.1 aprovado em 09/10.
 
 **09/10 (noite) e 10/10 de manhã: fechar o fluxo principal e criar uma rede de segurança**
 1. Push dos commits de documentação pendentes.
@@ -57,8 +57,7 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
    Com isso, uma demo do fluxo principal fica no ar antes de mexer nas funções novas.
 
 **10/10: contrato e preparação**
-5. Escrever a proposta do contrato v1.1 (A + B) em `docs/api-contract.md` e **PARAR** para a aprovação da gestão
-   (diff + lista de arquivos). Decisão G1: a confirmação do sacado é **obrigatória** antes da seleção de oferta.
+5. ~~Contrato v1.1 (A + B)~~ (aprovado em 09/10).
 6. Em paralelo, sem depender do contrato: instalar Rust, Solana CLI e Anchor no WSL (Ubuntu) e criar as carteiras
    "distribuidor demo" e "financiador demo" (secrets só no `.env`).
 

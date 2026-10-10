@@ -1,6 +1,7 @@
-# AgroFlux — Contrato da API (v1.0)
+# AgroFlux — Contrato da API (v1.1)
 
-> **Status:** v1.0, definida pela gestão do projeto em 09/10/2026.
+> **Status:** v1.1, aprovada pela gestão em 09/10/2026 (a v1.0 é de 09/10/2026).
+> As partes novas da v1.1 estão marcadas com **[v1.1]**.
 > **Vale para:** frontend, backend e blockchain.
 > **Regra de mudança:** nenhum campo, estado ou endpoint muda sem atualizar este arquivo e avisar as três frentes (ver §13).
 
@@ -17,12 +18,20 @@ Este contrato define como o frontend e o backend conversam para demonstrar o flu
 5. Exibir ofertas de financiamento **simuladas**.
 6. Selecionar uma oferta simulada e atualizar o histórico.
 
+**[v1.1]** Duas funções novas, aprovadas pela gestão como escopo:
+
+- **A) Confirmação do sacado (simulada):** o sacado recebe um link, vê um resumo mínimo e confirma ou recusa. A confirmação é registrada por memo na Devnet e é **obrigatória antes de selecionar uma oferta** (decisão G1).
+- **B) Cessão tokenizada com liquidação em stablecoin de teste:** depois da seleção, o recebível vira um token Token-2022 e é "cedido" ao financiador simulado, contra `tBRL-DEMO`, numa liquidação **atômica** feita por um programa de escrow na Devnet.
+
+Ordem do fluxo com a v1.1: cadastro → registro → **confirmação do sacado** → ofertas → seleção → **cessão tokenizada (opcional, atrás de feature flag)**.
+
 **Fora do escopo:**
 
 - Autenticação de usuários
 - Mainnet
-- Movimentação financeira
-- Validação jurídica do recebível
+- Movimentação financeira (**[v1.1]** o `tBRL-DEMO` é uma moeda de teste da Devnet, sem valor e sem lastro)
+- Validação jurídica do recebível e cessão jurídica (**[v1.1]** o token da cessão é ilustrativo)
+- Verificação de identidade do sacado (**[v1.1]** a confirmação é simulada)
 - Financiadores reais
 - Edição ou exclusão de recebíveis
 
@@ -36,6 +45,8 @@ Este contrato define como o frontend e o backend conversam para demonstrar o flu
 | R4 | Toda oferta é simulada (`isSimulated: true`), e a interface deve dizer isso de forma visível. |
 | R5 | O frontend nunca exibe uma assinatura Solana que não tenha vindo do backend. |
 | R6 | Nenhum texto apresenta o recebível como juridicamente validado ou o financiamento como garantido. |
+| R7 | **[v1.1]** A liquidação só existe se for **atômica** (as duas pernas na mesma transação, pelo programa de escrow). Transferências separadas nunca são apresentadas como liquidação. Sem o escrow pronto, a função B não aparece. |
+| R8 | **[v1.1]** Toda tela nova deixa claro: simulado, rede de testes, sem valor e sem validação jurídica. |
 
 ---
 
@@ -52,6 +63,7 @@ Este contrato define como o frontend e o backend conversam para demonstrar o flu
 | Data-hora | ISO 8601 em UTC, por exemplo `2026-10-09T14:32:10.123Z`. |
 | Data (sem hora) | `YYYY-MM-DD`, por exemplo `2026-12-15`. |
 | IDs | Strings opacas com prefixo: `rcv_`, `doc_`, `evt_`, `ofr_`. O frontend não deve interpretá-las. |
+| Token de confirmação | **[v1.1]** String aleatória opaca (32 bytes em base64url). Só aparece na resposta que o gera; o backend guarda apenas o hash dela. |
 | Código legível | `reference`, por exemplo `AGF-0001`, sequencial, para exibição. |
 | Hash | SHA-256 em **hexadecimal minúsculo** (64 caracteres), calculado sobre os **bytes crus** do arquivo. |
 | Autenticação | Nenhuma no MVP. |
@@ -83,6 +95,8 @@ Este contrato define como o frontend e o backend conversam para demonstrar o flu
 | `chain` | `ChainRecord` | sim | Registro na Devnet. Começa com `status: "none"`. |
 | `events` | `Event[]` | sim | Histórico em ordem cronológica crescente. |
 | `selectedOfferId` | string \| null | sim | `null` até uma oferta ser selecionada. |
+| `debtorConfirmation` | `DebtorConfirmation` | sim | **[v1.1]** Ver §3.9. Começa com `status: "none"`. |
+| `assignment` | `Assignment` | sim | **[v1.1]** Ver §3.10. Começa com `status: "none"`. |
 | `createdAt` | datetime | sim | |
 | `updatedAt` | datetime | sim | |
 
@@ -177,6 +191,45 @@ O backend gera **3 ofertas** determinísticas (mesma entrada, mesmas ofertas), c
 
 `id`, `reference`, `status`, `debtor`, `product`, `amountCents`, `currency`, `dueDate`, `chain.status`, `selectedOfferId`, `createdAt`.
 
+**[v1.1]** Mais dois campos: `debtorConfirmation.status` e `assignment.status`.
+
+### 3.9 `DebtorConfirmation` (confirmação do sacado) **[v1.1]**
+
+Bloco independente do status principal.
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `status` | `DebtorConfirmationStatus` | Ver §4.5. |
+| `isSimulated` | `true` | Sempre `true`. Não há verificação de identidade. |
+| `requestedAt` | datetime \| null | Quando o último link foi gerado. |
+| `expiresAt` | datetime \| null | Validade do último link (7 dias). |
+| `respondedAt` | datetime \| null | Quando o sacado confirmou ou recusou. |
+| `chain` | `{ status: "pending" \| "confirmed" \| "failed", signature: string \| null, explorerUrl: string \| null, memo: string \| null, confirmationHash: string \| null, error: { code: ChainErrorCode, message: string } \| null }` \| null | Registro on-chain da confirmação (§6.3). `null` até o sacado confirmar. Uma recusa não vai on-chain. |
+
+O token do link **não** faz parte deste bloco (ver §5.10).
+
+### 3.10 `Assignment` (cessão tokenizada) **[v1.1]**
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `status` | `AssignmentStatus` | Ver §4.6. |
+| `isSimulated` | `true` | Sempre `true`. Não é cessão jurídica nem oferta de investimento. |
+| `cluster` | `"devnet"` | |
+| `offerId` | string \| null | Oferta simulada usada na liquidação. |
+| `tokenMint` | string \| null | Mint Token-2022 do recebível (supply 1, decimals 0). |
+| `settlementMint` | string \| null | Mint do `tBRL-DEMO`. |
+| `settlementAsset` | `"tBRL-DEMO"` | Moeda de teste com 2 casas decimais. |
+| `settlementAmount` | integer \| null | Valor liquidado na menor unidade do `tBRL-DEMO`. Igual ao `netAmountCents` da oferta selecionada (2 casas decimais, então 1 unidade = 1 centavo de tBRL). |
+| `distributorWallet` | string \| null | Chave pública da carteira de demonstração "distribuidor demo" (controlada pelo backend). |
+| `funderWallet` | string \| null | Chave pública da carteira de demonstração "financiador demo" (controlada pelo backend). |
+| `escrowProgramId` | string \| null | Programa Anchor de escrow. |
+| `mintSignature` | string \| null | Transação que criou o token da cessão. |
+| `settlementSignature` | string \| null | Transação atômica da liquidação. |
+| `explorerUrls` | `{ tokenMint: string \| null, mint: string \| null, settlement: string \| null }` | Links do Explorer (`?cluster=devnet`). |
+| `submittedAt` | datetime \| null | |
+| `settledAt` | datetime \| null | |
+| `error` | `{ code: AssignmentErrorCode, message: string }` \| null | Preenchido quando `status = "failed"`. |
+
 ---
 
 ## 4. Estados
@@ -189,7 +242,10 @@ O backend gera **3 ofertas** determinísticas (mesma entrada, mesmas ofertas), c
 | `registration_pending` | Registro pendente | Transação enviada, aguardando confirmação. |
 | `registered` | Registrado na Devnet | Transação confirmada. Ofertas simuladas liberadas. |
 | `registration_failed` | Falha no registro | A transação falhou. Pode tentar de novo. |
-| `offer_selected` | Oferta simulada selecionada | Fim do fluxo da demonstração. |
+| `offer_selected` | Oferta simulada selecionada | Fim do fluxo principal da demonstração. |
+| `assignment_pending` | Cessão em liquidação | **[v1.1]** Transação de cessão enviada, aguardando confirmação. |
+| `assigned` | Cessão tokenizada (simulada) | **[v1.1]** Liquidação atômica confirmada na Devnet. |
+| `assignment_failed` | Falha na cessão | **[v1.1]** A liquidação falhou por inteiro (nenhuma perna aconteceu). Pode tentar de novo. |
 
 **Transições permitidas (só o backend muda o estado):**
 
@@ -199,6 +255,16 @@ created ──register──▶ registration_pending ──confirma──▶ reg
                               └──falha/timeout──▶ registration_failed ──register──▶ registration_pending
 ```
 
+**[v1.1]** Continuação, depois de `offer_selected`:
+
+```
+offer_selected ──assignment──▶ assignment_pending ──liquida──▶ assigned
+                                      │
+                                      └──falha/timeout──▶ assignment_failed ──assignment──▶ assignment_pending
+```
+
+**[v1.1]** O `select` passa a exigir `debtorConfirmation.status = "confirmed"` **e** `debtorConfirmation.chain.status = "confirmed"` (decisão G1). Sem isso, a resposta é `409 DEBTOR_CONFIRMATION_REQUIRED`.
+
 Qualquer outra transição responde `409 INVALID_STATE`.
 
 ### 4.2 `ChainStatus`
@@ -207,7 +273,7 @@ Qualquer outra transição responde `409 INVALID_STATE`.
 |---|---|---|
 | `none` | Não registrado | `created` |
 | `pending` | Aguardando confirmação | `registration_pending` |
-| `confirmed` | Confirmado | `registered` e `offer_selected` |
+| `confirmed` | Confirmado | `registered`, `offer_selected` e **[v1.1]** os três estados da cessão |
 | `failed` | Falhou | `registration_failed` |
 
 ### 4.3 `EventType`
@@ -221,6 +287,14 @@ Qualquer outra transição responde `409 INVALID_STATE`.
 | `chain_registration_failed` | Falha ou timeout | false | `{ code, message }` |
 | `offers_generated` | Primeira consulta de ofertas | false | `{ offerIds: string[] }` |
 | `offer_selected` | Oferta simulada escolhida | false | `{ offerId, funderName, netAmountCents }` |
+| `debtor_confirmation_requested` | **[v1.1]** Link de confirmação gerado | false | `{ expiresAt }` |
+| `debtor_confirmed` | **[v1.1]** Memo da confirmação confirmado na Devnet | **true** | `{ signature, confirmationHash }` |
+| `debtor_confirmation_chain_failed` | **[v1.1]** Falha ao registrar a confirmação on-chain | false | `{ code, message }` |
+| `debtor_declined` | **[v1.1]** Sacado recusou | false | `{}` |
+| `assignment_requested` | **[v1.1]** `POST /assignment` aceito | false | `{ offerId, settlementAmount }` |
+| `assignment_token_minted` | **[v1.1]** Token da cessão criado | **true** | `{ tokenMint, signature }` |
+| `assignment_settled` | **[v1.1]** Liquidação atômica confirmada | **true** | `{ signature, settlementAmount, settlementAsset }` |
+| `assignment_failed` | **[v1.1]** Falha na cessão | false | `{ code, message }` |
 
 > **Decisão D3:** no MVP, só o registro do recebível vai on-chain. A seleção de oferta fica só no histórico off-chain, porque é simulada e gravá-la na blockchain sugeriria uma operação real.
 
@@ -232,6 +306,39 @@ Qualquer outra transição responde `409 INVALID_STATE`.
 | `RPC_UNAVAILABLE` | O RPC da Devnet não respondeu. | "A rede Solana Devnet não respondeu. Tente novamente." |
 | `TIMEOUT` | Não confirmou em 60 s. | "A confirmação demorou mais que o esperado. Tente novamente." |
 | `TX_FAILED` | A transação foi rejeitada. | "A transação foi rejeitada pela rede." |
+
+### 4.5 `DebtorConfirmationStatus` **[v1.1]**
+
+| Código | Rótulo (pt-BR) | Significado |
+|---|---|---|
+| `none` | Confirmação não solicitada | Estado inicial. |
+| `requested` | Aguardando o sacado | Há um link válido. |
+| `confirmed` | Confirmado pelo sacado (simulado) | O sacado confirmou. O registro on-chain fica em `chain.status`. |
+| `declined` | Recusado pelo sacado (simulado) | O sacado recusou. |
+
+Regras:
+
+- Pedir o link é permitido quando o recebível está `registered` e a confirmação está `none`, `requested` ou `declined`.
+- Pedir de novo gera um link novo e invalida o anterior. Isso cobre link perdido, link expirado e uma nova tentativa depois de uma recusa.
+- Depois de `confirmed`, não há volta.
+
+### 4.6 `AssignmentStatus` **[v1.1]**
+
+| Código | Rótulo | Correspondência |
+|---|---|---|
+| `none` | Sem cessão | até `offer_selected` |
+| `pending` | Em liquidação | `assignment_pending` |
+| `settled` | Liquidada (simulação) | `assigned` |
+| `failed` | Falhou | `assignment_failed` |
+
+### 4.7 Códigos de erro da cessão (`AssignmentErrorCode`) **[v1.1]**
+
+Incluem os quatro códigos do §4.4, mais:
+
+| Código | Significado | Mensagem sugerida |
+|---|---|---|
+| `INSUFFICIENT_TEST_TOKENS` | A carteira "financiador demo" não tem `tBRL-DEMO` suficiente. | "A carteira de demonstração do financiador não tem tBRL-DEMO suficiente." |
+| `ESCROW_REJECTED` | O programa de escrow recusou a liquidação (termos divergentes). | "O programa de liquidação recusou a operação. Nenhuma transferência foi feita." |
 
 ---
 
@@ -250,6 +357,12 @@ Resumo:
 | GET | `/receivables/:id/offers` | Ofertas simuladas | 200 |
 | POST | `/receivables/:id/offers/:offerId/select` | Selecionar oferta simulada | 200 |
 | POST | `/demo/reset` | Reiniciar dados da demo (só com `DEMO_RESET_ENABLED=true`) | 204 |
+| POST | `/receivables/:id/debtor-confirmation` | **[v1.1]** Gerar link de confirmação do sacado | 201 |
+| GET | `/confirmations/:token` | **[v1.1]** Resumo mínimo para o sacado | 200 |
+| POST | `/confirmations/:token/confirm` | **[v1.1]** Sacado confirma | 202 |
+| POST | `/confirmations/:token/decline` | **[v1.1]** Sacado recusa | 200 |
+| POST | `/receivables/:id/debtor-confirmation/register` | **[v1.1]** Repetir o registro on-chain da confirmação que falhou | 202 |
+| POST | `/receivables/:id/assignment` | **[v1.1]** Formalizar a cessão tokenizada (só com `ASSIGNMENT_ENABLED=true`) | 202 |
 
 ### 5.1 `GET /health`
 
@@ -264,6 +377,8 @@ Resumo:
 ```
 
 O frontend usa este endpoint para mostrar "Backend conectado / indisponível" e avisar quando a carteira da Devnet está sem saldo.
+
+**[v1.1]** Campo novo: `"features": { "debtorConfirmation": true, "assignment": false }`. Assim, o frontend sabe se a cessão está ligada no backend (`ASSIGNMENT_ENABLED`). A versão passa a `1.1.0`.
 
 ### 5.2 `GET /receivables`
 
@@ -297,7 +412,7 @@ Lista em ordem de `createdAt` decrescente. Não há paginação no MVP (máximo 
 }
 ```
 
-`registeredCount` conta `registered` + `offer_selected`.
+`registeredCount` conta `registered` + `offer_selected`. **[v1.1]** Também conta os três estados da cessão. Totais novos: `debtorConfirmedCount` e `assignedCount`.
 
 ### 5.3 `POST /receivables`
 
@@ -412,9 +527,13 @@ Erro: `409 INVALID_STATE` (o recebível ainda não está registrado).
 
 O frontend **deve** exibir o `disclaimer` e um selo "Simulação" em cada card.
 
+**[v1.1]** As ofertas continuam visíveis a partir de `registered`, mesmo sem a confirmação do sacado. Assim, a tela pode mostrar as condições e indicar que falta a confirmação. Só a **seleção** exige a confirmação (§5.8).
+
 ### 5.8 `POST /receivables/:id/offers/:offerId/select`
 
 Corpo vazio. Permitido quando `status = registered` e a oferta está `available`.
+
+**[v1.1]** Também exige `debtorConfirmation.status = "confirmed"` e `debtorConfirmation.chain.status = "confirmed"` (decisão G1).
 
 Resposta `200` com o `Receivable` completo:
 
@@ -430,6 +549,7 @@ Erros:
 - `404 NOT_FOUND`
 - `409 OFFER_ALREADY_SELECTED`: já existe outra oferta selecionada.
 - `409 INVALID_STATE`
+- **[v1.1]** `409 DEBTOR_CONFIRMATION_REQUIRED`: falta a confirmação do sacado, ou o registro on-chain dela ainda não foi confirmado.
 
 ### 5.9 `POST /demo/reset`
 
@@ -439,6 +559,92 @@ Só existe com `DEMO_RESET_ENABLED=true`. Apaga os recebíveis e recria 2 exempl
 - um `created`.
 
 Isso deixa a demo reproduzível. Responde `204`.
+
+**[v1.1]** Os exemplos continuam os mesmos, com `debtorConfirmation` e `assignment` em `none`. Na demo, a confirmação e a cessão são feitas ao vivo.
+
+### 5.10 `POST /receivables/:id/debtor-confirmation` **[v1.1]**
+
+Corpo vazio. Permitido quando `status = registered` e a confirmação está `none`, `requested` ou `declined` (§4.5).
+
+```json
+201
+{
+  "token": "Zk3...base64url",
+  "confirmationPath": "/confirmar/Zk3...base64url",
+  "expiresAt": "2026-10-17T14:40:00.000Z",
+  "receivable": { "...": "Receivable com debtorConfirmation.status = requested" }
+}
+```
+
+- O frontend monta o link completo com a própria origem: `window.location.origin + confirmationPath`. O backend não precisa saber a URL do frontend.
+- O token só aparece nesta resposta. O backend guarda só o hash, e um novo pedido invalida o link anterior.
+- Gera o evento `debtor_confirmation_requested`.
+
+Erros: `404 NOT_FOUND`, `409 INVALID_STATE`.
+
+### 5.11 `GET /confirmations/:token` **[v1.1]**
+
+Resumo mínimo, para a página pública `/confirmar/[token]`. Não leva o documento, o pseudônimo, a UF nem os ids internos.
+
+```json
+200
+{
+  "isSimulated": true,
+  "disclaimer": "Simulação — sem verificação de identidade do sacado.",
+  "reference": "AGF-0001",
+  "distributor": { "name": "Distribuidora Demo" },
+  "product": { "category": "fertilizer", "description": "Fertilizante NPK 20-05-20" },
+  "amountCents": 15000000,
+  "currency": "BRL",
+  "dueDate": "2027-03-15",
+  "status": "requested",
+  "expiresAt": "2026-10-17T14:40:00.000Z"
+}
+```
+
+`status` mostra o estado atual. Se o sacado já respondeu, a página exibe o resultado em vez dos botões.
+
+Erros:
+
+- `404 NOT_FOUND`: token desconhecido.
+- `410 CONFIRMATION_LINK_EXPIRED`: link vencido ou substituído por um mais novo.
+
+### 5.12 `POST /confirmations/:token/confirm` e `/decline` **[v1.1]**
+
+Corpo vazio. Uso único: o token é consumido na primeira resposta.
+
+- **`confirm` → `202`**, com o mesmo resumo do §5.11 e `status: "confirmed"`. No `Receivable`, `debtorConfirmation.status` vira `confirmed` e `chain.status` vira `pending`. O backend envia o memo (§6.3) de forma assíncrona, com as mesmas regras do §5.5 (commitment `confirmed`, 60 s). Ao confirmar, entra o evento `debtor_confirmed` (`onChain: true`). Se falhar, `chain.status` vira `failed` e entra o evento `debtor_confirmation_chain_failed`.
+- **`decline` → `200`**, com `status: "declined"`. Entra o evento `debtor_declined`. A recusa não vai on-chain.
+
+Erros: `404 NOT_FOUND`, `410 CONFIRMATION_LINK_EXPIRED`, `409 CONFIRMATION_ALREADY_ANSWERED` (o link já foi usado).
+
+### 5.13 `POST /receivables/:id/debtor-confirmation/register` **[v1.1]**
+
+Repete o registro on-chain de uma confirmação cujo `chain.status` está `failed`. Corpo vazio e `Idempotency-Key` recomendada, com as mesmas regras do §5.5. Responde `202` com o `Receivable`.
+
+Erros: `409 INVALID_STATE` (não há confirmação com registro falho) e `503 CHAIN_UNAVAILABLE`.
+
+### 5.14 `POST /receivables/:id/assignment` **[v1.1]**
+
+Só existe com `ASSIGNMENT_ENABLED=true` no backend; sem isso, responde `404`. Corpo vazio e `Idempotency-Key` recomendada.
+
+Permitido quando `status` é `offer_selected` ou `assignment_failed`.
+
+```json
+202
+{ "receivable": { "...": "Receivable com status assignment_pending e assignment.status pending" } }
+```
+
+O backend faz, de forma assíncrona:
+
+1. Se ainda não existir, cria o token da cessão (Token-2022) na carteira "distribuidor demo". Evento `assignment_token_minted`.
+2. Executa a **liquidação atômica** pelo programa de escrow (§6.4). Evento `assignment_settled`.
+
+Uma nova tentativa reaproveita o token já criado. A liquidação nunca fica pela metade: se a transação falhar, nenhuma das duas pernas acontece.
+
+**Polling no frontend:** o mesmo do §5.5, enquanto `status = assignment_pending`.
+
+Erros: `409 INVALID_STATE`, `503 CHAIN_UNAVAILABLE`.
 
 ---
 
@@ -466,6 +672,43 @@ JSON compacto, sem espaços e com as chaves nesta ordem:
 ```
 
 O memo não leva nomes, pseudônimos, UF nem valores em texto aberto. O valor entra apenas dentro do hash.
+
+### 6.3 Memo da confirmação do sacado **[v1.1]**
+
+Mesmo programa, mesma carteira e mesmo commitment do §6.1. JSON compacto, com as chaves nesta ordem:
+
+```json
+{"app":"agroflux","v":1,"evt":"debtor_confirmed","rid":"rcv_01J9Z3K7Q2","ch":"<confirmationHash>"}
+```
+
+`confirmationHash` é o SHA-256 (hex minúsculo) deste payload canônico, com as chaves em ordem alfabética e sem espaços:
+
+```json
+{"confirmedAt":"2026-10-10T13:02:11.000Z","receivableId":"rcv_01J9Z3K7Q2","receivablePayloadHash":"<chain.payloadHash do registro>","response":"confirmed"}
+```
+
+O `receivablePayloadHash` liga a confirmação aos dados que foram registrados. O `GET /verification` (§5.6) ganha a checagem `debtor_confirmation_matches` ("Confirmação do sacado confere on-chain") quando houver confirmação registrada.
+
+### 6.4 Cessão tokenizada e liquidação atômica **[v1.1]**
+
+Preparação, feita uma vez por script do backend. As secrets ficam só no `.env`.
+
+- Carteiras de demonstração "distribuidor demo" e "financiador demo", controladas pelo backend.
+- Mint de teste `tBRL-DEMO` (2 casas decimais), com saldo de teste para o financiador demo. Nunca USDC de mainnet nem valor real.
+- Deploy do programa Anchor de escrow na Devnet (`ESCROW_PROGRAM_ID` no `.env`).
+
+Por recebível:
+
+- **Token da cessão:** Token-2022 com supply 1, decimals 0 e uma mint por recebível. Depois de emitido, a autoridade de mint é removida. Os metadados (extensão de metadata) levam só `name: "AgroFlux <reference>"`, `symbol: "AGFX"` e o campo adicional `payloadHash`. Nada de nomes, valores em texto aberto ou dados pessoais.
+- **Liquidação:** uma única transação chama o programa de escrow, que, na mesma instrução:
+  1. confere os termos (mint do token da cessão, mint do `tBRL-DEMO`, valor, carteiras);
+  2. transfere o token da cessão do distribuidor demo para o financiador demo;
+  3. transfere `settlementAmount` de `tBRL-DEMO` do financiador demo para o distribuidor demo.
+
+  Se qualquer passo falhar, a transação inteira é revertida.
+- **Testes obrigatórios do programa:** o caminho feliz e o caso de falha (por exemplo, financiador sem saldo), provando que nenhuma perna acontece.
+
+A interface mostra a faixa fixa: "Simulação em rede de testes. Token e moeda sem valor. Não é oferta de investimento nem cessão jurídica. Uma operação real exigiria adequação às regras da CVM e registro do título em registradora." Ela também diz que as carteiras do distribuidor e do financiador são de demonstração, controladas pelo backend.
 
 ---
 
@@ -568,6 +811,9 @@ Todo erro segue este envelope:
 | 422 | `VALIDATION_ERROR` | Regras do §8. Inclui `fieldErrors`. |
 | 422 | `HASH_MISMATCH` | O `X-Client-Sha256` não bate com o hash do backend. |
 | 503 | `CHAIN_UNAVAILABLE` | RPC da Devnet indisponível. |
+| 409 | `DEBTOR_CONFIRMATION_REQUIRED` | **[v1.1]** Seleção de oferta sem a confirmação do sacado registrada. |
+| 409 | `CONFIRMATION_ALREADY_ANSWERED` | **[v1.1]** O link de confirmação já foi usado. |
+| 410 | `CONFIRMATION_LINK_EXPIRED` | **[v1.1]** Link vencido ou substituído. |
 | 500 | `INTERNAL_ERROR` | Erro inesperado. A mensagem é genérica, sem detalhes internos. |
 
 ---
@@ -579,6 +825,8 @@ Todo erro segue este envelope:
 - **Arquivos:** guardados de forma privada no backend. Não existe URL pública de download no MVP.
 - **Dados:** todos os recebíveis são fictícios (`isDemo: true`), e o seed usa apenas pseudônimos.
 - **Logs:** o backend não registra a chave nem o conteúdo dos documentos.
+- **[v1.1] Link de confirmação:** token aleatório de 32 bytes, guardado só como hash, de uso único e válido por 7 dias. Os logs não registram o token.
+- **[v1.1] Carteiras da cessão:** as secrets do distribuidor demo, do financiador demo e da autoridade do `tBRL-DEMO` ficam só no `.env` do backend.
 
 ---
 
@@ -596,6 +844,9 @@ Todo erro segue este envelope:
 | Carteira Devnet com saldo (airdrop/faucet) | | | ● |
 | Endpoint de verificação | | ● | ● |
 | Geração das ofertas simuladas | | ● | |
+| **[v1.1]** Página `/confirmar/[token]`, cards da confirmação e da cessão, feature flag | ● | | |
+| **[v1.1]** Link de confirmação, máquinas de estado, eventos e payloads canônicos | | ● | |
+| **[v1.1]** Memo da confirmação, mint Token-2022, mint `tBRL-DEMO`, programa de escrow e testes | | ● | ● |
 
 ---
 
@@ -608,6 +859,7 @@ Enquanto a API não estiver pronta, o frontend pode rodar com `NEXT_PUBLIC_API_M
 - **Nenhuma assinatura Solana é exibida.** O registro fica em "Aguardando backend" e nunca chega a `confirmed`.
 - Atrasos e erros são simulados para testar os estados da tela.
 - O build de produção recusa o modo mock.
+- **[v1.1]** O mock simula o link e a resposta do sacado, mas **nunca** gera assinatura, mint ou liquidação. A confirmação fica em "Aguardando registro (backend)" e a cessão não chega a `settled`.
 
 ---
 
@@ -622,6 +874,11 @@ Enquanto a API não estiver pronta, o frontend pode rodar com `NEXT_PUBLIC_API_M
 | D5 | Assinatura e envio de transações exclusivamente no backend. |
 | D6 | Sem autenticação no MVP. Usuário único "demo". |
 | D7 | Enums em inglês, rótulos em português no frontend. |
+| D8 | **[v1.1]** Confirmação do sacado obrigatória antes da seleção de oferta (G1 da gestão). |
+| D9 | **[v1.1]** A recusa do sacado não vai on-chain; só a confirmação vai, por memo. |
+| D10 | **[v1.1]** O link de confirmação pode ser gerado de novo (invalida o anterior), inclusive depois de uma recusa. |
+| D11 | **[v1.1]** Liquidação atômica por um programa Anchor de escrow; sem ele, a função B fica desligada (`ASSIGNMENT_ENABLED` / `NEXT_PUBLIC_FEATURE_ASSIGNMENT`). |
+| D12 | **[v1.1]** O código do programa de escrow fica numa pasta nova, `blockchain/`, no monorepo (amplia a D1). |
 
 **Processo de mudança:** qualquer alteração neste arquivo exige três passos:
 
@@ -634,3 +891,4 @@ Enquanto a API não estiver pronta, o frontend pode rodar com `NEXT_PUBLIC_API_M
 | Versão | Data | Mudança |
 |---|---|---|
 | 1.0 | 09/10/2026 | Versão inicial. |
+| 1.1 | 09/10/2026 | Aprovada pela gestão. Confirmação do sacado (§3.9, §4.5, §5.10–5.13, §6.3), cessão tokenizada (§3.10, §4.6, §4.7, §5.14, §6.4), confirmação obrigatória antes da seleção (G1), `features` no health e novos totais. |

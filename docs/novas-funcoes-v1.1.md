@@ -1,7 +1,7 @@
 # Novas funções aprovadas pela gestão (base para o contrato v1.1)
 
-> **Status:** aprovadas pela gestão em 09/10/2026 como escopo. O **contrato v1.1 ainda não foi escrito**.
-> Nada daqui deve ser implementado antes da proposta do contrato v1.1 e do OK da gestão.
+> **Status:** aprovadas pela gestão em 09/10/2026. **O contrato v1.1 foi aprovado em 09/10** e é a fonte de verdade (`api-contract.md`).
+> Este arquivo guarda o escopo original, as regras e os prazos.
 
 Funções:
 
