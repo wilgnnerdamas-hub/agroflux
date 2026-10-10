@@ -1,5 +1,11 @@
 import type {
   ConfirmationSummary,
+  Funder,
+  Marketplace,
+  Offer,
+  Portfolio,
+  Terms,
+  Transparency,
   CreateReceivableInput,
   DebtorConfirmationRequest,
   Health,
@@ -28,4 +34,14 @@ export interface AgroFluxApi {
   declineDebtor(token: string): Promise<ConfirmationSummary>;
   // v1.1: cessão tokenizada (§5.14). 202; o frontend acompanha por polling.
   requestAssignment(id: string, idempotencyKey: string): Promise<Receivable>;
+  // v1.2 (§5.15–5.23).
+  getTerms(): Promise<Terms>;
+  publish(id: string, termsVersion: string, idempotencyKey: string): Promise<Receivable>;
+  retryPublishRegister(id: string, idempotencyKey: string): Promise<Receivable>;
+  proposeOffer(id: string, input: { funderId: string; monthlyRateBps: number; feesCents: number }): Promise<{ offer: Offer; receivable: Receivable }>;
+  listFunders(): Promise<{ items: Funder[] }>;
+  getMarketplace(funderId: string): Promise<Marketplace>;
+  getPortfolio(funderId: string): Promise<Portfolio>;
+  requestDoubleSpendProof(id: string): Promise<Receivable>;
+  getTransparency(): Promise<Transparency>;
 }

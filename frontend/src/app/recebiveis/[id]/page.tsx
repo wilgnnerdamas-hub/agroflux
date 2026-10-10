@@ -3,127 +3,144 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, FileText, Handshake, History } from "lucide-react";
+import { ArrowLeft, History } from "lucide-react";
 import { api } from "@/lib/api";
-import { useAsync } from "@/lib/useAsync";
-import { formatBytes, formatDate, formatDateTime, formatMoney } from "@/lib/format";
-import { DOCUMENT_KIND_LABEL, FUNDER_TYPE_LABEL, PRODUCT_CATEGORY_LABEL } from "@/lib/labels";
-import type { Offer, Receivable } from "@/lib/types";
-import { Alert, ButtonLink, Card, CardTitle, DescList, ErrorState, LoadingBlock, MonoValue, PageHeader } from "@/components/ui";
-import { DebtorConfirmationBadge, ReceivableStatusBadge, SimulatedBadge } from "@/components/status";
-import { ChainCard } from "@/components/ChainCard";
-import { DebtorConfirmationCard } from "@/components/DebtorConfirmationCard";
-import { AssignmentCard, useAssignmentAvailable } from "@/components/AssignmentCard";
+import { formatDateTime } from "@/lib/format";
 import { FEATURE_ASSIGNMENT } from "@/lib/features";
-import { Timeline } from "@/components/Timeline";
+import { useI18n } from "@/lib/i18n";
+import { useAsync } from "@/lib/useAsync";
+import type { Receivable } from "@/lib/types";
+import { Alert, Badge, Card, Collapsible, ErrorState, LoadingBlock, PageHeader } from "@/components/ui";
+import { ReceivableStatusBadge } from "@/components/status";
 import { FlowSteps } from "@/components/FlowSteps";
+import { Timeline } from "@/components/Timeline";
+import { RegisterStep } from "@/components/passport/RegisterStep";
+import { DebtorStep } from "@/components/passport/DebtorStep";
+import { PublishStep, TermsChainNotice } from "@/components/passport/PublishStep";
+import { ProposalsPanel } from "@/components/passport/ProposalsPanel";
+import { AssignedSummary, AssignmentStep, useAssignmentAvailable } from "@/components/passport/AssignmentStep";
+import { OnChainRecords } from "@/components/passport/OnChainRecords";
+import { ReceivableSummary } from "@/components/passport/ReceivableSummary";
 
 const POLL_MS = 2000;
 const POLL_MAX_MS = 75_000;
-// v1.1: enquanto espera o sacado responder (no celular dele), a tela se atualiza sozinha.
-const DEBTOR_POLL_MS = 3000;
-const DEBTOR_POLL_MAX_MS = 15 * 60_000;
-// v1.1, função B: polling da cessão (§5.14), mesmo ritmo do registro.
-const ASSIGNMENT_POLL_MAX_MS = 3 * 60_000;
-const ASSIGNMENT_STATES: Receivable["status"][] = ["offer_selected", "assignment_pending", "assigned", "assignment_failed"];
+// Espera de respostas que vêm de outro aparelho (sacado) ou de transações longas.
+const SLOW_POLL_MS = 3000;
+const SLOW_POLL_MAX_MS = 15 * 60_000;
 
-function SelectedOfferCard({ receivable }: { receivable: Receivable }) {
-  const [offer, setOffer] = useState<Offer | null | "error">(null);
-  useEffect(() => {
-    let alive = true;
-    api
-      .listOffers(receivable.id)
-      .then((l) => alive && setOffer(l.items.find((o) => o.id === receivable.selectedOfferId) ?? "error"))
-      .catch(() => alive && setOffer("error"));
-    return () => {
-      alive = false;
-    };
-  }, [receivable.id, receivable.selectedOfferId]);
-
+/** Algo do recebível está andando sozinho no backend? Então a tela se atualiza. */
+function isWaiting(r: Receivable) {
+  const dc = r.debtorConfirmation;
   return (
-    <Card className="border-sim/30">
-      <CardTitle icon={<Handshake className="h-4 w-4 text-sim" aria-hidden />} aside={<SimulatedBadge />}>
-        Oferta simulada selecionada
-      </CardTitle>
-      {offer === null && <LoadingBlock lines={2} />}
-      {offer === "error" && <p className="text-sm text-muted">Não foi possível carregar os detalhes da oferta.</p>}
-      {offer && offer !== "error" && (
-        <DescList
-          items={[
-            { label: "Financiador (fictício)", value: `${offer.funder.name} · ${FUNDER_TYPE_LABEL[offer.funder.type]}` },
-            { label: "Valor líquido simulado", value: <span className="font-semibold tabular-nums">{formatMoney(offer.netAmountCents)}</span> },
-          ]}
-        />
-      )}
-      <p className="mt-4 text-xs text-muted">Seleção registrada apenas no histórico da demonstração. Não há contratação nem movimentação financeira.</p>
-    </Card>
+    dc.status === "requested" ||
+    dc.chain?.status === "pending" ||
+    r.listing.chain?.status === "pending" ||
+    r.status === "assignment_pending" ||
+    r.assignment.doubleSpendProof?.status === "pending"
   );
 }
 
+function NextAction({
+  r,
+  onUpdated,
+  pollTimedOut,
+  refresh,
+  assignmentAvailable,
+}: {
+  r: Receivable;
+  onUpdated: (r: Receivable) => void;
+  pollTimedOut: boolean;
+  refresh: () => void;
+  assignmentAvailable: boolean | null;
+}) {
+  const dc = r.debtorConfirmation;
+  const accepted = dc.status === "confirmed" && dc.chain?.status === "confirmed";
+  const step = { receivable: r, onUpdated };
+  // Função B atrás da flag; com a flag, aparece se o backend tiver a cessão ou se ela já existir.
+  const assignmentOn = FEATURE_ASSIGNMENT && (assignmentAvailable === true || r.assignment.status !== "none");
+
+  switch (r.status) {
+    case "created":
+    case "registration_pending":
+    case "registration_failed":
+      return <RegisterStep {...step} pollingTimedOut={pollTimedOut} onRefresh={refresh} />;
+    case "registered":
+      return accepted ? <PublishStep {...step} /> : <DebtorStep {...step} />;
+    case "published":
+      return (
+        <div className="space-y-4">
+          <TermsChainNotice {...step} />
+          <ProposalsPanel {...step} />
+        </div>
+      );
+    case "offer_selected":
+    case "assignment_pending":
+    case "assignment_failed":
+      return assignmentOn ? <AssignmentStep {...step} /> : <ProposalsPanel {...step} />;
+    case "assigned":
+      return <AssignedSummary {...step} proofAvailable={assignmentAvailable === true} />;
+  }
+}
+
 function Passport() {
+  const { t } = useI18n();
   const { id } = useParams<{ id: string }>();
-  const search = useSearchParams();
-  const justCreated = search.get("criado") === "1";
-  const justSelected = search.get("oferta") === "1";
+  const justCreated = useSearchParams().get("criado") === "1";
   const { state, setState, reload } = useAsync(() => api.getReceivable(id), [id]);
   const r = state.data;
+  const onUpdated = (next: Receivable) => setState({ status: "success", data: next });
+  const assignmentAvailable = useAssignmentAvailable();
 
-  // Polling enquanto o registro está pendente (§5.5 do contrato).
+  // Registro pendente: polling rápido com limite (§5.5).
   const pollStart = useRef<number | null>(null);
   const [pollTimedOut, setPollTimedOut] = useState(false);
-  const pending = r?.status === "registration_pending";
+  const registering = r?.status === "registration_pending";
   useEffect(() => {
-    if (!pending) {
+    if (!registering) {
       pollStart.current = null;
       setPollTimedOut(false);
       return;
     }
     if (pollTimedOut) return;
-    if (pollStart.current == null) pollStart.current = Date.now();
-    const t = setInterval(() => {
+    pollStart.current ??= Date.now();
+    const timer = setInterval(() => {
       if (Date.now() - (pollStart.current ?? 0) > POLL_MAX_MS) {
         setPollTimedOut(true);
-        clearInterval(t);
+        clearInterval(timer);
         return;
       }
       void reload(true);
     }, POLL_MS);
-    return () => clearInterval(t);
-  }, [pending, pollTimedOut, reload]);
+    return () => clearInterval(timer);
+  }, [registering, pollTimedOut, reload]);
 
-  const dcWaiting = r?.debtorConfirmation.status === "requested" || r?.debtorConfirmation.chain?.status === "pending";
+  const waiting = !!r && isWaiting(r);
   useEffect(() => {
-    if (!dcWaiting) return;
+    if (!waiting) return;
     const started = Date.now();
-    const t = setInterval(() => {
-      if (Date.now() - started > DEBTOR_POLL_MAX_MS) return clearInterval(t);
+    const timer = setInterval(() => {
+      if (Date.now() - started > SLOW_POLL_MAX_MS) return clearInterval(timer);
       void reload(true);
-    }, DEBTOR_POLL_MS);
-    return () => clearInterval(t);
-  }, [dcWaiting, reload]);
+    }, r?.status === "assignment_pending" ? POLL_MS : SLOW_POLL_MS);
+    return () => clearInterval(timer);
+  }, [waiting, r?.status, reload]);
 
-  const assignmentPending = r?.status === "assignment_pending";
-  useEffect(() => {
-    if (!assignmentPending) return;
-    const started = Date.now();
-    const t = setInterval(() => {
-      if (Date.now() - started > ASSIGNMENT_POLL_MAX_MS) return clearInterval(t);
-      void reload(true);
-    }, POLL_MS);
-    return () => clearInterval(t);
-  }, [assignmentPending, reload]);
-  const assignmentAvailable = useAssignmentAvailable();
-
-  const refreshNow = () => {
+  const refresh = () => {
     pollStart.current = Date.now();
     setPollTimedOut(false);
     void reload(true);
   };
 
+  const back = (
+    <Link href="/distribuidor" className="inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-ink">
+      <ArrowLeft className="h-4 w-4" aria-hidden /> {t.passport.back}
+    </Link>
+  );
+
   if (!r && state.status === "loading") {
     return (
       <div className="space-y-6">
-        <LoadingBlock label="Carregando passaporte…" lines={2} />
+        <LoadingBlock label={t.passport.loading} lines={2} />
         <Card><LoadingBlock lines={4} /></Card>
       </div>
     );
@@ -131,140 +148,75 @@ function Passport() {
   if (!r && state.status === "error") {
     return (
       <>
-        <BackLink />
-        <ErrorState
-          title={state.error.code === "NOT_FOUND" ? "Recebível não encontrado" : "Não foi possível carregar o passaporte"}
-          message={state.error.message}
-          onRetry={state.error.code === "NOT_FOUND" ? undefined : () => reload()}
-        />
+        {back}
+        <div className="mt-4">
+          <ErrorState
+            title={state.error.code === "NOT_FOUND" ? t.passport.notFound : t.passport.loadError}
+            message={state.error.message}
+            onRetry={state.error.code === "NOT_FOUND" ? undefined : () => reload()}
+          />
+        </div>
       </>
     );
   }
   if (!r) return null;
 
-  const offersReady = r.chain.status === "confirmed";
-  const dc = r.debtorConfirmation;
-  const dcConfirmed = dc.status === "confirmed" && dc.chain?.status === "confirmed";
-  // Dados anteriores à v1.1 podem ter oferta selecionada sem confirmação: nesse caso o card não aparece.
-  const showDebtorCard = offersReady && (r.status === "registered" || dc.status !== "none");
-  const doc = r.documents[0];
-  // Função B: atrás da flag; com a flag ligada, aparece se o backend tiver a cessão ou se ela já existir neste recebível.
-  const showAssignment =
-    FEATURE_ASSIGNMENT && ASSIGNMENT_STATES.includes(r.status) && (assignmentAvailable === true || r.assignment.status !== "none");
-
   return (
     <>
       <PageHeader
-        back={<BackLink />}
+        back={back}
         title={
           <span className="flex flex-wrap items-center gap-3">
             {r.reference}
             <ReceivableStatusBadge status={r.status} />
-            {dc.status === "confirmed" && <DebtorConfirmationBadge status="confirmed" />}
           </span>
         }
-        subtitle={`Passaporte digital · atualizado em ${formatDateTime(r.updatedAt)}`}
-        actions={
-          offersReady && (
-            <ButtonLink href={`/recebiveis/${r.id}/ofertas`} variant={r.status === "registered" && dcConfirmed ? "primary" : "secondary"}>
-              {r.status === "registered" ? "Ver ofertas simuladas" : "Rever ofertas simuladas"} <ArrowRight className="h-4 w-4" aria-hidden />
-            </ButtonLink>
-          )
+        subtitle={
+          <span className="flex flex-wrap items-center gap-2">
+            {t.passport.subtitle(formatDateTime(r.updatedAt))}
+            {r.registry.registryId && <Badge tone="info">{r.registry.registryId}</Badge>}
+          </span>
         }
       />
 
       <div className="space-y-6">
-        {justCreated && r.status === "created" && (
-          <Alert tone="ok" title="Recebível cadastrado">
-            O passaporte digital foi criado. Próximo passo: registrar na Solana Devnet.
-          </Alert>
-        )}
-        {justSelected && r.status === "offer_selected" && (
-          <Alert tone="ok" title="Oferta simulada selecionada">
-            A escolha foi registrada no histórico da demonstração.
-          </Alert>
-        )}
-        {state.status === "error" && (
-          <ErrorState title="Não foi possível atualizar" message={state.error.message} onRetry={refreshNow} />
-        )}
+        {justCreated && r.status === "created" && <Alert tone="ok">{t.passport.created}</Alert>}
+        {state.status === "error" && <ErrorState title={t.common.updateError} message={state.error.message} onRetry={refresh} />}
 
         <Card className="py-4 sm:py-5">
           <FlowSteps receivable={r} />
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-          <div className="space-y-6">
-            <ChainCard
-              receivable={r}
-              onUpdated={(next) => setState({ status: "success", data: next })}
-              pollingTimedOut={pollTimedOut}
-              onRefresh={refreshNow}
-            />
-
-            {showDebtorCard && (
-              <DebtorConfirmationCard receivable={r} onUpdated={(next) => setState({ status: "success", data: next })} />
-            )}
-
-            {ASSIGNMENT_STATES.includes(r.status) && r.selectedOfferId && <SelectedOfferCard receivable={r} />}
-
-            {showAssignment && <AssignmentCard receivable={r} onUpdated={(next) => setState({ status: "success", data: next })} />}
-
-            <Card>
-              <CardTitle>Dados da operação</CardTitle>
-              <DescList
-                items={[
-                  { label: "Distribuidor", value: r.distributor.name },
-                  { label: "Sacado (pseudônimo)", value: `${r.debtor.alias} · ${r.debtor.state}` },
-                  { label: "Insumo", value: `${PRODUCT_CATEGORY_LABEL[r.product.category]} — ${r.product.description}` },
-                  { label: "Safra", value: r.cropSeason },
-                  { label: "Valor de face", value: <span className="font-semibold tabular-nums">{formatMoney(r.amountCents)}</span> },
-                  { label: "Prazo", value: `${r.termDays} dias` },
-                  { label: "Emissão", value: formatDate(r.issueDate) },
-                  { label: "Vencimento", value: formatDate(r.dueDate) },
-                ]}
-              />
-              <p className="mt-5 text-xs text-muted">Recebível fictício para demonstração. Não há validação jurídica.</p>
-            </Card>
-
-            {doc && (
-              <Card>
-                <CardTitle icon={<FileText className="h-4 w-4 text-muted" aria-hidden />}>Documento</CardTitle>
-                <DescList
-                  items={[
-                    { label: "Arquivo", value: <span className="break-all">{doc.filename}</span> },
-                    { label: "Tipo", value: `${DOCUMENT_KIND_LABEL[doc.kind]} · ${formatBytes(doc.sizeBytes)}` },
-                  ]}
-                />
-                <div className="mt-4">
-                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-faint">SHA-256 (calculado pelo backend)</p>
-                  <MonoValue value={doc.sha256} copyLabel="Copiar hash do documento" />
-                </div>
-                <p className="mt-3 text-xs text-muted">O arquivo fica guardado de forma privada. Apenas este hash é registrado on-chain.</p>
-              </Card>
-            )}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <section aria-labelledby="next-action" className="min-w-0 space-y-3">
+            <h2 id="next-action" className="text-xs font-semibold uppercase tracking-wide text-faint">
+              {r.status === "assigned" ? t.passport.done : t.passport.nextAction}
+            </h2>
+            <NextAction r={r} onUpdated={onUpdated} pollTimedOut={pollTimedOut} refresh={refresh} assignmentAvailable={assignmentAvailable} />
+          </section>
+          <div className="lg:pt-7">
+            <ReceivableSummary receivable={r} />
           </div>
-
-          <Card className="lg:self-start">
-            <CardTitle icon={<History className="h-4 w-4 text-muted" aria-hidden />}>Histórico</CardTitle>
-            <Timeline events={r.events} />
-          </Card>
         </div>
+
+        <OnChainRecords receivable={r} />
+
+        <Collapsible
+          title={t.passport.history}
+          icon={<History className="h-4 w-4 text-muted" aria-hidden />}
+          aside={<span className="text-xs text-muted">{t.passport.historyCount(r.events.length)}</span>}
+          testId="history"
+        >
+          <Timeline events={r.events} />
+        </Collapsible>
       </div>
     </>
   );
 }
 
-function BackLink() {
-  return (
-    <Link href="/" className="inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-ink">
-      <ArrowLeft className="h-4 w-4" aria-hidden /> Recebíveis
-    </Link>
-  );
-}
-
 export default function PassportPage() {
   return (
-    <Suspense fallback={<LoadingBlock label="Carregando passaporte…" />}>
+    <Suspense fallback={<LoadingBlock />}>
       <Passport />
     </Suspense>
   );

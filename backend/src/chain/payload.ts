@@ -42,3 +42,21 @@ export const confirmationHash = (r: Receivable, confirmedAt: string) =>
 export function buildConfirmationMemo(r: Receivable, ch: string): string {
   return JSON.stringify({ app: "agroflux", v: 1, evt: "debtor_confirmed", rid: r.id, ch });
 }
+
+// v1.2 (§6.6): payload canônico e memo do termo de coobrigação.
+export function termsPayload(r: Receivable, t: { acceptedAt: string; textSha256: string; version: string }): string {
+  return JSON.stringify({
+    acceptedAt: t.acceptedAt,
+    receivableId: r.id,
+    receivablePayloadHash: r.chain.payloadHash,
+    termsTextSha256: t.textSha256,
+    termsVersion: t.version,
+  });
+}
+
+export const termsHash = (r: Receivable, t: { acceptedAt: string; textSha256: string; version: string }) =>
+  createHash("sha256").update(termsPayload(r, t)).digest("hex");
+
+export function buildTermsMemo(r: Receivable, th: string): string {
+  return JSON.stringify({ app: "agroflux", v: 1, evt: "receivable_published", rid: r.id, th });
+}

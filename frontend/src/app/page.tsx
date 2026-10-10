@@ -1,184 +1,131 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, FileStack, Plus, RefreshCw } from "lucide-react";
-import { api } from "@/lib/api";
-import { useAsync } from "@/lib/useAsync";
-import { formatDate, formatMoney } from "@/lib/format";
-import { PRODUCT_CATEGORY_LABEL } from "@/lib/labels";
-import { Button, ButtonLink, EmptyState, ErrorState, PageHeader, Skeleton, cx } from "@/components/ui";
-import { ChainStatusBadge, DebtorConfirmationBadge, ReceivableStatusBadge } from "@/components/status";
-import { FEATURE_ASSIGNMENT } from "@/lib/features";
-import type { ReceivableList } from "@/lib/types";
+import { ArrowRight, Building2, FileCheck2, Landmark, Search, ShieldCheck, Store, UserCheck } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
+import { useRole } from "@/lib/role";
+import { cx } from "@/components/ui";
 
-function Kpi({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
+const QUESTION_ICONS = [FileCheck2, UserCheck, ShieldCheck];
+
+function RoleCard({ href, icon, title, text, cta, onPick, primary }: { href: string; icon: React.ReactNode; title: string; text: string; cta: string; onPick: () => void; primary?: boolean }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-faint">{label}</p>
-      <p className="mt-1.5 text-2xl font-bold tabular-nums text-ink">{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
-    </div>
+    <Link
+      href={href}
+      onClick={onPick}
+      className={cx(
+        "group flex flex-col rounded-2xl border p-6 transition-colors",
+        primary ? "border-brand bg-brand text-white hover:bg-brand-hover" : "border-border bg-surface hover:border-brand",
+      )}
+      data-testid={href === "/distribuidor" ? "enter-distributor" : "enter-funder"}
+    >
+      <span className={cx("flex h-11 w-11 items-center justify-center rounded-xl", primary ? "bg-white/15" : "bg-brand-soft text-brand")}>{icon}</span>
+      <span className="mt-4 text-lg font-bold">{title}</span>
+      <span className={cx("mt-1 flex-1 text-sm", primary ? "text-white/85" : "text-muted")}>{text}</span>
+      <span className={cx("mt-5 inline-flex items-center gap-2 text-sm font-semibold", primary ? "text-white" : "text-brand")}>
+        {cta} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+      </span>
+    </Link>
   );
 }
 
-// v1.1: confirmação do sacado e, com a função B ligada, cessões liquidadas.
-const KPI_COUNT = FEATURE_ASSIGNMENT ? 5 : 4;
-const KPI_COLS = FEATURE_ASSIGNMENT ? "lg:grid-cols-5" : "lg:grid-cols-4";
-
-function KpiRow({ data }: { data?: ReceivableList }) {
-  if (!data) {
-    return (
-      <div className={cx("grid grid-cols-2 gap-3", KPI_COLS)} aria-hidden>
-        {Array.from({ length: KPI_COUNT }).map((_, i) => (
-          <div key={i} className="rounded-xl border border-border bg-surface p-4">
-            <Skeleton className="w-20" />
-            <Skeleton className="mt-3 h-7 w-24" />
-          </div>
-        ))}
-      </div>
-    );
-  }
-  const t = data.totals;
-  return (
-    <div className={cx("grid grid-cols-2 gap-3", KPI_COLS)}>
-      <Kpi label="Valor em carteira" value={formatMoney(t.amountCents)} hint={`${t.count} recebível(is)`} />
-      <Kpi label="Registrados na Devnet" value={t.registeredCount} hint={t.pendingCount ? `${t.pendingCount} em registro` : undefined} />
-      <Kpi label="Confirmados pelo sacado" value={t.debtorConfirmedCount} hint="simulação" />
-      {/* Cessões liquidadas também passaram pela seleção de oferta. */}
-      <Kpi label="Com oferta simulada" value={t.offerSelectedCount + t.assignedCount} />
-      {FEATURE_ASSIGNMENT && <Kpi label="Cessões liquidadas" value={t.assignedCount} hint="tBRL-DEMO, sem valor" />}
-    </div>
-  );
-}
-
-function ListSkeleton() {
-  return (
-    <div className="rounded-xl border border-border bg-surface" role="status" aria-live="polite">
-      <span className="sr-only">Carregando recebíveis…</span>
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 border-b border-border p-4 last:border-0">
-          <Skeleton className="w-20" />
-          <Skeleton className="w-40" />
-          <Skeleton className="ml-auto w-24" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export default function DashboardPage() {
-  const { state, reload } = useAsync(() => api.listReceivables());
-  const data = state.data;
+export default function LandingPage() {
+  const { t } = useI18n();
+  const { setRole } = useRole();
+  const l = t.landing;
 
   return (
-    <>
-      <PageHeader
-        title="Recebíveis"
-        subtitle="Passaportes digitais dos recebíveis comerciais da Distribuidora Demo."
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => reload(true)} loading={state.status === "loading" && !!data}>
-              <RefreshCw className="h-4 w-4" aria-hidden /> Atualizar
-            </Button>
-            <ButtonLink href="/recebiveis/novo">
-              <Plus className="h-4 w-4" aria-hidden /> Novo recebível
-            </ButtonLink>
-          </>
-        }
-      />
-
-      <div className="space-y-6">
-        <KpiRow data={data} />
-
-        {state.status === "error" && !data && (
-          <ErrorState message={state.error.message} onRetry={() => reload()} title="Não foi possível carregar os recebíveis" />
-        )}
-        {state.status === "error" && data && (
-          <ErrorState message={state.error.message} onRetry={() => reload(true)} title="A lista pode estar desatualizada" />
-        )}
-
-        {!data && state.status === "loading" && <ListSkeleton />}
-
-        {data && data.items.length === 0 && (
-          <EmptyState
-            icon={<FileStack className="h-10 w-10" aria-hidden />}
-            title="Nenhum recebível cadastrado"
-            action={
-              <ButtonLink href="/recebiveis/novo">
-                <Plus className="h-4 w-4" aria-hidden /> Cadastrar o primeiro
-              </ButtonLink>
-            }
+    <div className="space-y-16 pb-6">
+      <section className="pt-4 text-center sm:pt-10">
+        <p className="text-xs font-semibold uppercase tracking-widest text-brand">{l.eyebrow}</p>
+        <h1 className="mx-auto mt-3 max-w-3xl text-3xl font-bold tracking-tight text-ink sm:text-5xl">{l.title}</h1>
+        <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">{l.subtitle}</p>
+        <div className="mx-auto mt-8 flex max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
+          <Link
+            href="/distribuidor"
+            onClick={() => setRole("distributor")}
+            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg bg-brand px-5 text-sm font-semibold text-white hover:bg-brand-hover"
           >
-            Cadastre um recebível fictício com um documento de teste para gerar o passaporte digital.
-          </EmptyState>
-        )}
+            <Store className="h-4 w-4" aria-hidden /> {l.enterDistributor}
+          </Link>
+          <Link
+            href="/financiador"
+            onClick={() => setRole("funder")}
+            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface px-5 text-sm font-semibold text-ink hover:bg-subtle"
+          >
+            <Landmark className="h-4 w-4" aria-hidden /> {l.enterFunder}
+          </Link>
+        </div>
+        <p className="mt-3 text-xs text-muted">{l.demoAccess}</p>
+      </section>
 
-        {data && data.items.length > 0 && (
-          <>
-            {/* Desktop: tabela */}
-            <div className="hidden overflow-hidden rounded-xl border border-border bg-surface md:block">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-border bg-subtle text-xs uppercase tracking-wide text-faint">
-                  <tr>
-                    <th scope="col" className="px-4 py-3 font-medium">Código</th>
-                    <th scope="col" className="px-4 py-3 font-medium">Sacado</th>
-                    <th scope="col" className="hidden px-4 py-3 font-medium 2xl:table-cell">Insumo</th>
-                    <th scope="col" className="px-4 py-3 text-right font-medium">Valor</th>
-                    <th scope="col" className="px-4 py-3 font-medium">Vencimento</th>
-                    <th scope="col" className="px-4 py-3 font-medium">Status</th>
-                    <th scope="col" className="px-4 py-3 font-medium">Devnet</th>
-                    <th scope="col" className="px-4 py-3 font-medium">Confirmação</th>
-                    <th scope="col" className="w-8 px-2 py-3"><span className="sr-only">Abrir</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.items.map((r) => (
-                    <tr key={r.id} className="group relative border-b border-border last:border-0 hover:bg-subtle/60">
-                      <td className="whitespace-nowrap px-4 py-3 font-semibold">
-                        <Link href={`/recebiveis/${r.id}`} className="after:absolute after:inset-0">
-                          {r.reference}
-                        </Link>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        {r.debtor.alias} <span className="text-faint">· {r.debtor.state}</span>
-                      </td>
-                      <td className="hidden px-4 py-3 text-muted 2xl:table-cell">{PRODUCT_CATEGORY_LABEL[r.product.category]}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums">{formatMoney(r.amountCents)}</td>
-                      <td className="px-4 py-3 tabular-nums">{formatDate(r.dueDate)}</td>
-                      <td className="px-4 py-3"><ReceivableStatusBadge status={r.status} /></td>
-                      <td className="px-4 py-3"><ChainStatusBadge status={r.chain.status} /></td>
-                      <td className="px-4 py-3"><DebtorConfirmationBadge status={r.debtorConfirmation.status} short /></td>
-                      <td className="px-2 py-3 text-faint group-hover:text-ink"><ChevronRight className="h-4 w-4" aria-hidden /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+      <section aria-labelledby="problem">
+        <h2 id="problem" className="text-xl font-bold text-ink">{l.problemTitle}</h2>
+        <p className="mt-1 text-sm text-muted">{l.problemIntro}</p>
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          {l.questions.map((q, i) => {
+            const Icon = QUESTION_ICONS[i];
+            return (
+              <div key={q.q} className="rounded-xl border border-border bg-surface p-5">
+                <Icon className="h-6 w-6 text-chain" aria-hidden />
+                <p className="mt-3 font-semibold text-ink">{q.q}</p>
+                <p className="mt-1 text-sm text-muted">{q.a}</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
-            {/* Mobile: cartões */}
-            <ul className="space-y-3 md:hidden">
-              {data.items.map((r) => (
-                <li key={r.id}>
-                  <Link href={`/recebiveis/${r.id}`} className="block rounded-xl border border-border bg-surface p-4 active:bg-subtle">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold">{r.reference}</span>
-                      <span className="font-semibold tabular-nums">{formatMoney(r.amountCents)}</span>
-                    </div>
-                    <p className="mt-1 text-sm text-muted">
-                      {r.debtor.alias} · {r.debtor.state} · {PRODUCT_CATEGORY_LABEL[r.product.category]} · vence {formatDate(r.dueDate)}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <ReceivableStatusBadge status={r.status} />
-                      <ChainStatusBadge status={r.chain.status} />
-                      {r.debtorConfirmation.status !== "none" && <DebtorConfirmationBadge status={r.debtorConfirmation.status} />}
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
-    </>
+      <section aria-labelledby="how">
+        <h2 id="how" className="text-xl font-bold text-ink">{l.howTitle}</h2>
+        <ol className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {l.steps.map((s, i) => (
+            <li key={s.t} className="flex gap-3 rounded-xl border border-border bg-surface p-5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-bold text-brand">{i + 1}</span>
+              <div>
+                <p className="font-semibold text-ink">{s.t}</p>
+                <p className="mt-1 text-sm text-muted">{s.d}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section aria-labelledby="roles">
+        <h2 id="roles" className="text-xl font-bold text-ink">{l.rolesTitle}</h2>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <RoleCard
+            href="/distribuidor"
+            primary
+            icon={<Building2 className="h-5 w-5" aria-hidden />}
+            title={l.distributorCard.title}
+            text={l.distributorCard.text}
+            cta={l.enterDistributor}
+            onPick={() => setRole("distributor")}
+          />
+          <RoleCard
+            href="/financiador"
+            icon={<Landmark className="h-5 w-5" aria-hidden />}
+            title={l.funderCard.title}
+            text={l.funderCard.text}
+            cta={l.enterFunder}
+            onPick={() => setRole("funder")}
+          />
+        </div>
+      </section>
+
+      <section className="flex flex-col items-start gap-4 rounded-2xl border border-chain/25 bg-chain-soft p-6 sm:flex-row sm:items-center">
+        <Search className="h-8 w-8 shrink-0 text-chain" aria-hidden />
+        <div className="flex-1">
+          <p className="font-semibold text-ink">{l.trustTitle}</p>
+          <p className="text-sm text-muted">{l.trustText}</p>
+        </div>
+        <Link href="/transparencia" className="inline-flex items-center gap-2 text-sm font-semibold text-chain hover:underline">
+          {l.trustLink} <ArrowRight className="h-4 w-4" aria-hidden />
+        </Link>
+      </section>
+
+      <p className="rounded-lg border border-sim/30 bg-sim-soft p-4 text-sm font-medium text-sim" role="note">{l.disclaimer}</p>
+    </div>
   );
 }

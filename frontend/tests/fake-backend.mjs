@@ -1,24 +1,33 @@
 // DUBLÊ DE TESTE — usado apenas pelos testes e2e (Playwright).
-// NÃO é uma API alternativa e não deve ser usado na demo: implementa o contrato v1.0 de forma mínima
-// para exercitar o cliente HTTP do frontend. Assinaturas aqui são marcadas como FAKE e não existem na Solana.
-// v1.1: inclui a confirmação do sacado (link, confirmar/recusar, memo FAKE) e a regra G1 na seleção.
+// NÃO é uma API alternativa e não deve ser usado na demo: implementa o contrato v1.2 de forma mínima
+// para exercitar o cliente HTTP do frontend. Assinaturas e endereços aqui são marcados como FAKE e não existem na Solana.
 import { createServer } from "node:http";
 import { createHash, randomUUID } from "node:crypto";
 
 const PORT = Number(process.env.FAKE_BACKEND_PORT ?? 4010);
 const CONFIRM_MS = Number(process.env.FAKE_CONFIRM_MS ?? 1500);
-// v1.1, função B: cessão tokenizada com mint e liquidação FAKE (nada vai para a Solana).
+// Função B: cessão tokenizada com mint e liquidação FAKE (nada vai para a Solana).
 const ASSIGNMENT = process.env.FAKE_ASSIGNMENT === "true";
 const FAIL_FIRST_REGISTER = process.env.FAKE_FAIL_FIRST_REGISTER === "1";
+const TERMS = { isSimulated: true, version: "coobrigacao-demo-v1", text: "TERMO DE COOBRIGAÇÃO — DEMONSTRAÇÃO (SIMULADO, SEM VALOR JURÍDICO)\n1. Texto de teste do dublê.", textSha256: "" };
+TERMS.textSha256 = createHash("sha256").update(TERMS.text).digest("hex");
+const FUNDERS = [
+  { id: "fnd_a", name: "Financiador Demo A", type: "simulated_fidc", mode: "interactive", wallet: ASSIGNMENT ? "FAKEFunderA1111" : null, isSimulated: true },
+  { id: "fnd_b", name: "Financiador Demo B", type: "simulated_bank", mode: "automatic", wallet: ASSIGNMENT ? "FAKEFunderB1111" : null, isSimulated: true },
+  { id: "fnd_c", name: "Financiador Demo C", type: "simulated_cooperative", mode: "automatic", wallet: ASSIGNMENT ? "FAKEFunderC1111" : null, isSimulated: true },
+];
 const db = new Map();
-const tokens = new Map(); // token → { receivableId, used, revoked }
+const tokens = new Map(); // token → { receivableId, used, revoked, expiresAt }
 let n = 0;
 let failedOnce = false;
 
 const now = () => new Date().toISOString();
 const ev = (type, description, data = {}, extra = {}) => ({ id: `evt_${randomUUID()}`, type, occurredAt: now(), actor: "demo_user", description, onChain: false, chain: null, data, ...extra });
 const days = (a, b) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
-const err = (res, status, code, message, extra = {}) => send(res, status, { error: { code, message, ...extra } });
+const fakeSig = (kind, id) => `FAKE_TEST_${kind}_SIGNATURE_${id}_NAO_EXISTE_NA_SOLANA`;
+const txUrl = (sig) => `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
+const addrUrl = (a) => `https://explorer.solana.com/address/${a}?cluster=devnet`;
+const err = (res, status, code, message, extra = {}) => send(res, status, { error: { code, message, details: {}, ...extra } });
 function send(res, status, body) {
   res.writeHead(status, {
     "Content-Type": "application/json",
@@ -28,37 +37,38 @@ function send(res, status, body) {
   });
   res.end(body === undefined ? "" : JSON.stringify(body));
 }
-const summary = (r) => ({ id: r.id, reference: r.reference, status: r.status, debtor: r.debtor, product: r.product, amountCents: r.amountCents, currency: "BRL", dueDate: r.dueDate, chain: { status: r.chain.status }, selectedOfferId: r.selectedOfferId, debtorConfirmation: { status: r.debtorConfirmation.status }, assignment: { status: r.assignment.status }, createdAt: r.createdAt });
-const emptyDc = () => ({ status: "none", isSimulated: true, requestedAt: null, expiresAt: null, respondedAt: null, chain: null });
-const emptyAssignment = () => ({ status: "none", isSimulated: true, cluster: "devnet", offerId: null, tokenMint: null, settlementMint: null, settlementAsset: "tBRL-DEMO", settlementAmount: null, distributorWallet: null, funderWallet: null, escrowProgramId: null, mintSignature: null, settlementSignature: null, explorerUrls: { tokenMint: null, mint: null, settlement: null }, submittedAt: null, settledAt: null, error: null });
-const dcSummary = (r, expiresAt) => ({ isSimulated: true, disclaimer: "Simulação — sem verificação de identidade do sacado.", reference: r.reference, distributor: r.distributor, product: r.product, amountCents: r.amountCents, currency: "BRL", dueDate: r.dueDate, status: r.debtorConfirmation.status, expiresAt });
-
-function offersFor(r) {
-  if (r.offers) return r.offers;
-  const specs = [
-    ["Financiador Simulado A", "simulated_fidc", 150, 15000],
-    ["Financiador Simulado B", "simulated_bank", 195, 5000],
-    ["Financiador Simulado C", "simulated_cooperative", 240, 30000],
-  ];
-  r.offers = specs.map(([name, type, bps, fees], i) => {
-    const discount = Math.round(r.amountCents * (bps / 10000) * (r.termDays / 30));
-    return { id: `ofr_${r.id}_${i}`, receivableId: r.id, isSimulated: true, funder: { name, type }, grossAmountCents: r.amountCents, monthlyRateBps: bps, feesCents: fees, netAmountCents: r.amountCents - discount - fees, termDays: r.termDays, status: "available", expiresAt: new Date(Date.now() + 7 * 86400000).toISOString() };
-  });
-  r.events.push(ev("offers_generated", "Ofertas simuladas geradas", { offerIds: r.offers.map((o) => o.id) }, { actor: "system" }));
-  return r.offers;
+async function json(req) {
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+  } catch {
+    return {};
+  }
 }
+const summary = (r) => ({ id: r.id, reference: r.reference, status: r.status, debtor: r.debtor, product: r.product, amountCents: r.amountCents, currency: "BRL", dueDate: r.dueDate, chain: { status: r.chain.status }, selectedOfferId: r.selectedOfferId, debtorConfirmation: { status: r.debtorConfirmation.status }, assignment: { status: r.assignment.status }, registry: { registryId: r.registry.registryId }, listing: { status: r.listing.status }, createdAt: r.createdAt });
+const emptyDc = () => ({ status: "none", isSimulated: true, requestedAt: null, expiresAt: null, respondedAt: null, chain: null });
+const emptyAssignment = () => ({ status: "none", isSimulated: true, cluster: "devnet", offerId: null, tokenMint: null, settlementMint: null, settlementAsset: "tBRL-DEMO", settlementAmount: null, distributorWallet: null, funderWallet: null, escrowProgramId: null, mintSignature: null, settlementSignature: null, explorerUrls: { tokenMint: null, mint: null, settlement: null, documentLock: null }, submittedAt: null, settledAt: null, error: null, funderId: null, funderName: null, documentLock: null, doubleSpendProof: null });
+const dcSummary = (r, expiresAt) => ({ isSimulated: true, disclaimer: "Simulação — sem verificação de identidade do sacado.", reference: r.reference, distributor: r.distributor, product: r.product, amountCents: r.amountCents, currency: "BRL", dueDate: r.dueDate, status: r.debtorConfirmation.status, expiresAt, registryId: r.registry.registryId, paymentDomicile: r.registry.paymentDomicile });
+const REGISTERED = ["registered", "published", "offer_selected", "assignment_pending", "assigned", "assignment_failed"];
+const net = (gross, bps, term, fees) => gross - Math.round(gross * (bps / 10000) * (term / 30)) - fees;
+const offer = (r, f, bps, fees, origin) => ({ id: `ofr_${r.id}_${f.id}`, receivableId: r.id, isSimulated: true, funder: { id: f.id, name: f.name, type: f.type }, origin, grossAmountCents: r.amountCents, monthlyRateBps: bps, feesCents: fees, netAmountCents: net(r.amountCents, bps, r.termDays, fees), termDays: r.termDays, status: "available", expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(), createdAt: now(), updatedAt: now() });
 
 const server = createServer(async (req, res) => {
   if (req.method === "OPTIONS") return send(res, 204);
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const p = url.pathname.replace(/^\/api\/v1/, "");
   const m = (re) => p.match(re);
+  const find = (id) => db.get(id);
   try {
-    if (req.method === "GET" && p === "/health") return send(res, 200, { status: "ok", version: "fake-test", cluster: "devnet", solana: { reachable: true, feePayerBalanceLamports: 2_000_000_000 }, features: { debtorConfirmation: true, assignment: ASSIGNMENT } });
+    if (req.method === "GET" && p === "/health") return send(res, 200, { status: "ok", version: "fake-test", cluster: "devnet", solana: { reachable: true, feePayerBalanceLamports: 2_000_000_000 }, features: { debtorConfirmation: true, assignment: ASSIGNMENT, marketplace: true, doubleSpendProof: ASSIGNMENT } });
     if (req.method === "POST" && p === "/__reset") { db.clear(); tokens.clear(); n = 0; failedOnce = false; return send(res, 204); }
+    if (req.method === "GET" && p === "/terms") return send(res, 200, TERMS);
+    if (req.method === "GET" && p === "/funders") return send(res, 200, { items: FUNDERS });
     if (req.method === "GET" && p === "/receivables") {
-      const items = [...db.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(summary);
-      return send(res, 200, { items, totals: { count: items.length, amountCents: items.reduce((s, i) => s + i.amountCents, 0), registeredCount: items.filter((i) => ["registered", "offer_selected", "assignment_pending", "assigned", "assignment_failed"].includes(i.status)).length, pendingCount: items.filter((i) => i.status === "registration_pending").length, offerSelectedCount: items.filter((i) => i.status === "offer_selected").length, debtorConfirmedCount: items.filter((i) => i.debtorConfirmation.status === "confirmed").length, assignedCount: items.filter((i) => i.status === "assigned").length } });
+      const all = [...db.values()];
+      const items = all.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(summary);
+      return send(res, 200, { items, totals: { count: items.length, amountCents: items.reduce((s, i) => s + i.amountCents, 0), registeredCount: items.filter((i) => REGISTERED.includes(i.status)).length, pendingCount: items.filter((i) => i.status === "registration_pending").length, offerSelectedCount: items.filter((i) => i.status === "offer_selected").length, debtorConfirmedCount: items.filter((i) => i.debtorConfirmation.status === "confirmed").length, assignedCount: items.filter((i) => i.status === "assigned").length, publishedCount: items.filter((i) => i.status === "published").length } });
     }
     if (req.method === "POST" && p === "/receivables") {
       const chunks = [];
@@ -71,21 +81,32 @@ const server = createServer(async (req, res) => {
       const sha = createHash("sha256").update(bytes).digest("hex");
       const client = req.headers["x-client-sha256"];
       if (client && client !== sha) return err(res, 422, "HASH_MISMATCH", "O hash do documento não confere.");
+      const dup = [...db.values()].find((x) => x.documents[0].sha256 === sha);
+      if (dup) return err(res, 409, "DUPLICATE_DOCUMENT", `Este documento já está registrado na registradora (simulada) como ${dup.reference} (${dup.registry.registryId}).`, { details: { reference: dup.reference, registryId: dup.registry.registryId } });
       n += 1;
       const id = `rcv_test${n}`;
       const reference = `AGF-${String(n).padStart(4, "0")}`;
+      const registryId = `REG-DEMO-${String(n).padStart(6, "0")}`;
       const doc = { id: `doc_test${n}`, kind: data.documentKind, filename: file.name, mimeType: file.type, sizeBytes: bytes.length, sha256: sha, uploadedAt: now() };
-      const r = { id, reference, status: "created", isDemo: true, distributor: { name: "Distribuidora Demo" }, debtor: data.debtor, product: data.product, cropSeason: data.cropSeason, amountCents: data.amountCents, currency: "BRL", issueDate: data.issueDate, dueDate: data.dueDate, termDays: days(data.issueDate, data.dueDate), documents: [doc], chain: { status: "none", cluster: "devnet", signature: null, slot: null, blockTime: null, explorerUrl: null, programId: null, memo: null, payloadHash: null, submittedAt: null, confirmedAt: null, error: null }, events: [ev("receivable_created", `Recebível ${reference} cadastrado`, { reference }), ev("document_attached", "Documento de teste anexado", { documentId: doc.id, sha256: sha, filename: file.name })], selectedOfferId: null, debtorConfirmation: emptyDc(), assignment: emptyAssignment(), createdAt: now(), updatedAt: now() };
+      const r = {
+        id, reference, status: "created", isDemo: true, distributor: { name: "Distribuidora Demo" }, debtor: data.debtor, product: data.product, cropSeason: data.cropSeason, amountCents: data.amountCents, currency: "BRL", issueDate: data.issueDate, dueDate: data.dueDate, termDays: days(data.issueDate, data.dueDate), documents: [doc],
+        chain: { status: "none", cluster: "devnet", signature: null, slot: null, blockTime: null, explorerUrl: null, programId: null, memo: null, payloadHash: null, submittedAt: null, confirmedAt: null, error: null },
+        events: [ev("receivable_created", `Recebível ${reference} cadastrado`, { reference }), ev("document_attached", "Documento de teste anexado", { documentId: doc.id, sha256: sha, filename: file.name }), ev("registry_registered", `Título registrado na registradora (simulada) sob o número ${registryId}`, { registryId }, { actor: "system" })],
+        selectedOfferId: null, debtorConfirmation: emptyDc(), assignment: emptyAssignment(),
+        registry: { status: "registered", isSimulated: true, registrarName: "Registradora Demo (simulada)", registryId, registeredAt: now(), documentSha256: sha, creditor: { kind: "distributor", name: "Distribuidora Demo", wallet: null }, paymentDomicile: null },
+        listing: { status: "none", publishedAt: null, terms: null, chain: null },
+        offers: [], createdAt: now(), updatedAt: now(),
+      };
       db.set(id, r);
       return send(res, 201, r);
     }
     let mm;
     if ((mm = m(/^\/receivables\/([^/]+)$/)) && req.method === "GET") {
-      const r = db.get(mm[1]);
+      const r = find(mm[1]);
       return r ? send(res, 200, r) : err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
     }
     if ((mm = m(/^\/receivables\/([^/]+)\/register$/)) && req.method === "POST") {
-      const r = db.get(mm[1]);
+      const r = find(mm[1]);
       if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
       if (!["created", "registration_failed"].includes(r.status)) return err(res, 409, "INVALID_STATE", "Este recebível já foi enviado para registro.");
       const payloadHash = createHash("sha256").update(r.id).digest("hex");
@@ -100,108 +121,194 @@ const server = createServer(async (req, res) => {
           r.chain = { ...r.chain, status: "failed", error: { code: "RPC_UNAVAILABLE", message: "A rede Solana Devnet não respondeu. Tente novamente." } };
           r.events.push(ev("chain_registration_failed", "Falha no registro na Solana Devnet", { code: "RPC_UNAVAILABLE" }, { actor: "system" }));
         } else {
-          const signature = `FAKE_TEST_SIGNATURE_${r.id}_NAO_EXISTE_NA_SOLANA`;
-          const explorerUrl = `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
+          const signature = fakeSig("REG", r.id);
           r.status = "registered";
-          r.chain = { ...r.chain, status: "confirmed", signature, slot: 123456, blockTime: now(), explorerUrl, programId: "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr", memo: JSON.stringify({ app: "agroflux", v: 1, evt: "receivable_registered", rid: r.id, doc: r.documents[0].sha256, ph: payloadHash }), confirmedAt: now() };
-          r.events.push(ev("chain_registration_confirmed", "Registro confirmado na Solana Devnet", { signature, slot: 123456 }, { actor: "system", onChain: true, chain: { signature, explorerUrl } }));
+          r.chain = { ...r.chain, status: "confirmed", signature, slot: 123456, blockTime: now(), explorerUrl: txUrl(signature), programId: "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr", memo: JSON.stringify({ app: "agroflux", v: 1, evt: "receivable_registered", rid: r.id, doc: r.documents[0].sha256, ph: payloadHash }), confirmedAt: now() };
+          r.events.push(ev("chain_registration_confirmed", "Registro confirmado na Solana Devnet", { signature, slot: 123456 }, { actor: "system", onChain: true, chain: { signature, explorerUrl: txUrl(signature) } }));
         }
         r.updatedAt = now();
       }, CONFIRM_MS);
       return send(res, 202, { receivable: r });
     }
     if ((mm = m(/^\/receivables\/([^/]+)\/verification$/)) && req.method === "GET") {
-      const r = db.get(mm[1]);
+      const r = find(mm[1]);
       if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
       if (r.chain.status !== "confirmed") return err(res, 409, "INVALID_STATE", "Ainda não há transação confirmada para verificar.");
-      return send(res, 200, { verified: true, checkedAt: now(), signature: r.chain.signature, checks: [
-        { name: "transaction_found", passed: true, label: "Transação encontrada na Devnet" },
-        { name: "memo_matches", passed: true, label: "Conteúdo on-chain igual ao registrado" },
-        { name: "document_hash_matches", passed: true, label: "Hash do documento confere" },
-        { name: "payload_hash_matches", passed: true, label: "Hash dos dados do recebível confere" },
-      ] });
+      const checks = ["transaction_found", "memo_matches", "document_hash_matches", "payload_hash_matches"];
+      if (r.debtorConfirmation.chain?.status === "confirmed") checks.push("debtor_confirmation_matches");
+      if (r.listing.chain?.status === "confirmed") checks.push("terms_matches");
+      if (r.status === "assigned") checks.push("asset_token_unique", "asset_metadata_matches", "asset_held_by_funder", "settlement_record_matches", "document_lock_matches");
+      return send(res, 200, { verified: true, checkedAt: now(), signature: r.chain.signature, checks: checks.map((name) => ({ name, passed: true, label: name })) });
     }
     if ((mm = m(/^\/receivables\/([^/]+)\/offers$/)) && req.method === "GET") {
-      const r = db.get(mm[1]);
+      const r = find(mm[1]);
       if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
-      if (!["registered", "offer_selected", "assignment_pending", "assigned", "assignment_failed"].includes(r.status)) return err(res, 409, "INVALID_STATE", "As ofertas simuladas ficam disponíveis após a confirmação na Devnet.");
-      return send(res, 200, { isSimulated: true, disclaimer: "Ofertas fictícias geradas para demonstração. Não há financiador real, proposta vinculante ou movimentação financeira.", items: offersFor(r) });
+      if (!REGISTERED.includes(r.status)) return err(res, 409, "INVALID_STATE", "As propostas ficam disponíveis depois do registro e da publicação.");
+      return send(res, 200, { isSimulated: true, disclaimer: "Propostas fictícias de financiadores demo. Não há financiador real, proposta vinculante ou movimentação financeira.", items: r.offers });
+    }
+    if ((mm = m(/^\/receivables\/([^/]+)\/offers$/)) && req.method === "POST") {
+      const r = find(mm[1]);
+      if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
+      const b = await json(req);
+      const f = FUNDERS.find((x) => x.id === b.funderId && x.mode === "interactive");
+      const fe = {};
+      if (!f) fe.funderId = "Selecione um financiador demo válido.";
+      if (!Number.isInteger(b.monthlyRateBps) || b.monthlyRateBps < 50 || b.monthlyRateBps > 500) fe.monthlyRateBps = "Informe uma taxa entre 0,50% e 5,00% ao mês.";
+      if (!Number.isInteger(b.feesCents) || b.feesCents < 0 || b.feesCents > 100000) fe.feesCents = "Informe tarifas entre R$ 0 e R$ 1.000.";
+      if (Object.keys(fe).length) return err(res, 422, "VALIDATION_ERROR", "Alguns campos precisam de ajuste.", { fieldErrors: fe });
+      if (r.status !== "published") return err(res, 409, "INVALID_STATE", "Este recebível não está aberto para propostas.");
+      const fresh = offer(r, f, b.monthlyRateBps, b.feesCents, "proposal");
+      const i = r.offers.findIndex((o) => o.funder.id === f.id);
+      if (i >= 0) r.offers[i] = { ...fresh, createdAt: r.offers[i].createdAt };
+      else r.offers.push(fresh);
+      r.events.push(ev("offer_proposed", `${i >= 0 ? "Proposta revisada" : "Proposta recebida"} de ${f.name} (simulação)`, { offerId: fresh.id, funderId: f.id }));
+      r.updatedAt = now();
+      return send(res, 201, { offer: r.offers.find((o) => o.funder.id === f.id), receivable: r });
     }
     if ((mm = m(/^\/receivables\/([^/]+)\/offers\/([^/]+)\/select$/)) && req.method === "POST") {
-      const r = db.get(mm[1]);
+      const r = find(mm[1]);
       if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
-      const offers = offersFor(r);
-      const o = offers.find((x) => x.id === mm[2]);
-      if (!o) return err(res, 404, "NOT_FOUND", "Oferta não encontrada.");
+      const o = r.offers.find((x) => x.id === mm[2]);
+      if (!o) return err(res, 404, "NOT_FOUND", "Proposta não encontrada.");
       if (r.selectedOfferId === o.id) return send(res, 200, r);
-      if (r.selectedOfferId) return err(res, 409, "OFFER_ALREADY_SELECTED", "Já existe outra oferta selecionada.");
-      if (r.debtorConfirmation.status !== "confirmed" || r.debtorConfirmation.chain?.status !== "confirmed") return err(res, 409, "DEBTOR_CONFIRMATION_REQUIRED", "Antes de selecionar uma oferta, o sacado precisa confirmar o recebível.");
-      if (r.status !== "registered") return err(res, 409, "INVALID_STATE", "Ação não permitida no estado atual.");
-      offers.forEach((x) => (x.status = x.id === o.id ? "selected" : "unavailable"));
+      if (r.selectedOfferId) return err(res, 409, "OFFER_ALREADY_SELECTED", "Já existe outra proposta aceita.");
+      if (r.status !== "published") return err(res, 409, "INVALID_STATE", "Ação não permitida no estado atual.");
+      r.offers.forEach((x) => (x.status = x.id === o.id ? "selected" : "unavailable"));
       r.selectedOfferId = o.id;
       r.status = "offer_selected";
-      r.events.push(ev("offer_selected", `Oferta simulada de ${o.funder.name} selecionada`, { offerId: o.id, funderName: o.funder.name, netAmountCents: o.netAmountCents }));
+      r.events.push(ev("offer_selected", `Proposta simulada de ${o.funder.name} aceita`, { offerId: o.id, funderName: o.funder.name, netAmountCents: o.netAmountCents }));
       r.updatedAt = now();
       return send(res, 200, r);
     }
-    // v1.1: cessão tokenizada (§5.14), só com FAKE_ASSIGNMENT=true
-    if (ASSIGNMENT && (mm = m(/^\/receivables\/([^/]+)\/assignment$/)) && req.method === "POST") {
-      const r = db.get(mm[1]);
+    if ((mm = m(/^\/receivables\/([^/]+)\/publish$/)) && req.method === "POST") {
+      const r = find(mm[1]);
       if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
-      if (!["offer_selected", "assignment_failed"].includes(r.status)) return err(res, 409, "INVALID_STATE", "A cessão fica disponível depois da seleção de uma oferta simulada.");
-      const o = offersFor(r).find((x) => x.id === r.selectedOfferId);
-      r.status = "assignment_pending";
-      r.assignment = { ...r.assignment, status: "pending", offerId: o.id, settlementAmount: o.netAmountCents, settlementMint: "FAKE_TBRL_MINT", distributorWallet: "FAKEDistributorWallet1111", funderWallet: "FAKEFunderWallet11111111", escrowProgramId: "FAKE_ESCROW", submittedAt: now(), error: null };
-      r.events.push(ev("assignment_requested", "Cessão tokenizada solicitada (simulação na Devnet)", { offerId: o.id, settlementAmount: o.netAmountCents }));
+      const b = await json(req);
+      if (b.acceptTerms !== true || b.termsVersion !== TERMS.version) return err(res, 422, "VALIDATION_ERROR", "Alguns campos precisam de ajuste.", { fieldErrors: { acceptTerms: "Aceite o termo." } });
+      if (r.status !== "registered") return err(res, 409, "INVALID_STATE", "Ação não permitida no estado atual.");
+      if (r.debtorConfirmation.chain?.status !== "confirmed") return err(res, 409, "DEBTOR_CONFIRMATION_REQUIRED", "Antes de publicar, o sacado precisa aceitar o título.");
+      const th = createHash("sha256").update(`${r.id}:terms`).digest("hex");
+      r.status = "published";
+      r.listing = { status: "published", publishedAt: now(), terms: { version: TERMS.version, textSha256: TERMS.textSha256, termsHash: th, acceptedAt: now() }, chain: { status: "pending", signature: null, explorerUrl: null, memo: JSON.stringify({ app: "agroflux", v: 1, evt: "receivable_published", rid: r.id, th }), error: null } };
+      r.offers = [offer(r, FUNDERS[1], 180, 8000, "automatic"), offer(r, FUNDERS[2], 230, 20000, "automatic")];
+      r.events.push(ev("listing_published", "Publicado para financiadores com termo de coobrigação aceito (simulação)", { termsHash: th }), ev("offers_generated", "Propostas automáticas dos financiadores demo recebidas (simulação)", { offerIds: r.offers.map((o) => o.id) }, { actor: "system" }));
       r.updatedAt = now();
       setTimeout(() => {
-        const mint = `FAKE_ASSET_MINT_${r.id}`;
-        const sig = `FAKE_TEST_MINT_SIGNATURE_${r.id}_NAO_EXISTE_NA_SOLANA`;
-        const url = `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
-        r.assignment = { ...r.assignment, tokenMint: mint, mintSignature: sig, explorerUrls: { tokenMint: `https://explorer.solana.com/address/${mint}?cluster=devnet`, mint: url, settlement: null } };
-        r.events.push(ev("assignment_token_minted", "Token da cessão criado na Solana Devnet (Token-2022, supply 1)", { tokenMint: mint, signature: sig }, { actor: "system", onChain: true, chain: { signature: sig, explorerUrl: url } }));
-        r.updatedAt = now();
-      }, CONFIRM_MS / 2);
-      setTimeout(() => {
-        const sig = `FAKE_TEST_SETTLEMENT_SIGNATURE_${r.id}_NAO_EXISTE_NA_SOLANA`;
-        const url = `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
-        r.status = "assigned";
-        r.assignment = { ...r.assignment, status: "settled", settlementSignature: sig, settledAt: now(), explorerUrls: { ...r.assignment.explorerUrls, settlement: url } };
-        r.events.push(ev("assignment_settled", "Liquidação atômica confirmada na Solana Devnet (simulação, tBRL-DEMO sem valor)", { signature: sig, settlementAmount: r.assignment.settlementAmount, settlementAsset: "tBRL-DEMO" }, { actor: "system", onChain: true, chain: { signature: sig, explorerUrl: url } }));
+        const signature = fakeSig("TERMS", r.id);
+        r.listing.chain = { ...r.listing.chain, status: "confirmed", signature, explorerUrl: txUrl(signature) };
+        r.events.push(ev("listing_terms_anchored", "Termo de coobrigação registrado na Solana Devnet (simulação)", { signature, termsHash: th }, { actor: "system", onChain: true, chain: { signature, explorerUrl: txUrl(signature) } }));
         r.updatedAt = now();
       }, CONFIRM_MS);
       return send(res, 202, { receivable: r });
     }
-    // v1.1: confirmação do sacado
-    if ((mm = m(/^\/receivables\/([^/]+)\/debtor-confirmation$/)) && req.method === "POST") {
-      const r = db.get(mm[1]);
+    if (req.method === "GET" && p === "/marketplace") {
+      const fid = url.searchParams.get("funderId");
+      const items = [...db.values()].filter((r) => r.status === "published").map((r) => {
+        const av = r.offers.filter((o) => o.status === "available");
+        const best = av.reduce((b, o) => (!b || o.netAmountCents > b.netAmountCents ? o : b), null);
+        return { receivable: { ...summary(r), cropSeason: r.cropSeason, issueDate: r.issueDate, termDays: r.termDays }, registryId: r.registry.registryId, debtorAccepted: true, offerCount: av.length, bestOffer: best && { funderName: best.funder.name, monthlyRateBps: best.monthlyRateBps, netAmountCents: best.netAmountCents }, myOffer: av.find((o) => o.funder.id === fid) ?? null };
+      });
+      return send(res, 200, { isSimulated: true, disclaimer: "Recebíveis fictícios publicados para demonstração. Não é oferta de investimento.", items });
+    }
+    if ((mm = m(/^\/funders\/([^/]+)\/portfolio$/)) && req.method === "GET") {
+      const f = FUNDERS.find((x) => x.id === mm[1]);
+      if (!f) return err(res, 404, "NOT_FOUND", "Financiador não encontrado.");
+      const items = [...db.values()].filter((r) => r.assignment.funderId === f.id && ["assignment_pending", "assigned"].includes(r.status)).map((r) => {
+        const o = r.offers.find((x) => x.id === r.assignment.offerId);
+        return { receivableId: r.id, reference: r.reference, registryId: r.registry.registryId, status: r.status === "assigned" ? "settled" : "settling", product: r.product, debtorState: r.debtor.state, faceAmountCents: r.amountCents, paidAmountCents: r.assignment.settlementAmount, monthlyRateBps: o.monthlyRateBps, feesCents: o.feesCents, settledAt: r.assignment.settledAt, dueDate: r.dueDate, tokenMint: r.assignment.tokenMint, settlementSignature: r.assignment.settlementSignature, explorerUrls: { tokenMint: r.assignment.explorerUrls.tokenMint, settlement: r.assignment.explorerUrls.settlement } };
+      });
+      const s = items.filter((i) => i.status === "settled");
+      const paid = s.reduce((a, i) => a + i.paidAmountCents, 0);
+      const face = s.reduce((a, i) => a + i.faceAmountCents, 0);
+      return send(res, 200, { isSimulated: true, funder: f, items, totals: { count: s.length, paidAmountCents: paid, faceAmountCents: face, projectedIncomeCents: face - paid } });
+    }
+    if (req.method === "GET" && p === "/transparency") {
+      const all = [...db.values()];
+      return send(res, 200, {
+        isSimulated: true, cluster: "devnet", checkedAt: now(),
+        programs: [{ role: "memo", label: "SPL Memo", address: "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr", explorerUrl: addrUrl("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr") }, ...(ASSIGNMENT ? [{ role: "escrow", label: "Escrow AgroFlux (Anchor)", address: "FAKE_ESCROW", explorerUrl: addrUrl("FAKE_ESCROW") }] : [])],
+        settlementAsset: ASSIGNMENT ? { symbol: "tBRL-DEMO", mint: "FAKE_TBRL_MINT", decimals: 2, explorerUrl: addrUrl("FAKE_TBRL_MINT") } : null,
+        wallets: ASSIGNMENT ? FUNDERS.map((f) => ({ role: "funder", funderId: f.id, label: f.name, address: f.wallet, explorerUrl: addrUrl(f.wallet), solLamports: 0, settlementUnits: 100000000 })) : [],
+        registry: { name: "Registradora Demo (simulada)", isSimulated: true, titles: all.length },
+        stats: { receivables: all.length, registeredOnChain: all.filter((r) => r.chain.status === "confirmed").length, debtorAccepted: all.filter((r) => r.debtorConfirmation.chain?.status === "confirmed").length, published: all.filter((r) => r.listing.status === "published").length, assigned: all.filter((r) => r.status === "assigned").length, doubleSpendRejected: all.filter((r) => r.assignment.doubleSpendProof?.status === "rejected").length },
+      });
+    }
+    // Cessão tokenizada (§5.14), só com FAKE_ASSIGNMENT=true
+    if (ASSIGNMENT && (mm = m(/^\/receivables\/([^/]+)\/assignment$/)) && req.method === "POST") {
+      const r = find(mm[1]);
       if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
-      if (r.status !== "registered" || r.debtorConfirmation.status === "confirmed") return err(res, 409, "INVALID_STATE", "A confirmação do sacado fica disponível depois do registro na Devnet.");
+      if (!["offer_selected", "assignment_failed"].includes(r.status)) return err(res, 409, "INVALID_STATE", "A cessão fica disponível depois que uma proposta é aceita.");
+      const o = r.offers.find((x) => x.id === r.selectedOfferId);
+      const f = FUNDERS.find((x) => x.id === o.funder.id);
+      const lock = `FAKE_DOC_LOCK_${r.id}`;
+      r.status = "assignment_pending";
+      r.assignment = { ...r.assignment, status: "pending", offerId: o.id, settlementAmount: o.netAmountCents, settlementMint: "FAKE_TBRL_MINT", distributorWallet: "FAKEDistributor1111", funderWallet: f.wallet, funderId: f.id, funderName: f.name, escrowProgramId: "FAKE_ESCROW", documentLock: lock, explorerUrls: { ...r.assignment.explorerUrls, documentLock: addrUrl(lock) }, submittedAt: now(), error: null };
+      r.events.push(ev("assignment_requested", "Cessão tokenizada solicitada (simulação na Devnet)", { offerId: o.id, settlementAmount: o.netAmountCents }));
+      r.updatedAt = now();
+      setTimeout(() => {
+        const mint = `FAKE_ASSET_MINT_${r.id}`;
+        const sig = fakeSig("MINT", r.id);
+        r.assignment = { ...r.assignment, tokenMint: mint, mintSignature: sig, explorerUrls: { ...r.assignment.explorerUrls, tokenMint: addrUrl(mint), mint: txUrl(sig) } };
+        r.events.push(ev("assignment_token_minted", "Token da cessão criado na Solana Devnet (Token-2022, supply 1)", { tokenMint: mint, signature: sig }, { actor: "system", onChain: true, chain: { signature: sig, explorerUrl: txUrl(sig) } }));
+        r.updatedAt = now();
+      }, CONFIRM_MS / 2);
+      setTimeout(() => {
+        const sig = fakeSig("SETTLEMENT", r.id);
+        r.status = "assigned";
+        r.assignment = { ...r.assignment, status: "settled", settlementSignature: sig, settledAt: now(), explorerUrls: { ...r.assignment.explorerUrls, settlement: txUrl(sig) } };
+        r.registry = { ...r.registry, creditor: { kind: "funder", name: f.name, wallet: f.wallet }, paymentDomicile: { payeeName: f.name, instruction: `Pagar ao credor atual: ${f.name} (simulado).`, updatedAt: now() } };
+        r.events.push(
+          ev("assignment_settled", "Liquidação atômica confirmada na Solana Devnet (simulação, tBRL-DEMO sem valor)", { signature: sig }, { actor: "system", onChain: true, chain: { signature: sig, explorerUrl: txUrl(sig) } }),
+          ev("registry_creditor_updated", `Registradora (simulada): credor atualizado para ${f.name}`, { funderId: f.id }, { actor: "system" }),
+        );
+        r.updatedAt = now();
+      }, CONFIRM_MS);
+      return send(res, 202, { receivable: r });
+    }
+    if (ASSIGNMENT && (mm = m(/^\/receivables\/([^/]+)\/assignment\/double-spend-test$/)) && req.method === "POST") {
+      const r = find(mm[1]);
+      if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
+      if (r.status !== "assigned" || (r.assignment.doubleSpendProof && r.assignment.doubleSpendProof.status !== "error")) return err(res, 409, "INVALID_STATE", "Ação não permitida no estado atual.");
+      const other = FUNDERS.find((f) => f.id !== r.assignment.funderId);
+      r.assignment.doubleSpendProof = { status: "pending", attemptedAt: now(), tokenMint: null, funderId: other.id, signature: null, explorerUrl: null, reason: null, error: null };
+      setTimeout(() => {
+        const sig = fakeSig("REJECTED", r.id);
+        r.assignment.doubleSpendProof = { ...r.assignment.doubleSpendProof, status: "rejected", tokenMint: `FAKE_ATTEMPT_MINT_${r.id}`, signature: sig, explorerUrl: txUrl(sig), reason: "Documento já cedido." };
+        r.events.push(ev("double_assignment_rejected", "Prova de recusa: a Solana recusou uma segunda cessão do mesmo documento", { signature: sig }, { actor: "system", onChain: true, chain: { signature: sig, explorerUrl: txUrl(sig) } }));
+        r.updatedAt = now();
+      }, CONFIRM_MS);
+      return send(res, 202, { receivable: r });
+    }
+    // Aceite do sacado (confirmação v1.1)
+    if ((mm = m(/^\/receivables\/([^/]+)\/debtor-confirmation$/)) && req.method === "POST") {
+      const r = find(mm[1]);
+      if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
+      if (r.status !== "registered" || r.debtorConfirmation.status === "confirmed") return err(res, 409, "INVALID_STATE", "O aceite fica disponível depois do registro na Devnet.");
       for (const t of tokens.values()) if (t.receivableId === r.id) t.revoked = true;
       const token = randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "").slice(0, 11);
       const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
       tokens.set(token, { receivableId: r.id, used: false, revoked: false, expiresAt });
       r.debtorConfirmation = { ...emptyDc(), status: "requested", requestedAt: now(), expiresAt };
-      r.events.push(ev("debtor_confirmation_requested", "Confirmação solicitada ao sacado (simulação)", { expiresAt }));
+      r.events.push(ev("debtor_confirmation_requested", "Aceite solicitado ao sacado (simulação)", { expiresAt }));
       r.updatedAt = now();
       return send(res, 201, { token, confirmationPath: `/confirmar/${token}`, expiresAt, receivable: r });
     }
-    if ((mm = m(/^\/receivables\/([^/]+)\/debtor-confirmation\/register$/)) && req.method === "POST") {
-      return err(res, 409, "INVALID_STATE", "Não há registro de confirmação com falha para repetir.");
+    if ((mm = m(/^\/receivables\/([^/]+)\/(debtor-confirmation|publish)\/register$/)) && req.method === "POST") {
+      return err(res, 409, "INVALID_STATE", "Não há registro com falha para repetir.");
     }
     if ((mm = m(/^\/confirmations\/([^/]+)(?:\/(confirm|decline))?$/))) {
       const t = tokens.get(mm[1]);
-      const r = t && db.get(t.receivableId);
-      if (!t || !r) return err(res, 404, "NOT_FOUND", "Link de confirmação não encontrado.");
-      if (t.revoked) return err(res, 410, "CONFIRMATION_LINK_EXPIRED", "Este link de confirmação venceu ou foi substituído por um mais novo.");
+      const r = t && find(t.receivableId);
+      if (!t || !r) return err(res, 404, "NOT_FOUND", "Link de aceite não encontrado.");
+      if (t.revoked) return err(res, 410, "CONFIRMATION_LINK_EXPIRED", "Este link venceu ou foi substituído por um mais novo.");
       const action = mm[2];
       if (!action && req.method === "GET") return send(res, 200, dcSummary(r, t.expiresAt));
       if (action && req.method === "POST") {
-        if (t.used) return err(res, 409, "CONFIRMATION_ALREADY_ANSWERED", "Este link de confirmação já foi usado.");
+        if (t.used) return err(res, 409, "CONFIRMATION_ALREADY_ANSWERED", "Este link já foi usado.");
         t.used = true;
         if (action === "decline") {
           r.debtorConfirmation = { ...r.debtorConfirmation, status: "declined", respondedAt: now() };
-          r.events.push(ev("debtor_declined", "Sacado recusou o recebível (simulação)", {}, { actor: "system" }));
+          r.events.push(ev("debtor_declined", "Sacado recusou o título (simulação)", {}, { actor: "system" }));
           r.updatedAt = now();
           return send(res, 200, dcSummary(r, t.expiresAt));
         }
@@ -210,10 +317,9 @@ const server = createServer(async (req, res) => {
         r.debtorConfirmation = { ...r.debtorConfirmation, status: "confirmed", respondedAt: now(), chain: { status: "pending", signature: null, explorerUrl: null, memo, confirmationHash: ch, error: null } };
         r.updatedAt = now();
         setTimeout(() => {
-          const signature = `FAKE_TEST_DC_SIGNATURE_${r.id}_NAO_EXISTE_NA_SOLANA`;
-          const explorerUrl = `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
-          r.debtorConfirmation.chain = { ...r.debtorConfirmation.chain, status: "confirmed", signature, explorerUrl };
-          r.events.push(ev("debtor_confirmed", "Confirmação do sacado registrada na Solana Devnet (simulação)", { signature, confirmationHash: ch }, { actor: "system", onChain: true, chain: { signature, explorerUrl } }));
+          const signature = fakeSig("DC", r.id);
+          r.debtorConfirmation.chain = { ...r.debtorConfirmation.chain, status: "confirmed", signature, explorerUrl: txUrl(signature) };
+          r.events.push(ev("debtor_confirmed", "Aceite do sacado registrado na Solana Devnet (simulação)", { signature, confirmationHash: ch }, { actor: "system", onChain: true, chain: { signature, explorerUrl: txUrl(signature) } }));
           r.updatedAt = now();
         }, CONFIRM_MS);
         return send(res, 202, dcSummary(r, t.expiresAt));

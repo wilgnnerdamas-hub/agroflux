@@ -1,4 +1,4 @@
-// Testes do escrow da cessão (contrato v1.1, §6.4): caminho feliz e casos de falha, provando que nenhuma perna acontece.
+// Testes do escrow da cessão (contrato v1.2, §6.4 e §6.5): caminho feliz e casos de falha, provando que nenhuma perna acontece.
 import * as anchor from "@anchor-lang/core";
 import { Program } from "@anchor-lang/core";
 import {
@@ -23,6 +23,7 @@ import {
 import { createInitializeInstruction, createUpdateFieldInstruction, pack, type TokenMetadata } from "@solana/spl-token-metadata";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
 import { assert } from "chai";
+import { createHash } from "node:crypto";
 import { AgrofluxEscrow } from "../target/types/agroflux_escrow";
 
 const provider = anchor.AnchorProvider.env();
@@ -33,7 +34,11 @@ const payer = (provider.wallet as anchor.Wallet).payer;
 
 const distributor = Keypair.generate();
 const funder = Keypair.generate();
+const funder2 = Keypair.generate();
 let tbrl: PublicKey;
+
+// Hash de documento de teste (32 bytes), um por caso.
+const docHash = (label: string) => [...createHash("sha256").update(label).digest()];
 
 async function airdrop(to: PublicKey) {
   const sig = await connection.requestAirdrop(to, 2 * LAMPORTS_PER_SOL);
@@ -81,19 +86,21 @@ async function createAssetToken(reference: string, opts: { revoke?: boolean } = 
 
 const settlementPda = (assetMint: PublicKey) =>
   PublicKey.findProgramAddressSync([Buffer.from("settlement"), assetMint.toBuffer()], program.programId)[0];
+const documentPda = (hash: number[]) =>
+  PublicKey.findProgramAddressSync([Buffer.from("document"), Buffer.from(hash)], program.programId)[0];
 
-function settle(assetMint: PublicKey, amount: number) {
+function settle(assetMint: PublicKey, amount: number, hash: number[], who: Keypair = funder) {
   return program.methods
-    .settle(new anchor.BN(amount))
+    .settle(new anchor.BN(amount), hash)
     .accounts({
       payer: payer.publicKey,
       distributor: distributor.publicKey,
-      funder: funder.publicKey,
+      funder: who.publicKey,
       assetMint,
       settlementMint: tbrl,
       settlementTokenProgram: TOKEN_PROGRAM_ID,
     })
-    .signers([distributor, funder])
+    .signers([distributor, who])
     .rpc({ commitment: "confirmed" });
 }
 
@@ -109,15 +116,19 @@ describe("agroflux-escrow", () => {
   before(async () => {
     await airdrop(distributor.publicKey);
     await airdrop(funder.publicKey);
+    await airdrop(funder2.publicKey);
     // tBRL-DEMO: SPL Token clássico, 2 casas decimais; financiador recebe 1.000,00.
     tbrl = await createMint(connection, payer, payer.publicKey, null, 2, undefined, { commitment: "confirmed" });
-    const funderAta = await getOrCreateAssociatedTokenAccount(connection, payer, tbrl, funder.publicKey);
+    const funderAta = await getOrCreateAssociatedTokenAccount(connection, payer, tbrl, funder.publicKey, false, "confirmed", { commitment: "confirmed" });
     await mintTo(connection, payer, tbrl, funderAta.address, payer, 100_000, [], { commitment: "confirmed" });
+    const funder2Ata = await getOrCreateAssociatedTokenAccount(connection, payer, tbrl, funder2.publicKey, false, "confirmed", { commitment: "confirmed" });
+    await mintTo(connection, payer, tbrl, funder2Ata.address, payer, 100_000, [], { commitment: "confirmed" });
   });
 
   it("liquida atomicamente: token vai ao financiador e tBRL-DEMO ao distribuidor", async () => {
     const asset = await createAssetToken("AGF-0001");
-    await settle(asset, 12_345);
+    const hash = docHash("doc-1");
+    await settle(asset, 12_345, hash);
 
     assert.equal(await balance(asset, distributor.publicKey, TOKEN_2022_PROGRAM_ID), 0);
     assert.equal(await balance(asset, funder.publicKey, TOKEN_2022_PROGRAM_ID), 1);
@@ -131,10 +142,16 @@ describe("agroflux-escrow", () => {
     assert.ok(record.distributor.equals(distributor.publicKey));
     assert.ok(record.funder.equals(funder.publicKey));
 
+    const lock = await program.account.documentLock.fetch(documentPda(hash));
+    assert.deepEqual([...lock.documentHash], hash);
+    assert.ok(lock.assetMint.equals(asset));
+    assert.ok(lock.funder.equals(funder.publicKey));
+    assert.equal(lock.amount.toNumber(), 12_345);
+
     // O mesmo token não pode ser liquidado duas vezes.
     let failed = false;
     try {
-      await settle(asset, 1);
+      await settle(asset, 1, docHash("doc-1-outra"));
     } catch {
       failed = true;
     }
@@ -148,7 +165,7 @@ describe("agroflux-escrow", () => {
 
     let err: unknown;
     try {
-      await settle(asset, 10_000_000);
+      await settle(asset, 10_000_000, docHash("doc-2"));
     } catch (e) {
       err = e;
     }
@@ -163,18 +180,47 @@ describe("agroflux-escrow", () => {
     assert.equal(await balance(tbrl, distributor.publicKey, TOKEN_PROGRAM_ID), distributorBefore);
     // Nenhum registro de liquidação.
     assert.isNull(await connection.getAccountInfo(settlementPda(asset), "confirmed"));
+    assert.isNull(await connection.getAccountInfo(documentPda(docHash("doc-2")), "confirmed"));
 
     // Depois de abastecer o financiador, a nova tentativa liquida normalmente.
     await mintTo(connection, payer, tbrl, getAssociatedTokenAddressSync(tbrl, funder.publicKey), payer, 10_000_000, [], { commitment: "confirmed" });
-    await settle(asset, 10_000_000);
+    await settle(asset, 10_000_000, docHash("doc-2"));
     assert.equal(await balance(asset, funder.publicKey, TOKEN_2022_PROGRAM_ID), 1);
+  });
+
+  it("v1.2: recusa ceder de novo o mesmo documento com OUTRO token e outro financiador; nenhuma perna acontece", async () => {
+    const hash = docHash("doc-duplo");
+    const first = await createAssetToken("AGF-0005");
+    await settle(first, 5_000, hash);
+
+    // Distribuidor mal-intencionado: novo token para o mesmo documento, outro financiador.
+    const second = await createAssetToken("AGF-0005-B");
+    const f2Before = await balance(tbrl, funder2.publicKey, TOKEN_PROGRAM_ID);
+    const distBefore = await balance(tbrl, distributor.publicKey, TOKEN_PROGRAM_ID);
+    let err: unknown;
+    try {
+      await settle(second, 5_000, hash, funder2);
+    } catch (e) {
+      err = e;
+    }
+    assert.ok(err, "a segunda cessão do mesmo documento deveria falhar");
+    assert.match(String(err) + JSON.stringify((err as { logs?: string[] })?.logs ?? []), /already in use/i);
+
+    assert.equal(await balance(second, distributor.publicKey, TOKEN_2022_PROGRAM_ID), 1);
+    assert.isNull(await balance(second, funder2.publicKey, TOKEN_2022_PROGRAM_ID));
+    assert.equal(await balance(tbrl, funder2.publicKey, TOKEN_PROGRAM_ID), f2Before);
+    assert.equal(await balance(tbrl, distributor.publicKey, TOKEN_PROGRAM_ID), distBefore);
+    assert.isNull(await connection.getAccountInfo(settlementPda(second), "confirmed"));
+    // A trava continua apontando para o primeiro token.
+    const lock = await program.account.documentLock.fetch(documentPda(hash));
+    assert.ok(lock.assetMint.equals(first));
   });
 
   it("recusa token com autoridade de mint ativa (termos divergentes)", async () => {
     const asset = await createAssetToken("AGF-0003", { revoke: false });
     let err: unknown;
     try {
-      await settle(asset, 100);
+      await settle(asset, 100, docHash("doc-3"));
     } catch (e) {
       err = e;
     }
@@ -186,7 +232,7 @@ describe("agroflux-escrow", () => {
     const asset = await createAssetToken("AGF-0004");
     let err: unknown;
     try {
-      await settle(asset, 0);
+      await settle(asset, 0, docHash("doc-4"));
     } catch (e) {
       err = e;
     }

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { AlertTriangle, Check, Copy, Info, Loader2, RefreshCw, XCircle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Copy, ExternalLink, Info, Loader2, RefreshCw, XCircle, CheckCircle2 } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");
@@ -146,10 +147,11 @@ export function Skeleton({ className }: { className?: string }) {
   return <div className={cx("skeleton h-4", className)} aria-hidden />;
 }
 
-export function LoadingBlock({ label = "Carregando…", lines = 3 }: { label?: string; lines?: number }) {
+export function LoadingBlock({ label, lines = 3 }: { label?: string; lines?: number }) {
+  const { t } = useI18n();
   return (
     <div role="status" aria-live="polite" className="space-y-3">
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{label ?? t.common.loading}</span>
       {Array.from({ length: lines }).map((_, i) => (
         <Skeleton key={i} className={i === 0 ? "h-6 w-1/3" : "w-full"} />
       ))}
@@ -157,15 +159,16 @@ export function LoadingBlock({ label = "Carregando…", lines = 3 }: { label?: s
   );
 }
 
-export function ErrorState({ message, onRetry, title = "Não foi possível carregar" }: { message: string; onRetry?: () => void; title?: string }) {
+export function ErrorState({ message, onRetry, title }: { message: string; onRetry?: () => void; title?: string }) {
+  const { t } = useI18n();
   return (
     <Alert
       tone="bad"
-      title={title}
+      title={title ?? t.common.loadError}
       action={
         onRetry && (
           <Button variant="secondary" onClick={onRetry}>
-            <RefreshCw className="h-4 w-4" aria-hidden /> Tentar novamente
+            <RefreshCw className="h-4 w-4" aria-hidden /> {t.common.retry}
           </Button>
         )
       }
@@ -186,8 +189,10 @@ export function EmptyState({ icon, title, children, action }: { icon?: ReactNode
   );
 }
 
-export function CopyButton({ value, label = "Copiar" }: { value: string; label?: string }) {
+export function CopyButton({ value, label }: { value: string; label?: string }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
+  const text = copied ? t.common.copied : (label ?? t.common.copy);
   return (
     <button
       type="button"
@@ -201,8 +206,8 @@ export function CopyButton({ value, label = "Copiar" }: { value: string; label?:
         }
       }}
       className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-subtle hover:text-ink"
-      aria-label={copied ? "Copiado" : label}
-      title={copied ? "Copiado" : label}
+      aria-label={text}
+      title={text}
     >
       {copied ? <Check className="h-4 w-4 text-ok" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
     </button>
@@ -245,4 +250,53 @@ export function PageHeader({ title, subtitle, actions, back }: { title: ReactNod
       </div>
     </header>
   );
+}
+
+/** Link para o Solana Explorer. Só recebe URLs que vieram do backend (regra R5). */
+export function ExplorerLink({ href, children, className }: { href: string; children?: ReactNode; className?: string }) {
+  const { t } = useI18n();
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className={cx("inline-flex items-center gap-1.5 text-sm font-semibold text-chain hover:underline", className)}>
+      {children ?? t.common.viewExplorer} <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
+      <span className="sr-only">{t.common.openNewTab}</span>
+    </a>
+  );
+}
+
+/** Seção recolhível (usa <details>, acessível por teclado sem JavaScript extra). */
+export function Collapsible({
+  title,
+  aside,
+  icon,
+  defaultOpen = false,
+  children,
+  className,
+  testId,
+}: {
+  title: ReactNode;
+  aside?: ReactNode;
+  icon?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+  className?: string;
+  testId?: string;
+}) {
+  return (
+    <details open={defaultOpen} className={cx("group rounded-xl border border-border bg-surface", className)} data-testid={testId}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-4 sm:px-6 [&::-webkit-details-marker]:hidden">
+        {icon}
+        <span className="text-base font-semibold text-ink">{title}</span>
+        <span className="ml-auto flex items-center gap-2">
+          {aside}
+          <ChevronDown className="h-4 w-4 text-muted transition-transform group-open:rotate-180" aria-hidden />
+        </span>
+      </summary>
+      <div className="border-t border-border px-5 py-5 sm:px-6">{children}</div>
+    </details>
+  );
+}
+
+/** Rótulo pequeno em caixa alta, usado acima de valores técnicos. */
+export function FieldLabel({ children }: { children: ReactNode }) {
+  return <p className="mb-1 text-xs font-medium uppercase tracking-wide text-faint">{children}</p>;
 }

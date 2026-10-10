@@ -1,7 +1,12 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { AssignmentGateway } from "./chain/assignment.js";
 import type { ChainGateway } from "./chain/solana.js";
 import { ApiError } from "./errors.js";
-import { listOffers, selectOffer } from "./offers.js";
+import { listFunders } from "./funders.js";
+import { getTerms, type ListingService } from "./listing.js";
+import { marketplace, portfolio } from "./marketplace.js";
+import { listOffers, proposeOffer, selectOffer } from "./offers.js";
+import { transparency } from "./transparency.js";
 import type { AssignmentService } from "./assignment.js";
 import type { ConfirmationService } from "./confirmation.js";
 import type { Registrar } from "./registration.js";
@@ -12,7 +17,7 @@ import type { Health } from "./types.js";
 import { detectMime, validateReceivableInput } from "./validation.js";
 import { verifyReceivable } from "./verification.js";
 
-export const API_VERSION = "1.1.0";
+export const API_VERSION = "1.2.0";
 const FILE_MESSAGE = "Envie um PDF, PNG ou JPEG de até 5 MB.";
 
 export interface RouteDeps {
@@ -20,13 +25,17 @@ export interface RouteDeps {
   chain: ChainGateway;
   registrar: Registrar;
   confirmations: ConfirmationService;
+  listings: ListingService;
   assignments: AssignmentService | null;
+  assignmentGateway: AssignmentGateway | null;
   demoResetEnabled: boolean;
 }
 
 type IdParams = { Params: { id: string } };
 type OfferParams = { Params: { id: string; offerId: string } };
 type TokenParams = { Params: { token: string } };
+type FunderParams = { Params: { id: string } };
+type MarketQuery = { Querystring: { funderId?: string } };
 
 const idempotencyKey = (req: FastifyRequest) => {
   const header = req.headers["idempotency-key"];
@@ -50,10 +59,20 @@ async function readMultipart(req: FastifyRequest) {
   return { data, document };
 }
 
-export async function routes(api: FastifyInstance, { store, chain, registrar, confirmations, assignments, demoResetEnabled }: RouteDeps) {
+export async function routes(api: FastifyInstance, deps: RouteDeps) {
+  const { store, chain, registrar, confirmations, listings, assignments, assignmentGateway, demoResetEnabled } = deps;
+  const wallets = assignmentGateway?.parties.funderWallets ?? null;
+
   api.get("/health", async (): Promise<Health> => {
     const solana = await chain.health();
-    return { status: "ok", version: API_VERSION, cluster: "devnet", solana, features: { debtorConfirmation: true, assignment: assignments !== null } };
+    const assignment = assignments !== null;
+    return {
+      status: "ok",
+      version: API_VERSION,
+      cluster: "devnet",
+      solana,
+      features: { debtorConfirmation: true, assignment, marketplace: true, doubleSpendProof: assignment },
+    };
   });
 
   api.get("/receivables", async () => listReceivables(store));
@@ -93,13 +112,29 @@ export async function routes(api: FastifyInstance, { store, chain, registrar, co
     return reply.status(202).send({ receivable });
   });
 
-  api.get<IdParams>("/receivables/:id/verification", async (req) => verifyReceivable(store, chain, req.params.id));
+  api.get<IdParams>("/receivables/:id/verification", async (req) => verifyReceivable(store, chain, req.params.id, assignmentGateway));
 
   api.get<IdParams>("/receivables/:id/offers", async (req) => listOffers(store, req.params.id));
 
   api.post<OfferParams>("/receivables/:id/offers/:offerId/select", async (req) =>
     selectOffer(store, req.params.id, req.params.offerId),
   );
+
+  // v1.2: publicação com termo de coobrigação, propostas, visão do financiador e transparência (§5.15–5.23).
+  api.get("/terms", async () => getTerms());
+  api.post<IdParams>("/receivables/:id/publish", async (req, reply) => {
+    const receivable = await listings.publish(req.params.id, req.body, idempotencyKey(req));
+    return reply.status(202).send({ receivable });
+  });
+  api.post<IdParams>("/receivables/:id/publish/register", async (req, reply) => {
+    const receivable = await listings.retryRegister(req.params.id, idempotencyKey(req));
+    return reply.status(202).send({ receivable });
+  });
+  api.post<IdParams>("/receivables/:id/offers", async (req, reply) => reply.status(201).send(proposeOffer(store, req.params.id, req.body)));
+  api.get("/funders", async () => ({ items: listFunders(wallets) }));
+  api.get<MarketQuery>("/marketplace", async (req) => marketplace(store, req.query.funderId));
+  api.get<FunderParams>("/funders/:id/portfolio", async (req) => portfolio(store, req.params.id, wallets));
+  api.get("/transparency", async () => transparency(store, chain, assignmentGateway));
 
   // v1.1: confirmação do sacado (§5.10–5.13).
   api.post<IdParams>("/receivables/:id/debtor-confirmation", async (req, reply) =>
@@ -121,12 +156,16 @@ export async function routes(api: FastifyInstance, { store, chain, registrar, co
       const receivable = await assignments.request(req.params.id, idempotencyKey(req));
       return reply.status(202).send({ receivable });
     });
+    api.post<IdParams>("/receivables/:id/assignment/double-spend-test", async (req, reply) => {
+      const receivable = await assignments.requestDoubleSpendProof(req.params.id);
+      return reply.status(202).send({ receivable });
+    });
   }
 
   // Só existe com DEMO_RESET_ENABLED=true; sem isso, cai no 404 padrão.
   if (demoResetEnabled) {
     api.post("/demo/reset", async (_req, reply) => {
-      await resetDemo(store, registrar);
+      await resetDemo(store, registrar, confirmations, listings);
       return reply.status(204).send();
     });
   }

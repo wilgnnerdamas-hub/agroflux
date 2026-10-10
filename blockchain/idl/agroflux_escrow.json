@@ -313,6 +313,34 @@
           }
         },
         {
+          "name": "document_lock",
+          "docs": [
+            "Trava do documento (v1.2). `init` falha se o documento já foi cedido, mesmo com outro token."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  99,
+                  117,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "document_hash"
+              }
+            ]
+          }
+        },
+        {
           "name": "asset_token_program",
           "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
         },
@@ -332,11 +360,33 @@
         {
           "name": "amount",
           "type": "u64"
+        },
+        {
+          "name": "document_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         }
       ]
     }
   ],
   "accounts": [
+    {
+      "name": "DocumentLock",
+      "discriminator": [
+        112,
+        144,
+        12,
+        98,
+        217,
+        224,
+        208,
+        118
+      ]
+    },
     {
       "name": "Settlement",
       "discriminator": [
@@ -400,6 +450,43 @@
   ],
   "types": [
     {
+      "name": "DocumentLock",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "document_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "asset_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "funder",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "settled_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "Settled",
       "type": {
         "kind": "struct",
@@ -407,6 +494,15 @@
           {
             "name": "asset_mint",
             "type": "pubkey"
+          },
+          {
+            "name": "document_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "settlement_mint",

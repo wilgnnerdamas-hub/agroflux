@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ChainUnavailableError } from "../src/chain/solana.js";
 import { netAmount, offerTerms } from "../src/offers.js";
 import type { Offer, Receivable } from "../src/types.js";
-import { createConfirmed, createOne, createRegistered, fakeChain, makeApp, TEST_SIGNATURE } from "./helpers.js";
+import { createOne, createPublished, createRegistered, fakeChain, makeApp, TEST_SIGNATURE } from "./helpers.js";
 
 type App = Awaited<ReturnType<typeof makeApp>>["app"];
 const verify = (app: App, id: string) => app.inject({ method: "GET", url: `/api/v1/receivables/${id}/verification` });
@@ -65,7 +65,7 @@ describe("GET /api/v1/receivables/:id/verification", () => {
   });
 });
 
-describe("ofertas simuladas", () => {
+describe("propostas simuladas (v1.2)", () => {
   it("cálculo de referência do contrato (§3.7 e exemplo do §5.7)", () => {
     expect(netAmount(15_000_000, 150, 157, 15_000)).toBe(13_807_500);
   });
@@ -81,27 +81,31 @@ describe("ofertas simuladas", () => {
     }
   });
 
-  it("409 antes do registro", async () => {
+  it("409 antes do registro; lista vazia em registered (ainda não publicado)", async () => {
     const built = await makeApp();
     const created = await createOne(built.app);
     const res = await offers(built.app, created.id);
     expect(res.statusCode).toBe(409);
     expect(res.json().error.code).toBe("INVALID_STATE");
+
+    const { id } = await createRegistered(built);
+    const empty = (await offers(built.app, id)).json();
+    expect(empty).toMatchObject({ isSimulated: true, items: [] });
+    expect(empty.disclaimer).toMatch(/fictícias/);
   });
 
-  it("gera 3 ofertas uma única vez, com disclaimer e evento", async () => {
+  it("a publicação gera as propostas automáticas de B e C, uma única vez", async () => {
     const built = await makeApp();
-    const { id } = await createRegistered(built);
+    const { id } = await createPublished(built);
     const first = (await offers(built.app, id)).json();
-    expect(first.isSimulated).toBe(true);
-    expect(first.disclaimer).toMatch(/fictícias/);
-    expect(first.items).toHaveLength(3);
+    expect(first.items).toHaveLength(2);
     for (const o of first.items as Offer[]) {
-      expect(o).toMatchObject({ receivableId: id, isSimulated: true, grossAmountCents: 15_000_000, termDays: 165, status: "available" });
+      expect(o).toMatchObject({ receivableId: id, isSimulated: true, origin: "automatic", grossAmountCents: 15_000_000, termDays: 165, status: "available" });
       expect(o.id).toMatch(/^ofr_/);
       expect(o.netAmountCents).toBe(netAmount(o.grossAmountCents, o.monthlyRateBps, o.termDays, o.feesCents));
     }
-    expect(first.items.map((o: Offer) => o.funder.type)).toEqual(["simulated_fidc", "simulated_bank", "simulated_cooperative"]);
+    expect(first.items.map((o: Offer) => o.funder.id)).toEqual(["fnd_b", "fnd_c"]);
+    expect(first.items.map((o: Offer) => o.funder.type)).toEqual(["simulated_bank", "simulated_cooperative"]);
 
     const second = (await offers(built.app, id)).json();
     expect(second.items).toEqual(first.items);
@@ -110,19 +114,9 @@ describe("ofertas simuladas", () => {
     expect(events[0].data).toEqual({ offerIds: first.items.map((o: Offer) => o.id) });
   });
 
-  it("G1: sem a confirmação do sacado, a seleção responde 409 DEBTOR_CONFIRMATION_REQUIRED", async () => {
+  it("aceita uma proposta, é idempotente e bloqueia outra", async () => {
     const built = await makeApp();
-    const { id } = await createRegistered(built);
-    const items: Offer[] = (await offers(built.app, id)).json().items;
-    const res = await select(built.app, id, items[0].id);
-    expect(res.statusCode).toBe(409);
-    expect(res.json().error.code).toBe("DEBTOR_CONFIRMATION_REQUIRED");
-    expect((await get(built.app, id)).status).toBe("registered");
-  });
-
-  it("seleciona uma oferta, é idempotente e bloqueia outra", async () => {
-    const built = await makeApp();
-    const { id } = await createConfirmed(built);
+    const { id } = await createPublished(built);
     const items: Offer[] = (await offers(built.app, id)).json().items;
     const [a, b] = items;
 
@@ -147,10 +141,10 @@ describe("ofertas simuladas", () => {
     expect(other.json().error.code).toBe("OFFER_ALREADY_SELECTED");
 
     const after: Offer[] = (await offers(built.app, id)).json().items;
-    expect(after.map((o) => o.status)).toEqual(["selected", "unavailable", "unavailable"]);
+    expect(after.map((o) => o.status)).toEqual(["selected", "unavailable"]);
 
     const totals = (await built.app.inject({ method: "GET", url: "/api/v1/receivables" })).json().totals;
-    expect(totals).toMatchObject({ registeredCount: 1, offerSelectedCount: 1 });
+    expect(totals).toMatchObject({ registeredCount: 1, offerSelectedCount: 1, publishedCount: 0 });
 
     expect((await select(built.app, id, "ofr_nao_existe")).statusCode).toBe(404);
   });

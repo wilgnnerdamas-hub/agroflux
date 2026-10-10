@@ -22,6 +22,8 @@ export interface SendOptions {
 }
 
 export interface ChainGateway {
+  // v1.2: endereço público da carteira pagadora (para /transparency). null se não configurada.
+  feePayerAddress?: string | null;
   health(): Promise<ChainHealth>;
   // Lança ChainUnavailableError se não der para enviar agora (RPC fora ou carteira não configurada).
   ping(): Promise<void>;
@@ -93,6 +95,8 @@ export function createSolanaGateway(rpcUrl: string, feePayerSecret: string | nul
   }
 
   return {
+    feePayerAddress: feePayer?.publicKey.toBase58() ?? null,
+
     async health() {
       try {
         if (!feePayer) {

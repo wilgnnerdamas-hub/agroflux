@@ -29,6 +29,8 @@ function summary(r: Receivable, t: ConfirmationToken): ConfirmationSummary {
     dueDate: r.dueDate,
     status: r.debtorConfirmation.status,
     expiresAt: t.expiresAt,
+    registryId: r.registry.registryId,
+    paymentDomicile: r.registry.paymentDomicile,
   };
 }
 

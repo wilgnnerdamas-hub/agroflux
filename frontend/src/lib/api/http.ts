@@ -2,6 +2,12 @@ import type { AgroFluxApi } from "./client";
 import { ApiError } from "./errors";
 import type {
   ConfirmationSummary,
+  Funder,
+  Marketplace,
+  Offer,
+  Portfolio,
+  Terms,
+  Transparency,
   CreateReceivableInput,
   DebtorConfirmationRequest,
   Health,
@@ -94,5 +100,35 @@ export function createHttpApi(baseUrl: string): AgroFluxApi {
       });
       return r.receivable;
     },
+    getTerms: () => request<Terms>("/terms"),
+    async publish(id, termsVersion, idempotencyKey) {
+      const r = await request<{ receivable: Receivable }>(`/receivables/${encodeURIComponent(id)}/publish`, {
+        method: "POST",
+        body: JSON.stringify({ acceptTerms: true, termsVersion }),
+        headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+      });
+      return r.receivable;
+    },
+    async retryPublishRegister(id, idempotencyKey) {
+      const r = await request<{ receivable: Receivable }>(`/receivables/${encodeURIComponent(id)}/publish/register`, {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+      return r.receivable;
+    },
+    proposeOffer: (id, input) =>
+      request<{ offer: Offer; receivable: Receivable }>(`/receivables/${encodeURIComponent(id)}/offers`, {
+        method: "POST",
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+      }),
+    listFunders: () => request<{ items: Funder[] }>("/funders"),
+    getMarketplace: (funderId) => request<Marketplace>(`/marketplace?funderId=${encodeURIComponent(funderId)}`),
+    getPortfolio: (funderId) => request<Portfolio>(`/funders/${encodeURIComponent(funderId)}/portfolio`),
+    async requestDoubleSpendProof(id) {
+      const r = await request<{ receivable: Receivable }>(`/receivables/${encodeURIComponent(id)}/assignment/double-spend-test`, { method: "POST" });
+      return r.receivable;
+    },
+    getTransparency: () => request<Transparency>("/transparency"),
   };
 }

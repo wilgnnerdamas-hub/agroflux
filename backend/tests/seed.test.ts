@@ -13,7 +13,7 @@ describe("POST /api/v1/demo/reset", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("apaga os dados e recria 1 registrado (tx do seed) + 1 cadastrado", async () => {
+  it("apaga os dados e recria 1 registrado + 1 cadastrado + 1 publicado (txs do seed)", async () => {
     const { app } = await makeApp(fakeChain(), ON);
     await createOne(app);
     await createOne(app);
@@ -23,9 +23,20 @@ describe("POST /api/v1/demo/reset", () => {
     expect(res.statusCode).toBe(204);
 
     const list = (await app.inject({ method: "GET", url: "/api/v1/receivables" })).json();
-    expect(list.totals).toMatchObject({ count: 2, registeredCount: 1, pendingCount: 0, offerSelectedCount: 0 });
+    expect(list.totals).toMatchObject({ count: 3, registeredCount: 2, pendingCount: 0, offerSelectedCount: 0, publishedCount: 1, debtorConfirmedCount: 1 });
     const byRef = Object.fromEntries(list.items.map((i: { reference: string; status: string }) => [i.reference, i.status]));
-    expect(byRef).toEqual({ "AGF-0001": "registered", "AGF-0002": "created" });
+    expect(byRef).toEqual({ "AGF-0001": "registered", "AGF-0002": "created", "AGF-0003": "published" });
+
+    const pub = list.items.find((i: { reference: string }) => i.reference === "AGF-0003");
+    const pubFull = (await app.inject({ method: "GET", url: `/api/v1/receivables/${pub.id}` })).json();
+    expect(pubFull.listing.chain.status).toBe("confirmed");
+    expect(pubFull.registry.registryId).toBe("REG-DEMO-000003");
+    const market = (await app.inject({ method: "GET", url: "/api/v1/marketplace?funderId=fnd_a" })).json();
+    expect(market.items).toHaveLength(1);
+    expect(market.items[0]).toMatchObject({ registryId: "REG-DEMO-000003", debtorAccepted: true, offerCount: 2, myOffer: null });
+    const pv = (await app.inject({ method: "GET", url: `/api/v1/receivables/${pub.id}/verification` })).json();
+    expect(pv.verified).toBe(true);
+    expect(pv.checks.map((c: { name: string }) => c.name)).toContain("terms_matches");
 
     const reg = list.items.find((i: { reference: string }) => i.reference === "AGF-0001");
     const full = (await app.inject({ method: "GET", url: `/api/v1/receivables/${reg.id}` })).json();

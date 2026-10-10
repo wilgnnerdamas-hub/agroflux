@@ -20,12 +20,18 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | F12 | 10/10 | As ofertas aparecem antes da confirmação, mas os botões de seleção ficam desligados, com um aviso e um atalho para a confirmação. | G1, com a proposta 2 do v1.1. |
 | F13 | 10/10 | Card "Cessão tokenizada" e quinta etapa "Cessão liquidada" atrás de `NEXT_PUBLIC_FEATURE_ASSIGNMENT`; com a flag ligada, o card só aparece se o `health` disser `features.assignment: true` (ou se a cessão já existir). A faixa de aviso fica no topo do card. | Regra 3 do v1.1: sem escrow pronto, a função não aparece. |
 
+| F14 | 10/10 | v1.2: landing em `/`, painel da distribuidora em `/distribuidor`, telas do financiador em `/financiador` (disponíveis, análise e proposta, carteira) e `/transparencia`. Sem login: "Entrar como" guarda o perfil só no navegador. | Decisões D14 e D18 do contrato v1.2. |
+| F15 | 10/10 | Passaporte enxuto: etapas, "Próxima ação" (um único cartão por estado), resumo do recebível, registros on-chain e histórico recolhíveis. Cartões antigos (`ChainCard`, `DebtorConfirmationCard`, `AssignmentCard`) substituídos por `components/passport/*`. | Pedido da gestão: didático, sem faltar nem sobrar informação. |
+| F16 | 10/10 | Interface em PT (padrão) e EN, com dicionários tipados em `src/lib/i18n` (o EN precisa ter as mesmas chaves). Em inglês, erros e eventos são traduzidos pelo código; a API segue em português. | Jurados internacionais (D18). |
+| F17 | 10/10 | QR code do aceite gerado no navegador (`qrcode`), sem serviço externo. Gráfico de rendimento em SVG próprio (`YieldChart`), com área forte até a data de referência e hachurada depois, e controle deslizante da data. | Sem dependência de gráficos; projeção sempre rotulada como simulada. |
+
 ## Decisões da gestão
 
 | # | Data | Decisão |
 |---|---|---|
 | G1 | 09/10 | A confirmação do sacado (função A do v1.1) é **obrigatória** antes de selecionar uma oferta simulada. |
 | G2 | 09/10 | O backend da demo vai ser hospedado no **Railway**. |
+| G3 | 10/10 | Refinamento v1.2: registradora simulada no backend, modelo de propostas (financiadores propõem, distribuidora aceita), uma carteira por financiador demo, registradora + termo de coobrigação contra venda dupla, trava on-chain por documento e prova de recusa. Prazo não é critério de corte (equipe em tempo integral). |
 
 ## Decisões do backend
 
@@ -47,6 +53,9 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | B14 | 10/10 | Escrow Anchor 0.32.2 em `blockchain/` com uma instrução `settle`: confere os termos, transfere o token da cessão (Token-2022) e o tBRL-DEMO (SPL Token) na mesma instrução, e cria um PDA de registro por token (impede liquidar duas vezes). Sem conferência prévia de saldo no programa, para os testes provarem a reversão. | §6.4; 4 testes (`anchor test`), incluindo financiador sem saldo sem nenhuma perna executada. |
 | B15 | 10/10 | Backend monta a instrução `settle` à mão (discriminador da IDL em `blockchain/idl/`), sem depender do cliente Anchor. Cria o token da cessão com metadados (`name`, `symbol` AGFX, `payloadHash`), revoga mint e autoridade de metadados. Assinaturas de cada etapa guardadas antes do envio (`as-mint:`, `as-settle:`) e conferidas numa nova tentativa. | Mesmo padrão do B6; nova tentativa reaproveita o token. |
 | B16 | 10/10 | A função B só liga com `ASSIGNMENT_ENABLED=true` e as quatro variáveis (`DEMO_DISTRIBUTOR_SECRET`, `DEMO_FUNDER_SECRET`, `TBRL_MINT`, `ESCROW_PROGRAM_ID`); preenchidas por `npm run setup:assignment`. Gateway real testado contra validador local (`scripts/localnet-assignment.ts`). | Secrets só no `.env`/Railway; produção continua desligada até o deploy do escrow. |
+| B17 | 10/10 | Registradora simulada no cadastro: `registryId` sequencial (`registrySeq` no `db.json`), recusa de hash de documento repetido (`409 DUPLICATE_DOCUMENT`) antes de salvar qualquer coisa. Migração completa `registry`, `listing` e os campos novos da cessão em dados antigos. | Unicidade por documento (D13). |
+| B18 | 10/10 | `ListingService` reaproveita a ancoragem de memo (chave `ls:<id>`) para o termo de coobrigação; falha no memo não bloqueia as propostas. Propostas automáticas de B e C nascem no `publish`; A propõe/revisa por `POST /offers` (mesmo id). | §5.16–5.18 do contrato v1.2. |
+| B19 | 10/10 | Escrow v1.2: `settle(amount, document_hash)` com PDA `["document", hash]` (`init`), 5/5 em `anchor test`. Gateway com uma carteira por financiador, `classifySettleError` distingue `DOCUMENT_ALREADY_ASSIGNED`, `inspect` lê mint/metadados/ATA/registros para a verificação, `readBalances` para a transparência. Prova de recusa enviada com `skipPreflight` e só vale se os logs apontarem a trava do documento. Integração real aprovada no validador local. | §6.5 e §6.7. |
 
 ## O frontend depende de
 

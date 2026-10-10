@@ -1,6 +1,9 @@
-// POST /demo/reset (§5.9): apaga os recebíveis e recria 2 exemplos fictícios.
-// O primeiro é registrado na Devnet com uma transação REAL; o segundo fica `created` para registrar ao vivo.
+// POST /demo/reset (§5.9): apaga os recebíveis e recria 3 exemplos fictícios, todos com transações REAIS quando há.
+// AGF-0001: registrado na Devnet. AGF-0002: só cadastrado, para registrar ao vivo.
+// AGF-0003 (v1.2): registrado, aceito pelo sacado e publicado, para a tela do financiador começar com um recebível.
+import type { ConfirmationService } from "./confirmation.js";
 import { ApiError } from "./errors.js";
+import { TERMS_VERSION, type ListingService } from "./listing.js";
 import { createReceivable } from "./receivables.js";
 import type { Registrar } from "./registration.js";
 import type { Store } from "./store.js";
@@ -32,9 +35,11 @@ export function demoPdf(title: string): Buffer {
   return Buffer.from(body, "latin1");
 }
 
-const EXAMPLES: { input: () => CreateReceivableInput; filename: string; title: string; register: boolean }[] = [
+type Stage = "created" | "registered" | "published";
+
+const EXAMPLES: { input: () => CreateReceivableInput; filename: string; title: string; stage: Stage }[] = [
   {
-    register: true,
+    stage: "registered",
     filename: "nf-teste-demo-01.pdf",
     title: "Nota fiscal de teste 01",
     input: () => ({
@@ -48,7 +53,7 @@ const EXAMPLES: { input: () => CreateReceivableInput; filename: string; title: s
     }),
   },
   {
-    register: false,
+    stage: "created",
     filename: "contrato-teste-demo-02.pdf",
     title: "Contrato de teste 02",
     input: () => ({
@@ -61,19 +66,44 @@ const EXAMPLES: { input: () => CreateReceivableInput; filename: string; title: s
       documentKind: "test_contract",
     }),
   },
+  {
+    stage: "published",
+    filename: "nf-teste-demo-03.pdf",
+    title: "Nota fiscal de teste 03",
+    input: () => ({
+      debtor: { alias: "Produtor Demo 03", state: "PR" },
+      product: { category: "seed", description: "Semente de soja certificada (demo)" },
+      cropSeason: "2026/27",
+      amountCents: 22_000_000,
+      issueDate: isoDaysFromToday(-5),
+      dueDate: isoDaysFromToday(180),
+      documentKind: "test_invoice",
+    }),
+  },
 ];
 
-export async function resetDemo(store: Store, registrar: Registrar) {
+const fail = (reason: string) => new ApiError(503, "CHAIN_UNAVAILABLE", `Dados da demo recriados, mas um exemplo falhou: ${reason}`);
+
+export async function resetDemo(store: Store, registrar: Registrar, confirmations: ConfirmationService, listings: ListingService) {
   store.reset();
   for (const ex of EXAMPLES) {
     const r = createReceivable(store, ex.input(), { filename: ex.filename, mimeType: "application/pdf", bytes: demoPdf(ex.title) });
-    if (!ex.register) continue;
+    if (ex.stage === "created") continue;
     await registrar.register(r.id);
     await registrar.settle(r.id);
-    const after = store.get(r.id);
-    if (after?.status !== "registered") {
-      const reason = after?.chain.error?.message ?? "o registro não foi confirmado";
-      throw new ApiError(503, "CHAIN_UNAVAILABLE", `Dados da demo recriados, mas o exemplo registrado falhou: ${reason}`);
-    }
+    let after = store.get(r.id);
+    if (after?.status !== "registered") throw fail(after?.chain.error?.message ?? "o registro não foi confirmado");
+    if (ex.stage !== "published") continue;
+
+    // Aceite do sacado (simulado) e publicação com o termo, como na demo ao vivo.
+    const { token } = confirmations.request(r.id);
+    confirmations.confirm(token);
+    await confirmations.settle(r.id);
+    after = store.get(r.id);
+    if (after?.debtorConfirmation.chain?.status !== "confirmed") throw fail(after?.debtorConfirmation.chain?.error?.message ?? "o aceite do sacado não foi confirmado");
+    await listings.publish(r.id, { acceptTerms: true, termsVersion: TERMS_VERSION });
+    await listings.settle(r.id);
+    after = store.get(r.id);
+    if (after?.listing.chain?.status !== "confirmed") throw fail(after?.listing.chain?.error?.message ?? "o termo não foi confirmado");
   }
 }

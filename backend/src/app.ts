@@ -7,6 +7,7 @@ import { errorHandler } from "./errors.js";
 import { AssignmentService } from "./assignment.js";
 import { createAssignmentGateway, type AssignmentGateway } from "./chain/assignment.js";
 import { ConfirmationService } from "./confirmation.js";
+import { ListingService } from "./listing.js";
 import { Registrar } from "./registration.js";
 import { routes } from "./routes.js";
 import { Store } from "./store.js";
@@ -46,9 +47,12 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
   registrar.resumePending();
   const confirmations = new ConfirmationService(store, chain, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
   confirmations.resumePending();
+  const listings = new ListingService(store, chain, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
+  listings.resumePending();
 
   // Função B só liga com ASSIGNMENT_ENABLED=true e a configuração completa (§5.14).
   let assignments: AssignmentService | null = null;
+  let activeGateway: AssignmentGateway | null = null;
   if (config.assignmentEnabled) {
     const gateway =
       assignmentGateway ??
@@ -56,13 +60,26 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
         ? createAssignmentGateway({ rpcUrl: config.solanaRpcUrl, feePayerSecret: config.feePayerSecret, ...config.assignment })
         : null);
     if (gateway) {
+      activeGateway = gateway;
       assignments = new AssignmentService(store, gateway, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
       assignments.resumePending();
     } else {
-      app.log.warn("ASSIGNMENT_ENABLED=true, mas faltam DEMO_DISTRIBUTOR_SECRET, DEMO_FUNDER_SECRET, TBRL_MINT ou ESCROW_PROGRAM_ID. Cessão desligada.");
+      app.log.warn(
+        "ASSIGNMENT_ENABLED=true, mas faltam DEMO_DISTRIBUTOR_SECRET, DEMO_FUNDER_SECRET, DEMO_FUNDER_B_SECRET, DEMO_FUNDER_C_SECRET, TBRL_MINT ou ESCROW_PROGRAM_ID. Cessão desligada.",
+      );
     }
   }
 
-  await app.register(routes, { prefix: "/api/v1", store, chain, registrar, confirmations, assignments, demoResetEnabled: config.demoResetEnabled });
-  return { app, registrar, confirmations, assignments, store };
+  await app.register(routes, {
+    prefix: "/api/v1",
+    store,
+    chain,
+    registrar,
+    confirmations,
+    listings,
+    assignments,
+    assignmentGateway: activeGateway,
+    demoResetEnabled: config.demoResetEnabled,
+  });
+  return { app, registrar, confirmations, listings, assignments, store };
 }

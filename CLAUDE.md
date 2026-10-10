@@ -79,6 +79,14 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
 12. Acabamento visual, roteiro da demo e novo deploy. Feito: dashboard v1.1 (indicadores de confirmação e cessão,
     coluna de confirmação) e roteiro em `docs/roteiro-demo.md`. Falta: gravação de reserva.
 
+**10/10 (noite): refinamento v1.2** (contrato `docs/api-contract.md` v1.2, decisão G3)
+13. Escrow com trava por documento (5/5 no `anchor test`; falta atualizar o programa na Devnet).
+14. Backend v1.2: registradora simulada, publicação com termo, propostas, financiadores B e C, prova de recusa,
+    verificação da cessão, transparência (76 testes; gateway real ok no validador local).
+15. Frontend v1.2: landing, entrar como distribuidora/financiador, passaporte enxuto, telas do financiador com gráfico,
+    transparência, QR de aceite, PT/EN (e2e 10/10). Falta: deploy (Railway precisa de `DEMO_FUNDER_B_SECRET` e
+    `DEMO_FUNDER_C_SECRET`), roteiro novo da demo e gravação.
+
 **12/10: só correções críticas e submissão.**
 
 ## Comandos do backend (dentro de `backend/`)
@@ -96,7 +104,8 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
 - Modo mock: `frontend/.env.development.local` com `NEXT_PUBLIC_API_MODE=mock`.
 
 ## Código do frontend
-- `src/lib/types.ts`: tipos do contrato. `src/lib/labels.ts`: rótulos em pt-BR.
+- `src/lib/types.ts`: tipos do contrato. `src/lib/i18n/`: textos PT e EN (mesma estrutura; use `useI18n()`).
 - `src/lib/api/`: única porta para a API (`http.ts` real, `mock.ts` desenvolvimento).
-- `src/components/`: `ui.tsx` (primitivos), `status.tsx`, `ChainCard.tsx`, `Timeline.tsx`, `FlowSteps.tsx`, `AppShell.tsx`.
+- `src/components/`: `ui.tsx` (primitivos), `status.tsx`, `Timeline.tsx`, `FlowSteps.tsx`, `AppShell.tsx`, `YieldChart.tsx`,
+  `passport/*` (uma etapa por arquivo: registro, aceite, publicação, propostas, cessão, registros on-chain).
 - Cores e tokens em `src/app/globals.css` (`@theme`).

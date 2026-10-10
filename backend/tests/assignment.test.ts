@@ -1,28 +1,52 @@
 import { describe, expect, it, vi } from "vitest";
-import { AssignmentFailure, classifySettleError, type AssignmentGateway } from "../src/chain/assignment.js";
+import { AssignmentFailure, classifySettleError, type AssignmentGateway, type SettleInput } from "../src/chain/assignment.js";
 import { ChainUnavailableError } from "../src/chain/solana.js";
-import { createConfirmed, fakeChain, makeApp } from "./helpers.js";
+import { createConfirmed, createPublished, fakeChain, makeApp } from "./helpers.js";
 
 const MINT = "AssetMint1111111111111111111111111111111111";
 const SIG = (n: string) => `TestSig${n}`.padEnd(88, "1");
 
-// Dublê da cessão: nada vai para a Solana.
-function fakeAssignment(over: Partial<AssignmentGateway> = {}): AssignmentGateway & { calls: { mint: number; settle: number } } {
-  const calls = { mint: 0, settle: 0 };
+const WALLETS = { fnd_a: "FunderA111", fnd_b: "FunderB111", fnd_c: "FunderC111" };
+const LOCK = "DocLock111";
+let inspectPayloadHash: string | null = null;
+
+// Dublê da cessão: nada vai para a Solana. Guarda o que foi "liquidado" para o inspect devolver.
+function fakeAssignment(over: Partial<AssignmentGateway> = {}): AssignmentGateway & { calls: { mint: number; settle: number; double: number }; settled: SettleInput[] } {
+  const calls = { mint: 0, settle: 0, double: 0 };
+  const settled: SettleInput[] = [];
   return {
     calls,
-    parties: { distributorWallet: "Distributor111", funderWallet: "Funder111", settlementMint: "TbrlMint111", escrowProgramId: "Escrow111" },
+    settled,
+    parties: { distributorWallet: "Distributor111", funderWallets: WALLETS, settlementMint: "TbrlMint111", escrowProgramId: "Escrow111" },
     ping: async () => {},
     mintAssetToken: async (_input, opts) => {
       calls.mint++;
       opts.onSubmitted?.(SIG("Mint"), MINT);
       return { signature: SIG("Mint"), slot: 1, blockTime: "2026-10-11T12:00:00.000Z", mint: MINT };
     },
-    settle: async (_input, opts) => {
+    settle: async (input, opts) => {
       calls.settle++;
+      settled.push(input);
       opts.onSubmitted?.(SIG("Settle"));
       return { signature: SIG("Settle"), slot: 2, blockTime: "2026-10-11T12:00:05.000Z" };
     },
+    attemptDoubleSettle: async (_input, opts) => {
+      calls.double++;
+      opts.onSubmitted?.(SIG("Double"));
+      return { signature: SIG("Double"), landedWithError: true, rejectedByDocumentLock: true };
+    },
+    documentLockAddress: () => LOCK,
+    inspect: async ({ funderId, documentSha256 }) => {
+      const s = settled.at(-1);
+      return {
+        mint: { supply: 1, decimals: 0, mintAuthorityRevoked: true },
+        metadataPayloadHash: inspectPayloadHash,
+        funderBalance: 1,
+        settlement: s ? { assetMint: s.assetMint, settlementMint: "TbrlMint111", distributor: "Distributor111", funder: WALLETS[funderId], amount: s.amount } : null,
+        documentLock: s ? { documentSha256, assetMint: s.assetMint, funder: WALLETS[funderId], amount: s.amount } : null,
+      };
+    },
+    readBalances: async (addresses) => addresses.map((address) => ({ address, solLamports: 0, settlementUnits: 1_000 })),
     checkSignature: async () => null,
     ...over,
   };
@@ -31,10 +55,10 @@ function fakeAssignment(over: Partial<AssignmentGateway> = {}): AssignmentGatewa
 const ENABLED = { ASSIGNMENT_ENABLED: "true" };
 const enabledApp = (gateway: AssignmentGateway) => makeApp(fakeChain(), { env: ENABLED, assignmentGateway: gateway });
 
-// Recebível confirmado pelo sacado e com oferta selecionada: pronto para a cessão.
+// Recebível publicado e com a proposta de B aceita: pronto para a cessão.
 async function withSelectedOffer(gateway: AssignmentGateway) {
   const built = await enabledApp(gateway);
-  const r = await createConfirmed(built);
+  const r = await createPublished(built);
   const offers = (await built.app.inject({ method: "GET", url: `/api/v1/receivables/${r.id}/offers` })).json();
   const offer = offers.items[0];
   await built.app.inject({ method: "POST", url: `/api/v1/receivables/${r.id}/offers/${offer.id}/select` });
@@ -79,14 +103,29 @@ describe("cessão tokenizada (função B)", () => {
       settlementSignature: SIG("Settle"),
       settlementMint: "TbrlMint111",
       distributorWallet: "Distributor111",
-      funderWallet: "Funder111",
+      funderWallet: "FunderB111",
+      funderId: "fnd_b",
+      funderName: "Financiador Demo B",
       escrowProgramId: "Escrow111",
+      documentLock: LOCK,
       error: null,
     });
+    expect(gw.settled[0]).toMatchObject({ assetMint: MINT, amount: offer.netAmountCents, funderId: "fnd_b", documentSha256: r.documents[0].sha256 });
+    // v1.2: a registradora simulada passou o crédito ao financiador e mudou o domicílio de pagamento.
+    expect(r.registry.creditor).toEqual({ kind: "funder", name: "Financiador Demo B", wallet: "FunderB111" });
+    expect(r.registry.paymentDomicile.payeeName).toBe("Financiador Demo B");
+    expect(r.registry.paymentDomicile.instruction).toMatch(/Pagar ao credor atual: Financiador Demo B/);
     expect(r.assignment.explorerUrls.tokenMint).toBe(`https://explorer.solana.com/address/${MINT}?cluster=devnet`);
     expect(r.assignment.explorerUrls.settlement).toContain(SIG("Settle"));
-    expect(r.events.map((e: { type: string }) => e.type).slice(-3)).toEqual(["assignment_requested", "assignment_token_minted", "assignment_settled"]);
-    expect(r.events.at(-1)).toMatchObject({ onChain: true, data: { settlementAmount: offer.netAmountCents, settlementAsset: "tBRL-DEMO" } });
+    expect(r.events.map((e: { type: string }) => e.type).slice(-4)).toEqual(["assignment_requested", "assignment_token_minted", "assignment_settled", "registry_creditor_updated"]);
+    expect(r.events.at(-2)).toMatchObject({ onChain: true, data: { settlementAmount: offer.netAmountCents, settlementAsset: "tBRL-DEMO" } });
+
+    // v1.2: carteira do financiador B mostra a cessão; a de A continua vazia.
+    const pf = (await built.app.inject({ method: "GET", url: "/api/v1/funders/fnd_b/portfolio" })).json();
+    expect(pf.items).toHaveLength(1);
+    expect(pf.items[0]).toMatchObject({ reference: r.reference, status: "settled", faceAmountCents: 15_000_000, paidAmountCents: offer.netAmountCents, monthlyRateBps: offer.monthlyRateBps });
+    expect(pf.totals).toEqual({ count: 1, paidAmountCents: offer.netAmountCents, faceAmountCents: 15_000_000, projectedIncomeCents: 15_000_000 - offer.netAmountCents });
+    expect((await built.app.inject({ method: "GET", url: "/api/v1/funders/fnd_a/portfolio" })).json().items).toHaveLength(0);
 
     const list = (await built.app.inject({ method: "GET", url: "/api/v1/receivables" })).json();
     expect(list.totals.assignedCount).toBe(1);
@@ -96,7 +135,7 @@ describe("cessão tokenizada (função B)", () => {
 
   it("antes da seleção da oferta: 409 INVALID_STATE", async () => {
     const built = await enabledApp(fakeAssignment());
-    const r = await createConfirmed(built);
+    const r = await createPublished(built);
     const res = await built.app.inject({ method: "POST", url: `/api/v1/receivables/${r.id}/assignment` });
     expect(res.statusCode).toBe(409);
     expect(res.json().error.code).toBe("INVALID_STATE");
@@ -183,6 +222,70 @@ describe("cessão tokenizada (função B)", () => {
     expect((await built.app.inject({ method: "GET", url: `/api/v1/receivables/${id}` })).json().status).toBe("offer_selected");
   });
 
+  it("verificação confere token, metadados, financiador, registro da liquidação e trava do documento", async () => {
+    const gw = fakeAssignment();
+    const { built, id } = await withSelectedOffer(gw);
+    await post(built, id);
+    await built.assignments!.settle();
+    inspectPayloadHash = (await built.app.inject({ method: "GET", url: `/api/v1/receivables/${id}` })).json().chain.payloadHash;
+    const v = (await built.app.inject({ method: "GET", url: `/api/v1/receivables/${id}/verification` })).json();
+    expect(v.verified).toBe(true);
+    expect(v.checks.map((c: { name: string }) => c.name)).toEqual([
+      "transaction_found", "memo_matches", "document_hash_matches", "payload_hash_matches", "debtor_confirmation_matches",
+      "terms_matches", "asset_token_unique", "asset_metadata_matches", "asset_held_by_funder", "settlement_record_matches", "document_lock_matches",
+    ]);
+
+    // Token fora do financiador (ex.: vendido para outro): a verificação acusa.
+    const original = gw.inspect;
+    gw.inspect = async (i) => ({ ...(await original(i)), funderBalance: 0 });
+    const bad = (await built.app.inject({ method: "GET", url: `/api/v1/receivables/${id}/verification` })).json();
+    expect(bad.verified).toBe(false);
+    expect(bad.checks.find((c: { name: string }) => c.name === "asset_held_by_funder").passed).toBe(false);
+    inspectPayloadHash = null;
+  });
+
+  it("prova de recusa: outro token, outro financiador, recusa on-chain registrada", async () => {
+    const gw = fakeAssignment();
+    const { built, id } = await withSelectedOffer(gw);
+    const proof = () => built.app.inject({ method: "POST", url: `/api/v1/receivables/${id}/assignment/double-spend-test` });
+    expect((await proof()).json().error.code).toBe("INVALID_STATE");
+
+    await post(built, id);
+    await built.assignments!.settle();
+    const res = await proof();
+    expect(res.statusCode).toBe(202);
+    expect(res.json().receivable.assignment.doubleSpendProof).toMatchObject({ status: "pending", funderId: "fnd_a" });
+    await built.assignments!.settle();
+
+    const r = (await built.app.inject({ method: "GET", url: `/api/v1/receivables/${id}` })).json();
+    expect(r.assignment.doubleSpendProof).toMatchObject({ status: "rejected", tokenMint: MINT, funderId: "fnd_a", signature: SIG("Double"), error: null });
+    expect(r.assignment.doubleSpendProof.reason).toMatch(/trava on-chain/);
+    expect(r.events.at(-1)).toMatchObject({ type: "double_assignment_rejected", onChain: true, chain: { signature: SIG("Double") } });
+    expect(gw.calls).toMatchObject({ mint: 2, settle: 1, double: 1 });
+    // Feita uma vez; o status do recebível não muda.
+    expect(r.status).toBe("assigned");
+    expect((await proof()).json().error.code).toBe("INVALID_STATE");
+
+    const t = (await built.app.inject({ method: "GET", url: "/api/v1/transparency" })).json();
+    expect(t.stats).toMatchObject({ assigned: 1, doubleSpendRejected: 1, published: 1 });
+    expect(t.wallets.map((w: { role: string }) => w.role)).toEqual(["distributor", "funder", "funder", "funder"]);
+    expect(t.programs.map((p: { role: string }) => p.role)).toEqual(["memo", "escrow", "token_2022"]);
+  });
+
+  it("prova de recusa: se a recusa não vier da trava, fica em erro e pode ser refeita", async () => {
+    const gw = fakeAssignment({ attemptDoubleSettle: async () => ({ signature: SIG("Other"), landedWithError: true, rejectedByDocumentLock: false }) });
+    const { built, id } = await withSelectedOffer(gw);
+    await post(built, id);
+    await built.assignments!.settle();
+    await built.app.inject({ method: "POST", url: `/api/v1/receivables/${id}/assignment/double-spend-test` });
+    await built.assignments!.settle();
+    const r = (await built.app.inject({ method: "GET", url: `/api/v1/receivables/${id}` })).json();
+    expect(r.assignment.doubleSpendProof).toMatchObject({ status: "error", error: { code: "TX_FAILED" } });
+    expect(r.events.some((e: { type: string }) => e.type === "double_assignment_rejected")).toBe(false);
+    expect((await built.app.inject({ method: "POST", url: `/api/v1/receivables/${id}/assignment/double-spend-test` })).statusCode).toBe(202);
+    await built.assignments!.settle();
+  });
+
   it("classifica os erros da liquidação", () => {
     const err = (message: string, logs: string[] = []) => Object.assign(new Error(message), { logs });
     expect(classifySettleError(err("custom program error: 0x1", ["Program log: Error: insufficient funds"]))).toBe("INSUFFICIENT_TEST_TOKENS");
@@ -191,5 +294,9 @@ describe("cessão tokenizada (função B)", () => {
     expect(classifySettleError(err("Attempt to debit an account but found no record of a prior credit."))).toBe("INSUFFICIENT_FUNDS");
     expect(classifySettleError(err("fetch failed"))).toBe("RPC_UNAVAILABLE");
     expect(classifySettleError(err("custom program error: 0x1770a"))).toBe("TX_FAILED");
+    // v1.2: "already in use" na trava do documento.
+    const inUse = err("custom program error: 0x0", ["Allocate: account Address { address: DocLock111 } already in use"]);
+    expect(classifySettleError(inUse, { documentLock: "DocLock111" })).toBe("DOCUMENT_ALREADY_ASSIGNED");
+    expect(classifySettleError(inUse, { documentLock: "OutraConta" })).toBe("ESCROW_REJECTED");
   });
 });

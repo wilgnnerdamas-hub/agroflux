@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildConfirmationMemo, confirmationHash, confirmationPayload } from "../src/chain/payload.js";
 import { ChainFailure, ChainUnavailableError, type Confirmed } from "../src/chain/solana.js";
 import type { Receivable } from "../src/types.js";
-import { createOne, createRegistered, fakeChain, makeApp, sha } from "./helpers.js";
+import { createOne, createRegistered, fakeChain, makeApp, PUBLISH_BODY, sha } from "./helpers.js";
 
 type Built = Awaited<ReturnType<typeof makeApp>>;
 const post = (b: Built, url: string, headers: Record<string, string> = {}) => b.app.inject({ method: "POST", url: `/api/v1${url}`, headers });
@@ -76,7 +76,7 @@ describe("GET /confirmations/:token", () => {
     const { token } = await requestLink(b, id);
     const s = await getJson(b, `/confirmations/${token}`);
     expect(Object.keys(s).sort()).toEqual(
-      ["amountCents", "currency", "disclaimer", "distributor", "dueDate", "expiresAt", "isSimulated", "product", "reference", "status"].sort(),
+      ["amountCents", "currency", "disclaimer", "distributor", "dueDate", "expiresAt", "isSimulated", "product", "reference", "status", "registryId", "paymentDomicile"].sort(),
     );
     expect(s).toMatchObject({ isSimulated: true, reference: "AGF-0001", distributor: { name: "Distribuidora Demo" }, status: "requested" });
     expect(s.disclaimer).toBe("Simulação — sem verificação de identidade do sacado.");
@@ -201,15 +201,18 @@ describe("POST /confirmations/:token/confirm e /decline", () => {
     expect(failed.debtorConfirmation.chain).toMatchObject({ status: "failed", error: { code: "RPC_UNAVAILABLE" } });
     expect(failed.events.at(-1)).toMatchObject({ type: "debtor_confirmation_chain_failed", onChain: false });
 
-    const offers = await getJson(b, `/receivables/${id}/offers`);
-    const sel = await post(b, `/receivables/${id}/offers/${offers.items[0].id}/select`);
-    expect(sel.json().error.code).toBe("DEBTOR_CONFIRMATION_REQUIRED");
+    // v1.2: sem o aceite registrado on-chain, a publicação (e com ela as propostas) fica bloqueada.
+    const blocked = await b.app.inject({ method: "POST", url: `/api/v1/receivables/${id}/publish`, payload: PUBLISH_BODY });
+    expect(blocked.json().error.code).toBe("DEBTOR_CONFIRMATION_REQUIRED");
 
     fail = false;
     const retry = await post(b, `/receivables/${id}/debtor-confirmation/register`, { "idempotency-key": "r1" });
     expect(retry.statusCode).toBe(202);
     await b.confirmations.settle();
     expect((await rcv(b, id)).debtorConfirmation.chain?.status).toBe("confirmed");
+    expect((await b.app.inject({ method: "POST", url: `/api/v1/receivables/${id}/publish`, payload: PUBLISH_BODY })).statusCode).toBe(202);
+    await b.listings.settle();
+    const offers = await getJson(b, `/receivables/${id}/offers`);
     expect((await post(b, `/receivables/${id}/offers/${offers.items[0].id}/select`)).statusCode).toBe(200);
   });
 

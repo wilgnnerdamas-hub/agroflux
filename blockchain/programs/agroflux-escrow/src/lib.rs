@@ -1,10 +1,12 @@
-//! AgroFlux — programa de escrow da cessão tokenizada (contrato v1.1, §6.4). SIMULAÇÃO NA DEVNET.
+//! AgroFlux — programa de escrow da cessão tokenizada (contrato v1.2, §6.4 e §6.5). SIMULAÇÃO NA DEVNET.
 //!
 //! Uma única instrução, `settle`, faz a liquidação atômica:
 //! 1. confere os termos (token da cessão único e sem autoridade de mint, moeda com 2 casas, valor, carteiras);
 //! 2. transfere o token da cessão do distribuidor para o financiador;
 //! 3. transfere `amount` da moeda de teste (tBRL-DEMO) do financiador para o distribuidor;
-//! 4. grava o registro da liquidação (PDA por token da cessão), o que impede liquidar o mesmo token duas vezes.
+//! 4. grava o registro da liquidação (PDA por token da cessão), o que impede liquidar o mesmo token duas vezes;
+//! 5. grava a trava do documento (PDA por hash do documento), o que impede ceder o mesmo documento de novo,
+//!    mesmo com outro token.
 //!
 //! Se qualquer passo falhar, a transação inteira é revertida: nenhuma perna acontece.
 //! Token e moeda não têm valor. Não é oferta de investimento nem cessão jurídica.
@@ -17,13 +19,14 @@ use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, Tran
 declare_id!("B3PdnyjFAJua4FbzdfotdZLN3S6LfAXKwavbJNkLxRXa");
 
 pub const SETTLEMENT_SEED: &[u8] = b"settlement";
+pub const DOCUMENT_SEED: &[u8] = b"document";
 pub const SETTLEMENT_DECIMALS: u8 = 2;
 
 #[program]
 pub mod agroflux_escrow {
     use super::*;
 
-    pub fn settle(ctx: Context<Settle>, amount: u64) -> Result<()> {
+    pub fn settle(ctx: Context<Settle>, amount: u64, document_hash: [u8; 32]) -> Result<()> {
         require!(amount > 0, EscrowError::InvalidAmount);
         let asset_mint = &ctx.accounts.asset_mint;
         require!(asset_mint.supply == 1 && asset_mint.decimals == 0, EscrowError::AssetNotUnique);
@@ -75,8 +78,17 @@ pub mod agroflux_escrow {
             settled_at,
             bump: ctx.bumps.settlement,
         });
+        ctx.accounts.document_lock.set_inner(DocumentLock {
+            document_hash,
+            asset_mint: asset_mint.key(),
+            funder: ctx.accounts.funder.key(),
+            amount,
+            settled_at,
+            bump: ctx.bumps.document_lock,
+        });
         emit!(Settled {
             asset_mint: asset_mint.key(),
+            document_hash,
             settlement_mint: ctx.accounts.settlement_mint.key(),
             distributor: ctx.accounts.distributor.key(),
             funder: ctx.accounts.funder.key(),
@@ -88,6 +100,7 @@ pub mod agroflux_escrow {
 }
 
 #[derive(Accounts)]
+#[instruction(amount: u64, document_hash: [u8; 32])]
 pub struct Settle<'info> {
     /// Paga taxas e aluguel das contas novas (carteira do backend).
     #[account(mut)]
@@ -147,6 +160,16 @@ pub struct Settle<'info> {
     )]
     pub settlement: Account<'info, Settlement>,
 
+    /// Trava do documento (v1.2). `init` falha se o documento já foi cedido, mesmo com outro token.
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + DocumentLock::INIT_SPACE,
+        seeds = [DOCUMENT_SEED, document_hash.as_ref()],
+        bump,
+    )]
+    pub document_lock: Account<'info, DocumentLock>,
+
     pub asset_token_program: Program<'info, Token2022>,
     pub settlement_token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -165,9 +188,21 @@ pub struct Settlement {
     pub bump: u8,
 }
 
+#[account]
+#[derive(InitSpace)]
+pub struct DocumentLock {
+    pub document_hash: [u8; 32],
+    pub asset_mint: Pubkey,
+    pub funder: Pubkey,
+    pub amount: u64,
+    pub settled_at: i64,
+    pub bump: u8,
+}
+
 #[event]
 pub struct Settled {
     pub asset_mint: Pubkey,
+    pub document_hash: [u8; 32],
     pub settlement_mint: Pubkey,
     pub distributor: Pubkey,
     pub funder: Pubkey,

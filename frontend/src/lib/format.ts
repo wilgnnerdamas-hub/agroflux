@@ -1,7 +1,21 @@
-const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+// Formatação de valores para a tela. O idioma vem do I18nProvider (setFormatLocale); o padrão é pt-BR.
+// A moeda é sempre o real (BRL); a digitação de valores no formulário segue o padrão brasileiro.
+let LOCALE = "pt-BR";
+let brl = new Intl.NumberFormat(LOCALE, { style: "currency", currency: "BRL" });
+
+export function setFormatLocale(locale: string) {
+  if (locale === LOCALE) return;
+  LOCALE = locale;
+  brl = new Intl.NumberFormat(LOCALE, { style: "currency", currency: "BRL" });
+}
 
 export function formatMoney(cents: number): string {
   return brl.format(cents / 100);
+}
+
+/** Valor compacto para eixos de gráfico: "R$ 150 mil" / "R$150K". */
+export function formatMoneyCompact(cents: number): string {
+  return new Intl.NumberFormat(LOCALE, { style: "currency", currency: "BRL", notation: "compact", maximumFractionDigits: 1 }).format(cents / 100);
 }
 
 /** "1500000" (centavos) a partir de "15.000,00" digitado pelo usuário. */
@@ -18,20 +32,21 @@ export function maskMoneyInput(raw: string): string {
   const digits = raw.replace(/\D/g, "").replace(/^0+/, "");
   if (!digits) return "";
   const cents = Number(digits);
-  return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-    cents / 100,
-  );
+  return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100);
 }
 
 export function formatDate(isoDate: string): string {
   // "YYYY-MM-DD" sem fuso: formata sem converter para evitar deslocar um dia.
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
-  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
-  return new Date(isoDate).toLocaleDateString("pt-BR");
+  if (m) {
+    if (LOCALE === "pt-BR") return `${m[3]}/${m[2]}/${m[1]}`;
+    return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).toLocaleDateString(LOCALE, { timeZone: "UTC", year: "numeric", month: "short", day: "numeric" });
+  }
+  return new Date(isoDate).toLocaleDateString(LOCALE, LOCALE === "pt-BR" ? undefined : { year: "numeric", month: "short", day: "numeric" });
 }
 
 export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("pt-BR", {
+  return new Date(iso).toLocaleString(LOCALE, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -41,14 +56,20 @@ export function formatDateTime(iso: string): string {
   });
 }
 
+export function formatNumber(n: number): string {
+  return n.toLocaleString(LOCALE);
+}
+
 export function formatRateBps(bps: number): string {
-  return `${(bps / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% a.m.`;
+  const v = (bps / 100).toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return LOCALE === "pt-BR" ? `${v}% a.m.` : `${v}%/mo`;
 }
 
 export function formatBytes(bytes: number): string {
+  const n = (v: number, d: number) => v.toLocaleString(LOCALE, { minimumFractionDigits: d, maximumFractionDigits: d });
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1).replace(".", ",")} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2).replace(".", ",")} MB`;
+  if (bytes < 1024 * 1024) return `${n(bytes / 1024, 1)} KB`;
+  return `${n(bytes / 1024 / 1024, 2)} MB`;
 }
 
 /** Encurta hashes e assinaturas para exibição: "9f2c1e…e4a7". */

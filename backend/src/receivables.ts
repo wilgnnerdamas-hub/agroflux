@@ -6,6 +6,8 @@ import type { Store } from "./store.js";
 import type {
   Assignment,
   ChainRecord,
+  Listing,
+  Registry,
   DebtorConfirmation,
   CreateReceivableInput,
   EventType,
@@ -59,11 +61,36 @@ export function emptyAssignment(): Assignment {
     escrowProgramId: null,
     mintSignature: null,
     settlementSignature: null,
-    explorerUrls: { tokenMint: null, mint: null, settlement: null },
+    explorerUrls: { tokenMint: null, mint: null, settlement: null, documentLock: null },
     submittedAt: null,
     settledAt: null,
     error: null,
+    funderId: null,
+    funderName: null,
+    documentLock: null,
+    doubleSpendProof: null,
   };
+}
+
+// v1.2: registradora SIMULADA (§3.11) e publicação (§3.12).
+export const REGISTRAR_NAME = "Registradora Demo (simulada)";
+export const DISTRIBUTOR_NAME = "Distribuidora Demo";
+
+export function emptyRegistry(): Registry {
+  return {
+    status: "none",
+    isSimulated: true,
+    registrarName: REGISTRAR_NAME,
+    registryId: null,
+    registeredAt: null,
+    documentSha256: null,
+    creditor: { kind: "distributor", name: DISTRIBUTOR_NAME, wallet: null },
+    paymentDomicile: null,
+  };
+}
+
+export function emptyListing(): Listing {
+  return { status: "none", publishedAt: null, terms: null, chain: null };
 }
 
 export function makeEvent(
@@ -98,8 +125,21 @@ export function createReceivable(
     );
   }
 
+  // v1.2: a registradora simulada recusa um documento que já tem registro (unicidade por documento).
+  const duplicate = store.all().find((r) => r.documents.some((d) => d.sha256 === sha256));
+  if (duplicate) {
+    throw new ApiError(
+      409,
+      "DUPLICATE_DOCUMENT",
+      `Este documento já está registrado na registradora (simulada) como ${duplicate.reference}${duplicate.registry.registryId ? ` (${duplicate.registry.registryId})` : ""}. Um mesmo título não pode ser registrado nem cedido duas vezes.`,
+      undefined,
+      { reference: duplicate.reference, registryId: duplicate.registry.registryId },
+    );
+  }
+
   const id = newId("rcv");
   const reference = store.nextReference();
+  const registryId = store.nextRegistryId();
   const documentId = newId("doc");
   const createdAt = now();
   store.saveUpload(documentId, EXT[doc.mimeType] ?? "", doc.bytes);
@@ -109,7 +149,7 @@ export function createReceivable(
     reference,
     status: "created",
     isDemo: true,
-    distributor: { name: "Distribuidora Demo" },
+    distributor: { name: DISTRIBUTOR_NAME },
     debtor: input.debtor,
     product: input.product,
     cropSeason: input.cropSeason,
@@ -133,10 +173,13 @@ export function createReceivable(
     events: [
       makeEvent("receivable_created", `Recebível ${reference} cadastrado`, { reference }, { occurredAt: createdAt }),
       makeEvent("document_attached", "Documento de teste anexado", { documentId, sha256, filename: doc.filename }),
+      makeEvent("registry_registered", `Título registrado na registradora (simulada) sob o número ${registryId}`, { registryId }, { actor: "system" }),
     ],
     selectedOfferId: null,
     debtorConfirmation: emptyDebtorConfirmation(),
     assignment: emptyAssignment(),
+    registry: { ...emptyRegistry(), status: "registered", registryId, registeredAt: createdAt, documentSha256: sha256 },
+    listing: emptyListing(),
     createdAt,
     updatedAt: createdAt,
   };
@@ -163,10 +206,13 @@ const toSummary = (r: Receivable): ReceivableSummary => ({
   selectedOfferId: r.selectedOfferId,
   debtorConfirmation: { status: r.debtorConfirmation.status },
   assignment: { status: r.assignment.status },
+  registry: { registryId: r.registry.registryId },
+  listing: { status: r.listing.status },
   createdAt: r.createdAt,
 });
+export { toSummary };
 
-const REGISTERED: Receivable["status"][] = ["registered", "offer_selected", "assignment_pending", "assigned", "assignment_failed"];
+const REGISTERED: Receivable["status"][] = ["registered", "published", "offer_selected", "assignment_pending", "assigned", "assignment_failed"];
 
 export function listReceivables(store: Store): ReceivableList {
   const all = store.all().sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
@@ -180,6 +226,7 @@ export function listReceivables(store: Store): ReceivableList {
       offerSelectedCount: all.filter((r) => r.status === "offer_selected").length,
       debtorConfirmedCount: all.filter((r) => r.debtorConfirmation.status === "confirmed").length,
       assignedCount: all.filter((r) => r.status === "assigned").length,
+      publishedCount: all.filter((r) => r.status === "published").length,
     },
   };
 }

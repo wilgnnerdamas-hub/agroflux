@@ -1,7 +1,7 @@
-// Preparação da função B (contrato v1.1, §6.4), feita uma vez. Idempotente: pula o que já existe.
-// 1) Carteiras de demonstração "distribuidor demo" e "financiador demo" (secrets só em backend/.env).
+// Preparação da função B (contrato v1.2, §6.4), feita uma vez. Idempotente: pula o que já existe.
+// 1) Carteiras de demonstração "distribuidor demo" e financiadores demo A, B e C (secrets só em backend/.env).
 // 2) Mint de TESTE tBRL-DEMO (2 casas decimais), com a carteira pagadora como autoridade.
-// 3) Saldo de tBRL-DEMO para o financiador demo (sem valor).
+// 3) Saldo de tBRL-DEMO para cada financiador demo (sem valor).
 // Mostra só chaves públicas. Uso: npm run setup:assignment -- [--escrow <PROGRAM_ID>]
 import fs from "node:fs";
 import path from "node:path";
@@ -41,9 +41,13 @@ function wallet(key: string, label: string): Keypair {
 }
 
 const distributor = wallet("DEMO_DISTRIBUTOR_SECRET", "distribuidor demo");
-const funder = wallet("DEMO_FUNDER_SECRET", "financiador demo");
-console.log(`Distribuidor demo: ${distributor.publicKey.toBase58()}`);
-console.log(`Financiador demo:  ${funder.publicKey.toBase58()}`);
+const funders = [
+  { label: "Financiador Demo A", kp: wallet("DEMO_FUNDER_SECRET", "financiador demo A") },
+  { label: "Financiador Demo B", kp: wallet("DEMO_FUNDER_B_SECRET", "financiador demo B") },
+  { label: "Financiador Demo C", kp: wallet("DEMO_FUNDER_C_SECRET", "financiador demo C") },
+];
+console.log(`Distribuidor demo:  ${distributor.publicKey.toBase58()}`);
+for (const f of funders) console.log(`${f.label}: ${f.kp.publicKey.toBase58()}`);
 
 let mint = get("TBRL_MINT");
 if (!mint) {
@@ -54,13 +58,15 @@ if (!mint) {
 }
 console.log(`tBRL-DEMO: ${mint}`);
 
-const funderAta = await getOrCreateAssociatedTokenAccount(connection, payer, new PublicKey(mint), funder.publicKey, false, "confirmed");
-if (funderAta.amount < FUNDER_TARGET / 10n) {
-  await mintTo(connection, payer, new PublicKey(mint), funderAta.address, payer, FUNDER_TARGET - funderAta.amount, [], { commitment: "confirmed" });
-  console.log("Saldo de tBRL-DEMO do financiador demo abastecido.");
+for (const f of funders) {
+  const ata = await getOrCreateAssociatedTokenAccount(connection, payer, new PublicKey(mint), f.kp.publicKey, false, "confirmed", { commitment: "confirmed" });
+  if (ata.amount < FUNDER_TARGET / 10n) {
+    await mintTo(connection, payer, new PublicKey(mint), ata.address, payer, FUNDER_TARGET - ata.amount, [], { commitment: "confirmed" });
+    console.log(`Saldo de tBRL-DEMO do ${f.label} abastecido.`);
+  }
+  const bal = await connection.getTokenAccountBalance(ata.address, "confirmed");
+  console.log(`Saldo do ${f.label}: ${bal.value.uiAmountString} tBRL-DEMO`);
 }
-const bal = await connection.getTokenAccountBalance(funderAta.address, "confirmed");
-console.log(`Saldo do financiador demo: ${bal.value.uiAmountString} tBRL-DEMO`);
 
 const i = process.argv.indexOf("--escrow");
 if (i > 0 && process.argv[i + 1]) {

@@ -9,6 +9,8 @@ import { validateReceivable, validateFile } from "../validation";
 import type {
   Assignment,
   ChainRecord,
+  Listing,
+  Registry,
   ConfirmationSummary,
   DebtorConfirmation,
   CreateReceivableInput,
@@ -55,10 +57,26 @@ function emptyAssignment(): Assignment {
   return {
     status: "none", isSimulated: true, cluster: "devnet", offerId: null, tokenMint: null, settlementMint: null,
     settlementAsset: "tBRL-DEMO", settlementAmount: null, distributorWallet: null, funderWallet: null, escrowProgramId: null,
-    mintSignature: null, settlementSignature: null, explorerUrls: { tokenMint: null, mint: null, settlement: null },
-    submittedAt: null, settledAt: null, error: null,
+    mintSignature: null, settlementSignature: null, explorerUrls: { tokenMint: null, mint: null, settlement: null, documentLock: null },
+    submittedAt: null, settledAt: null, error: null, funderId: null, funderName: null, documentLock: null, doubleSpendProof: null,
   };
 }
+
+// v1.2: a registradora simulada do mock só numera; nada vai para a rede.
+function registry(n: number, sha256: string, at: string): Registry {
+  return {
+    status: "registered",
+    isSimulated: true,
+    registrarName: "Registradora Demo (simulada)",
+    registryId: `REG-MOCK-${String(n).padStart(6, "0")}`,
+    registeredAt: at,
+    documentSha256: sha256,
+    creditor: { kind: "distributor", name: "Distribuidora Demo", wallet: null },
+    paymentDomicile: null,
+  };
+}
+
+const emptyListing = (): Listing => ({ status: "none", publishedAt: null, terms: null, chain: null });
 
 // Links de confirmação do mock: token → id do recebível (só em memória).
 const mockTokens = new Map<string, { receivableId: string; expiresAt: string; used: boolean }>();
@@ -97,6 +115,8 @@ function seed(): Receivable[] {
       selectedOfferId: null,
       debtorConfirmation: emptyDebtorConfirmation(),
       assignment: emptyAssignment(),
+      registry: registry(n, docHash, now),
+      listing: emptyListing(),
       createdAt: now,
       updatedAt: now,
     };
@@ -115,7 +135,9 @@ function load(): Receivable[] {
     // Dados salvos antes da v1.1 não têm os blocos novos.
     for (const r of store) {
       r.debtorConfirmation ??= emptyDebtorConfirmation();
-      r.assignment ??= emptyAssignment();
+      r.assignment = { ...emptyAssignment(), ...r.assignment };
+      r.registry ??= registry(0, r.documents[0]?.sha256 ?? "", r.createdAt);
+      r.listing ??= emptyListing();
     }
   } catch {
     store = seed();
@@ -153,6 +175,8 @@ function summary(r: Receivable): ReceivableSummary {
     selectedOfferId: r.selectedOfferId,
     debtorConfirmation: { status: r.debtorConfirmation.status },
     assignment: { status: r.assignment.status },
+    registry: { registryId: r.registry.registryId },
+    listing: { status: r.listing.status },
     createdAt: r.createdAt,
   };
 }
@@ -169,6 +193,8 @@ function confirmationSummary(r: Receivable, expiresAt: string): ConfirmationSumm
     dueDate: r.dueDate,
     status: r.debtorConfirmation.status,
     expiresAt,
+    registryId: r.registry.registryId,
+    paymentDomicile: r.registry.paymentDomicile,
   };
 }
 
@@ -195,7 +221,7 @@ export function createMockApi(): AgroFluxApi {
         version: "mock",
         cluster: "devnet",
         solana: { reachable: false, feePayerBalanceLamports: null },
-        features: { debtorConfirmation: true, assignment: false },
+        features: { debtorConfirmation: true, assignment: false, marketplace: true, doubleSpendProof: false },
       };
     },
     async listReceivables() {
@@ -211,6 +237,7 @@ export function createMockApi(): AgroFluxApi {
           offerSelectedCount: items.filter((i) => i.status === "offer_selected").length,
           debtorConfirmedCount: items.filter((i) => i.debtorConfirmation.status === "confirmed").length,
           assignedCount: items.filter((i) => i.status === "assigned").length,
+          publishedCount: items.filter((i) => i.status === "published").length,
         },
       });
     },
@@ -231,6 +258,13 @@ export function createMockApi(): AgroFluxApi {
         throw new ApiError("HASH_MISMATCH", "O hash do documento não confere. Selecione o arquivo novamente.", 422);
       }
       const all = load();
+      const dup = all.find((x) => x.documents.some((d) => d.sha256 === sha));
+      if (dup) {
+        throw new ApiError("DUPLICATE_DOCUMENT", `Este documento já está registrado na registradora (simulada) como ${dup.reference}.`, 409, undefined, {
+          reference: dup.reference,
+          registryId: dup.registry.registryId,
+        });
+      }
       const n = all.length + 1;
       const reference = `AGF-${String(n).padStart(4, "0")}`;
       const now = new Date().toISOString();
@@ -258,6 +292,8 @@ export function createMockApi(): AgroFluxApi {
         selectedOfferId: null,
         debtorConfirmation: emptyDebtorConfirmation(),
         assignment: emptyAssignment(),
+        registry: registry(n, sha, now),
+        listing: emptyListing(),
         createdAt: now,
         updatedAt: now,
       };
@@ -300,8 +336,8 @@ export function createMockApi(): AgroFluxApi {
     async listOffers(rid) {
       await delay();
       const r = find(rid);
-      if (r.status !== "registered" && r.status !== "offer_selected") {
-        throw new ApiError("INVALID_STATE", "As ofertas simuladas ficam disponíveis após a confirmação na Devnet.", 409);
+      if (r.chain.status !== "confirmed") {
+        throw new ApiError("INVALID_STATE", "As propostas ficam disponíveis depois do registro na Devnet e da publicação.", 409);
       }
       return { isSimulated: true, disclaimer: "", items: [] };
     },
@@ -333,6 +369,68 @@ export function createMockApi(): AgroFluxApi {
     async requestAssignment() {
       await delay();
       throw new ApiError("NOT_FOUND", "A cessão tokenizada só existe com o backend real e a função ligada.", 404);
+    },
+
+    // v1.2. No mock nada chega a ser publicado (o aceite nunca é confirmado on-chain).
+    async getTerms() {
+      await delay(150, 300);
+      const text = "TERMO DE COOBRIGAÇÃO — DEMONSTRAÇÃO (SIMULADO, SEM VALOR JURÍDICO)\nModo mock: o texto oficial vem do backend.";
+      return { isSimulated: true, version: "coobrigacao-demo-v1", text, textSha256: await sha256File(new File([text], "termo.txt")) };
+    },
+    async publish(rid) {
+      await delay();
+      find(rid);
+      throw new ApiError("DEBTOR_CONFIRMATION_REQUIRED", "Antes de publicar, o aceite do sacado precisa estar registrado on-chain.", 409);
+    },
+    async retryPublishRegister() {
+      await delay();
+      throw new ApiError("INVALID_STATE", "Não há registro do termo com falha para repetir.", 409);
+    },
+    async proposeOffer(rid) {
+      await delay();
+      find(rid);
+      throw new ApiError("INVALID_STATE", "Este recebível não está aberto para propostas.", 409);
+    },
+    async listFunders() {
+      await delay(150, 300);
+      return {
+        items: [
+          { id: "fnd_a", name: "Financiador Demo A", type: "simulated_fidc", mode: "interactive", wallet: null, isSimulated: true },
+          { id: "fnd_b", name: "Financiador Demo B", type: "simulated_bank", mode: "automatic", wallet: null, isSimulated: true },
+          { id: "fnd_c", name: "Financiador Demo C", type: "simulated_cooperative", mode: "automatic", wallet: null, isSimulated: true },
+        ],
+      };
+    },
+    async getMarketplace() {
+      await delay();
+      return { isSimulated: true, disclaimer: "Recebíveis fictícios publicados para demonstração. Não é oferta de investimento.", items: [] };
+    },
+    async getPortfolio() {
+      await delay();
+      return {
+        isSimulated: true,
+        funder: { id: "fnd_a", name: "Financiador Demo A", type: "simulated_fidc", mode: "interactive", wallet: null, isSimulated: true },
+        items: [],
+        totals: { count: 0, paidAmountCents: 0, faceAmountCents: 0, projectedIncomeCents: 0 },
+      };
+    },
+    async requestDoubleSpendProof() {
+      await delay();
+      throw new ApiError("NOT_FOUND", "A prova de recusa só existe com o backend real e a cessão ligada.", 404);
+    },
+    async getTransparency() {
+      await delay();
+      const all = load();
+      return {
+        isSimulated: true,
+        cluster: "devnet",
+        checkedAt: new Date().toISOString(),
+        programs: [{ role: "memo", label: "SPL Memo", address: "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr", explorerUrl: "https://explorer.solana.com/address/MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr?cluster=devnet" }],
+        settlementAsset: null,
+        wallets: [],
+        registry: { name: "Registradora Demo (simulada)", isSimulated: true, titles: all.length },
+        stats: { receivables: all.length, registeredOnChain: 0, debtorAccepted: 0, published: 0, assigned: 0, doubleSpendRejected: 0 },
+      };
     },
 
     async retryDebtorConfirmationRegister() {

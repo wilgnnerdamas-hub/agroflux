@@ -1,13 +1,15 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { buildApp } from "../src/app.js";
 import type { AssignmentGateway } from "../src/chain/assignment.js";
 import type { ChainGateway } from "../src/chain/solana.js";
 import { loadConfig } from "../src/config.js";
 
 export const PDF = Buffer.from("%PDF-1.4\n% documento de teste AgroFlux\n%%EOF\n");
+// v1.2: a registradora simulada recusa documento repetido; cada recebível de teste ganha um PDF próprio.
+export const uniquePdf = () => Buffer.from(`%PDF-1.4\n% documento de teste AgroFlux ${randomBytes(6).toString("hex")}\n%%EOF\n`);
 export const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
 
 export const validInput = () => ({
@@ -58,6 +60,17 @@ export async function createConfirmed(built: Awaited<ReturnType<typeof makeApp>>
   return r;
 }
 
+export const PUBLISH_BODY = { acceptTerms: true, termsVersion: "coobrigacao-demo-v1" };
+
+// Cria, registra, confirma e publica (termo aceito): pronto para receber e aceitar propostas.
+export async function createPublished(built: Awaited<ReturnType<typeof makeApp>>) {
+  const r = await createConfirmed(built);
+  const res = await built.app.inject({ method: "POST", url: `/api/v1/receivables/${r.id}/publish`, payload: PUBLISH_BODY });
+  if (res.statusCode !== 202) throw new Error(`publish falhou: ${res.body}`);
+  await built.listings.settle();
+  return r;
+}
+
 // Cria um recebível e leva até `registered` com o dublê.
 export async function createRegistered(built: Awaited<ReturnType<typeof makeApp>>) {
   const r = await createOne(built.app);
@@ -79,7 +92,7 @@ export async function makeApp(
 type Built = Awaited<ReturnType<typeof makeApp>>;
 
 export async function createOne(app: Built["app"]) {
-  const res = await app.inject({ method: "POST", url: "/api/v1/receivables", payload: form(validInput()) });
+  const res = await app.inject({ method: "POST", url: "/api/v1/receivables", payload: form(validInput(), uniquePdf()) });
   return res.json();
 }
 

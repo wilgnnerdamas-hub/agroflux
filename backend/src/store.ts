@@ -2,11 +2,13 @@
 // Escrita atômica: grava num arquivo temporário e renomeia.
 import fs from "node:fs";
 import path from "node:path";
-import { emptyAssignment, emptyDebtorConfirmation } from "./receivables.js";
+import { emptyAssignment, emptyDebtorConfirmation, emptyListing, emptyRegistry } from "./receivables.js";
 import type { Offer, Receivable } from "./types.js";
 
 export interface DbShape {
   seq: number;
+  // v1.2: sequência dos números de registro da registradora simulada.
+  registrySeq: number;
   receivables: Record<string, Receivable>;
   offers: Record<string, Offer[]>;
   // Estado interno, fora do contrato: Idempotency-Key → id do recebível, e última assinatura enviada por recebível.
@@ -22,13 +24,24 @@ export interface ConfirmationToken {
   state: "active" | "used" | "revoked";
 }
 
-const empty = (): DbShape => ({ seq: 0, receivables: {}, offers: {}, idempotency: {}, submissions: {}, confirmationTokens: {} });
+const empty = (): DbShape => ({ seq: 0, registrySeq: 0, receivables: {}, offers: {}, idempotency: {}, submissions: {}, confirmationTokens: {} });
 
-// Dados gravados pela v1.0 não têm os blocos da v1.1: completa ao carregar.
+// Dados gravados por versões anteriores não têm os blocos novos: completa ao carregar.
 function migrate(db: DbShape): DbShape {
+  db.registrySeq ??= 0;
   for (const r of Object.values(db.receivables)) {
     r.debtorConfirmation ??= emptyDebtorConfirmation();
-    r.assignment ??= emptyAssignment();
+    const a = emptyAssignment();
+    r.assignment = { ...a, ...r.assignment, explorerUrls: { ...a.explorerUrls, ...r.assignment?.explorerUrls } };
+    r.registry ??= emptyRegistry();
+    r.listing ??= emptyListing();
+  }
+  for (const offers of Object.values(db.offers)) {
+    for (const o of offers) {
+      o.origin ??= "automatic";
+      o.createdAt ??= o.expiresAt;
+      o.updatedAt ??= o.createdAt;
+    }
   }
   return db;
 }
@@ -48,6 +61,11 @@ export class Store {
   nextReference(): string {
     this.db.seq += 1;
     return `AGF-${String(this.db.seq).padStart(4, "0")}`;
+  }
+
+  nextRegistryId(): string {
+    this.db.registrySeq += 1;
+    return `REG-DEMO-${String(this.db.registrySeq).padStart(6, "0")}`;
   }
 
   get(id: string): Receivable | undefined {

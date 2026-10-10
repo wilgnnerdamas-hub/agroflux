@@ -10,7 +10,7 @@ import { AssignmentFailure, createAssignmentGateway } from "../src/chain/assignm
 const url = process.env.LOCALNET_URL ?? "http://127.0.0.1:8899";
 if (!/127\.0\.0\.1|localhost/.test(url)) throw new Error("Só roda contra validador local.");
 const connection = new Connection(url, "confirmed");
-const [payer, distributor, funder] = [Keypair.generate(), Keypair.generate(), Keypair.generate()];
+const [payer, distributor, funder, funderB, funderC] = [Keypair.generate(), Keypair.generate(), Keypair.generate(), Keypair.generate(), Keypair.generate()];
 
 for (const kp of [payer, distributor, funder]) {
   const sig = await connection.requestAirdrop(kp.publicKey, 10 * LAMPORTS_PER_SOL);
@@ -19,12 +19,14 @@ for (const kp of [payer, distributor, funder]) {
 const tbrl = await createMint(connection, payer, payer.publicKey, null, 2, undefined, { commitment: "confirmed" });
 const funderAta = await getOrCreateAssociatedTokenAccount(connection, payer, tbrl, funder.publicKey, false, "confirmed");
 await mintTo(connection, payer, tbrl, funderAta.address, payer, 50_000, [], { commitment: "confirmed" });
+const funderBAta = await getOrCreateAssociatedTokenAccount(connection, payer, tbrl, funderB.publicKey, false, "confirmed");
+await mintTo(connection, payer, tbrl, funderBAta.address, payer, 50_000, [], { commitment: "confirmed" });
 
 const gw = createAssignmentGateway({
   rpcUrl: url,
   feePayerSecret: bs58.encode(payer.secretKey),
   distributorSecret: bs58.encode(distributor.secretKey),
-  funderSecret: bs58.encode(funder.secretKey),
+  funderSecrets: { fnd_a: bs58.encode(funder.secretKey), fnd_b: bs58.encode(funderB.secretKey), fnd_c: bs58.encode(funderC.secretKey) },
   settlementMint: tbrl.toBase58(),
   escrowProgramId: process.env.ESCROW_PROGRAM_ID!,
 });
@@ -52,13 +54,16 @@ assert.deepEqual(md?.additionalMetadata, [["payloadHash", payloadHash]]);
 assert.equal(md?.updateAuthority, undefined);
 console.log("OK  token da cessão:", minted.mint);
 
+const documentSha256 = "d0c".padEnd(64, "1");
+const settleInput = (assetMint: string, amount: number, funderId: "fnd_a" | "fnd_b" = "fnd_a") => ({ assetMint, amount, funderId, documentSha256 });
+
 // 2) Financiador sem saldo: falha amigável antes de enviar; nada muda.
-await assert.rejects(gw.settle({ assetMint: minted.mint, amount: 60_000 }, opts), (e) => e instanceof AssignmentFailure && e.code === "INSUFFICIENT_TEST_TOKENS");
+await assert.rejects(gw.settle(settleInput(minted.mint, 60_000), opts), (e) => e instanceof AssignmentFailure && e.code === "INSUFFICIENT_TEST_TOKENS");
 assert.equal(await bal(mint, distributor.publicKey, TOKEN_2022_PROGRAM_ID), 1);
 console.log("OK  sem saldo: INSUFFICIENT_TEST_TOKENS, token continua com o distribuidor");
 
 // 3) Liquidação atômica.
-const settled = await gw.settle({ assetMint: minted.mint, amount: 12_345 }, opts);
+const settled = await gw.settle(settleInput(minted.mint, 12_345), opts);
 assert.equal(await bal(mint, distributor.publicKey, TOKEN_2022_PROGRAM_ID), 0);
 assert.equal(await bal(mint, funder.publicKey, TOKEN_2022_PROGRAM_ID), 1);
 assert.equal(await bal(tbrl, distributor.publicKey), 12_345);
@@ -67,6 +72,40 @@ assert.ok(await gw.checkSignature(settled.signature));
 console.log("OK  liquidação atômica:", settled.signature);
 
 // 4) Segunda liquidação do mesmo token: o escrow recusa (registro já existe / distribuidor não tem o token).
-await assert.rejects(gw.settle({ assetMint: minted.mint, amount: 1 }, opts), (e) => e instanceof AssignmentFailure && e.code === "ESCROW_REJECTED");
-console.log("OK  segunda liquidação recusada: ESCROW_REJECTED");
+await assert.rejects(gw.settle(settleInput(minted.mint, 1), opts), (e) => e instanceof AssignmentFailure && e.code === "ESCROW_REJECTED");
+console.log("OK  segunda liquidação do mesmo token recusada: ESCROW_REJECTED");
+
+// 5) v1.2: inspeção on-chain usada pela verificação.
+const ins = await gw.inspect({ assetMint: minted.mint, funderId: "fnd_a", documentSha256 });
+assert.deepEqual(ins.mint, { supply: 1, decimals: 0, mintAuthorityRevoked: true });
+assert.equal(ins.metadataPayloadHash, payloadHash);
+assert.equal(ins.funderBalance, 1);
+assert.deepEqual(ins.settlement, {
+  assetMint: minted.mint,
+  settlementMint: tbrl.toBase58(),
+  distributor: distributor.publicKey.toBase58(),
+  funder: funder.publicKey.toBase58(),
+  amount: 12_345,
+});
+assert.deepEqual(ins.documentLock, { documentSha256, assetMint: minted.mint, funder: funder.publicKey.toBase58(), amount: 12_345 });
+console.log("OK  inspeção: token único, metadados, financiador, registro da liquidação e trava do documento");
+
+// 6) v1.2: OUTRO token para o MESMO documento, com outro financiador. Com simulação: DOCUMENT_ALREADY_ASSIGNED.
+const second = await gw.mintAssetToken({ reference: "AGF-0042-T", payloadHash }, opts);
+await assert.rejects(gw.settle(settleInput(second.mint, 100, "fnd_b"), opts), (e) => e instanceof AssignmentFailure && e.code === "DOCUMENT_ALREADY_ASSIGNED");
+console.log("OK  segunda cessão do mesmo documento (com simulação): DOCUMENT_ALREADY_ASSIGNED");
+
+// 7) v1.2: prova de recusa, sem simulação: a transação entra na rede com erro, por causa da trava.
+const fB = await bal(tbrl, funderB.publicKey);
+const attempt = await gw.attemptDoubleSettle(settleInput(second.mint, 100, "fnd_b"), opts);
+assert.equal(attempt.landedWithError, true);
+assert.equal(attempt.rejectedByDocumentLock, true);
+assert.equal(await bal(new PublicKey(second.mint), distributor.publicKey, TOKEN_2022_PROGRAM_ID), 1);
+assert.equal(await bal(tbrl, funderB.publicKey), fB);
+console.log("OK  prova de recusa gravada on-chain:", attempt.signature);
+
+// 8) Saldos para a transparência.
+const balances = await gw.readBalances([distributor.publicKey.toBase58(), funderC.publicKey.toBase58()]);
+assert.equal(balances[0].settlementUnits, 12_345);
+assert.equal(balances[1].settlementUnits, 0);
 console.log("TUDO OK");

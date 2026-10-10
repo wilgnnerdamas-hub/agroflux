@@ -2,48 +2,38 @@
 
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { CheckCircle2, ShieldAlert, XCircle } from "lucide-react";
+import { CheckCircle2, Landmark, ShieldAlert, XCircle } from "lucide-react";
 import { api, toApiError } from "@/lib/api";
-import { useAsync } from "@/lib/useAsync";
 import { formatDate, formatMoney } from "@/lib/format";
-import { PRODUCT_CATEGORY_LABEL } from "@/lib/labels";
+import { useI18n } from "@/lib/i18n";
+import { useAsync } from "@/lib/useAsync";
 import type { ConfirmationSummary } from "@/lib/types";
 import { Alert, Button, Card, DescList, ErrorState, LoadingBlock } from "@/components/ui";
 
-// v1.1 (§5.11 e §5.12): página pública, pensada para o celular do sacado.
+// §5.11 e §5.12 (v1.2: aceite do título na registradora simulada). Página pública, pensada para o celular do sacado.
 function SimulationNotice({ text }: { text: string }) {
+  const { t } = useI18n();
   return (
     <div className="mb-5 flex gap-3 rounded-lg border border-sim/30 bg-sim-soft p-4" role="note">
       <ShieldAlert className="h-5 w-5 shrink-0 text-sim" aria-hidden />
       <div>
         <p className="text-sm font-bold text-sim">{text}</p>
-        <p className="mt-0.5 text-sm text-ink/80">
-          Demonstração em rede de testes. Recebível fictício, sem validação jurídica e sem movimentação financeira.
-        </p>
+        <p className="mt-0.5 text-sm text-ink/80">{t.confirm.noticeExtra}</p>
       </div>
     </div>
   );
 }
 
 function Result({ s }: { s: ConfirmationSummary }) {
-  if (s.status === "confirmed") {
-    return (
-      <Alert tone="ok" title="Confirmação registrada">
-        Obrigado. A distribuidora já pode ver a sua confirmação, que será registrada na Solana Devnet (rede de testes).
-      </Alert>
-    );
-  }
-  if (s.status === "declined") {
-    return (
-      <Alert tone="warn" title="Você recusou este recebível">
-        A distribuidora foi avisada. Se foi um engano, peça a ela um novo link.
-      </Alert>
-    );
-  }
+  const { t } = useI18n();
+  if (s.status === "confirmed") return <Alert tone="ok" title={t.confirm.okTitle}>{t.confirm.okText}</Alert>;
+  if (s.status === "declined") return <Alert tone="warn" title={t.confirm.declinedTitle}>{t.confirm.declinedText}</Alert>;
   return null;
 }
 
 export default function ConfirmPage() {
+  const { t, errorMessage, locale } = useI18n();
+  const c = t.confirm;
   const { token } = useParams<{ token: string }>();
   const { state, setState } = useAsync(() => api.getConfirmation(token), [token]);
   const [busy, setBusy] = useState<"confirm" | "decline" | null>(null);
@@ -58,7 +48,7 @@ export default function ConfirmPage() {
       setState({ status: "success", data: next });
     } catch (e) {
       const ae = toApiError(e);
-      setError(ae.message);
+      setError(errorMessage(ae));
       // Link já usado em outra aba: mostra o resultado atual.
       if (ae.code === "CONFIRMATION_ALREADY_ANSWERED") {
         try {
@@ -78,7 +68,7 @@ export default function ConfirmPage() {
   if (!s && state.status === "loading") {
     return (
       <Card>
-        <LoadingBlock label="Carregando a confirmação…" lines={4} />
+        <LoadingBlock label={c.loading} lines={4} />
       </Card>
     );
   }
@@ -89,36 +79,41 @@ export default function ConfirmPage() {
         <Card>
           <div className="flex flex-col items-center py-6 text-center">
             <XCircle className="mb-3 h-10 w-10 text-faint" aria-hidden />
-            <h1 className="text-lg font-bold">{code === "NOT_FOUND" ? "Link não encontrado" : "Link vencido ou substituído"}</h1>
-            <p className="mt-1 text-sm text-muted">
-              {code === "NOT_FOUND"
-                ? "Confira se o endereço foi copiado inteiro."
-                : "Este link não vale mais. Peça um novo link à distribuidora."}
-            </p>
+            <h1 className="text-lg font-bold">{code === "NOT_FOUND" ? c.notFound : c.expired}</h1>
+            <p className="mt-1 text-sm text-muted">{code === "NOT_FOUND" ? c.notFoundText : c.expiredText}</p>
           </div>
         </Card>
       );
     }
-    return <ErrorState title="Não foi possível carregar a confirmação" message={state.error.message} />;
+    return <ErrorState title={c.loadError} message={errorMessage(state.error)} />;
   }
   if (!s) return null;
 
   return (
     <>
-      <SimulationNotice text={s.disclaimer || "Simulação — sem verificação de identidade do sacado."} />
-      <h1 className="text-xl font-bold tracking-tight">Confirmação de compra a prazo</h1>
-      <p className="mt-1 text-sm text-muted">
-        {s.distributor.name} pede que você confirme a compra abaixo, referente ao recebível {s.reference}.
-      </p>
+      <SimulationNotice text={locale === "pt" ? s.disclaimer : t.debtor.noIdentity} />
+      <h1 className="text-xl font-bold tracking-tight">{c.title}</h1>
+      <p className="mt-1 text-sm text-muted">{c.lead(s.distributor.name, s.reference)}</p>
+
+      {s.paymentDomicile && (
+        <div className="mt-5 flex gap-3 rounded-lg border border-info/25 bg-info-soft p-4" data-testid="payment-domicile">
+          <Landmark className="h-5 w-5 shrink-0 text-info" aria-hidden />
+          <div className="text-sm">
+            <p className="font-semibold text-info">{c.payTitle}</p>
+            <p className="mt-0.5 text-ink/80">{c.payText(s.paymentDomicile.payeeName)}</p>
+          </div>
+        </div>
+      )}
 
       <Card className="mt-5">
         <DescList
           items={[
-            { label: "Distribuidor", value: s.distributor.name },
-            { label: "Referência", value: s.reference },
-            { label: "Insumo", value: `${PRODUCT_CATEGORY_LABEL[s.product.category]} — ${s.product.description}` },
-            { label: "Valor", value: <span className="text-lg font-bold tabular-nums">{formatMoney(s.amountCents)}</span> },
-            { label: "Vencimento", value: formatDate(s.dueDate) },
+            { label: c.distributor, value: s.distributor.name },
+            { label: c.reference, value: s.reference },
+            ...(s.registryId ? [{ label: c.registry, value: <span className="font-mono text-xs">{s.registryId}</span> }] : []),
+            { label: c.product, value: `${t.status.product[s.product.category]} — ${s.product.description}` },
+            { label: c.amount, value: <span className="text-lg font-bold tabular-nums">{formatMoney(s.amountCents)}</span> },
+            { label: c.due, value: formatDate(s.dueDate) },
           ]}
         />
       </Card>
@@ -126,35 +121,28 @@ export default function ConfirmPage() {
       <div className="mt-5 space-y-3" aria-live="polite">
         {s.status === "requested" ? (
           <>
-            <p className="text-sm text-muted">
-              Ao confirmar, você declara (nesta simulação) que reconhece esta compra. Um registro com códigos técnicos,
-              sem seus dados, é gravado na Solana Devnet.
-            </p>
+            <p className="text-sm text-muted">{c.explain}</p>
             {!askDecline ? (
               <div className="flex flex-col gap-2">
                 <Button onClick={() => answer("confirm")} loading={busy === "confirm"} disabled={busy !== null} className="w-full py-3">
-                  <CheckCircle2 className="h-5 w-5" aria-hidden /> Confirmar compra
+                  <CheckCircle2 className="h-5 w-5" aria-hidden /> {c.accept}
                 </Button>
                 <Button variant="secondary" onClick={() => setAskDecline(true)} disabled={busy !== null} className="w-full">
-                  Não reconheço esta compra
+                  {c.decline}
                 </Button>
               </div>
             ) : (
               <Alert
                 tone="warn"
-                title="Recusar este recebível?"
+                title={c.declineTitle}
                 action={
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button variant="danger" onClick={() => answer("decline")} loading={busy === "decline"}>
-                      Sim, recusar
-                    </Button>
-                    <Button variant="secondary" onClick={() => setAskDecline(false)} disabled={busy !== null}>
-                      Voltar
-                    </Button>
+                    <Button variant="danger" onClick={() => answer("decline")} loading={busy === "decline"}>{c.declineYes}</Button>
+                    <Button variant="secondary" onClick={() => setAskDecline(false)} disabled={busy !== null}>{t.common.back}</Button>
                   </div>
                 }
               >
-                A distribuidora verá que você não reconhece a compra.
+                {c.declineText}
               </Alert>
             )}
           </>
