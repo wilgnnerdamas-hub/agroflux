@@ -6,8 +6,9 @@ import { api } from "@/lib/api";
 import { useAsync } from "@/lib/useAsync";
 import { formatDate, formatMoney } from "@/lib/format";
 import { PRODUCT_CATEGORY_LABEL } from "@/lib/labels";
-import { Button, ButtonLink, EmptyState, ErrorState, PageHeader, Skeleton } from "@/components/ui";
-import { ChainStatusBadge, ReceivableStatusBadge } from "@/components/status";
+import { Button, ButtonLink, EmptyState, ErrorState, PageHeader, Skeleton, cx } from "@/components/ui";
+import { ChainStatusBadge, DebtorConfirmationBadge, ReceivableStatusBadge } from "@/components/status";
+import { FEATURE_ASSIGNMENT } from "@/lib/features";
 import type { ReceivableList } from "@/lib/types";
 
 function Kpi({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
@@ -20,11 +21,15 @@ function Kpi({ label, value, hint }: { label: string; value: React.ReactNode; hi
   );
 }
 
+// v1.1: confirmação do sacado e, com a função B ligada, cessões liquidadas.
+const KPI_COUNT = FEATURE_ASSIGNMENT ? 5 : 4;
+const KPI_COLS = FEATURE_ASSIGNMENT ? "lg:grid-cols-5" : "lg:grid-cols-4";
+
 function KpiRow({ data }: { data?: ReceivableList }) {
   if (!data) {
     return (
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-hidden>
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className={cx("grid grid-cols-2 gap-3", KPI_COLS)} aria-hidden>
+        {Array.from({ length: KPI_COUNT }).map((_, i) => (
           <div key={i} className="rounded-xl border border-border bg-surface p-4">
             <Skeleton className="w-20" />
             <Skeleton className="mt-3 h-7 w-24" />
@@ -35,11 +40,13 @@ function KpiRow({ data }: { data?: ReceivableList }) {
   }
   const t = data.totals;
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className={cx("grid grid-cols-2 gap-3", KPI_COLS)}>
       <Kpi label="Valor em carteira" value={formatMoney(t.amountCents)} hint={`${t.count} recebível(is)`} />
-      <Kpi label="Registrados na Devnet" value={t.registeredCount} />
-      <Kpi label="Aguardando confirmação" value={t.pendingCount} />
-      <Kpi label="Com oferta simulada" value={t.offerSelectedCount} />
+      <Kpi label="Registrados na Devnet" value={t.registeredCount} hint={t.pendingCount ? `${t.pendingCount} em registro` : undefined} />
+      <Kpi label="Confirmados pelo sacado" value={t.debtorConfirmedCount} hint="simulação" />
+      {/* Cessões liquidadas também passaram pela seleção de oferta. */}
+      <Kpi label="Com oferta simulada" value={t.offerSelectedCount + t.assignedCount} />
+      {FEATURE_ASSIGNMENT && <Kpi label="Cessões liquidadas" value={t.assignedCount} hint="tBRL-DEMO, sem valor" />}
     </div>
   );
 }
@@ -115,30 +122,32 @@ export default function DashboardPage() {
                   <tr>
                     <th scope="col" className="px-4 py-3 font-medium">Código</th>
                     <th scope="col" className="px-4 py-3 font-medium">Sacado</th>
-                    <th scope="col" className="px-4 py-3 font-medium">Insumo</th>
+                    <th scope="col" className="hidden px-4 py-3 font-medium 2xl:table-cell">Insumo</th>
                     <th scope="col" className="px-4 py-3 text-right font-medium">Valor</th>
                     <th scope="col" className="px-4 py-3 font-medium">Vencimento</th>
                     <th scope="col" className="px-4 py-3 font-medium">Status</th>
                     <th scope="col" className="px-4 py-3 font-medium">Devnet</th>
+                    <th scope="col" className="px-4 py-3 font-medium">Confirmação</th>
                     <th scope="col" className="w-8 px-2 py-3"><span className="sr-only">Abrir</span></th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.items.map((r) => (
                     <tr key={r.id} className="group relative border-b border-border last:border-0 hover:bg-subtle/60">
-                      <td className="px-4 py-3 font-semibold">
+                      <td className="whitespace-nowrap px-4 py-3 font-semibold">
                         <Link href={`/recebiveis/${r.id}`} className="after:absolute after:inset-0">
                           {r.reference}
                         </Link>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="whitespace-nowrap px-4 py-3">
                         {r.debtor.alias} <span className="text-faint">· {r.debtor.state}</span>
                       </td>
-                      <td className="px-4 py-3 text-muted">{PRODUCT_CATEGORY_LABEL[r.product.category]}</td>
-                      <td className="px-4 py-3 text-right font-medium tabular-nums">{formatMoney(r.amountCents)}</td>
+                      <td className="hidden px-4 py-3 text-muted 2xl:table-cell">{PRODUCT_CATEGORY_LABEL[r.product.category]}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums">{formatMoney(r.amountCents)}</td>
                       <td className="px-4 py-3 tabular-nums">{formatDate(r.dueDate)}</td>
                       <td className="px-4 py-3"><ReceivableStatusBadge status={r.status} /></td>
                       <td className="px-4 py-3"><ChainStatusBadge status={r.chain.status} /></td>
+                      <td className="px-4 py-3"><DebtorConfirmationBadge status={r.debtorConfirmation.status} short /></td>
                       <td className="px-2 py-3 text-faint group-hover:text-ink"><ChevronRight className="h-4 w-4" aria-hidden /></td>
                     </tr>
                   ))}
@@ -161,6 +170,7 @@ export default function DashboardPage() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <ReceivableStatusBadge status={r.status} />
                       <ChainStatusBadge status={r.chain.status} />
+                      {r.debtorConfirmation.status !== "none" && <DebtorConfirmationBadge status={r.debtorConfirmation.status} />}
                     </div>
                   </Link>
                 </li>

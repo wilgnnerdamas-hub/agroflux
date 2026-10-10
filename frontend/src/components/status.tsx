@@ -58,10 +58,18 @@ const DC_ICON: Record<DebtorConfirmationStatus, React.ReactNode> = {
   declined: <UserX className={ic} aria-hidden />,
 };
 
-export function DebtorConfirmationBadge({ status }: { status: DebtorConfirmationStatus }) {
+// Versão curta para tabelas e listas.
+const DC_SHORT_LABEL: Record<DebtorConfirmationStatus, string> = {
+  none: "Não solicitada",
+  requested: "Aguardando",
+  confirmed: "Confirmada (simulada)",
+  declined: "Recusada (simulada)",
+};
+
+export function DebtorConfirmationBadge({ status, short = false }: { status: DebtorConfirmationStatus; short?: boolean }) {
   return (
     <Badge tone={DC_TONE[status]} icon={DC_ICON[status]}>
-      {DEBTOR_CONFIRMATION_STATUS_LABEL[status]}
+      {short ? DC_SHORT_LABEL[status] : DEBTOR_CONFIRMATION_STATUS_LABEL[status]}
     </Badge>
   );
 }

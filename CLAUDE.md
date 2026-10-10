@@ -76,7 +76,8 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
     **Corte às 18h:** se não estiver estável, a flag fica `false`, a gestão é avisada e o tema vira roadmap no pitch.
 
 **11/10 à noite: demo**
-12. Acabamento visual, roteiro da demo e novo deploy.
+12. Acabamento visual, roteiro da demo e novo deploy. Feito: dashboard v1.1 (indicadores de confirmação e cessão,
+    coluna de confirmação) e roteiro em `docs/roteiro-demo.md`. Falta: gravação de reserva.
 
 **12/10: só correções críticas e submissão.**
 

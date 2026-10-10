@@ -58,7 +58,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && p === "/__reset") { db.clear(); tokens.clear(); n = 0; failedOnce = false; return send(res, 204); }
     if (req.method === "GET" && p === "/receivables") {
       const items = [...db.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(summary);
-      return send(res, 200, { items, totals: { count: items.length, amountCents: items.reduce((s, i) => s + i.amountCents, 0), registeredCount: items.filter((i) => ["registered", "offer_selected"].includes(i.status)).length, pendingCount: items.filter((i) => i.status === "registration_pending").length, offerSelectedCount: items.filter((i) => i.status === "offer_selected").length, debtorConfirmedCount: items.filter((i) => i.debtorConfirmation.status === "confirmed").length, assignedCount: items.filter((i) => i.status === "assigned").length } });
+      return send(res, 200, { items, totals: { count: items.length, amountCents: items.reduce((s, i) => s + i.amountCents, 0), registeredCount: items.filter((i) => ["registered", "offer_selected", "assignment_pending", "assigned", "assignment_failed"].includes(i.status)).length, pendingCount: items.filter((i) => i.status === "registration_pending").length, offerSelectedCount: items.filter((i) => i.status === "offer_selected").length, debtorConfirmedCount: items.filter((i) => i.debtorConfirmation.status === "confirmed").length, assignedCount: items.filter((i) => i.status === "assigned").length } });
     }
     if (req.method === "POST" && p === "/receivables") {
       const chunks = [];
