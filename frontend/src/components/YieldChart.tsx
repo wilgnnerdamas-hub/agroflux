@@ -124,31 +124,3 @@ export function YieldChart({ positions, refMs, title }: { positions: YieldPositi
     </figure>
   );
 }
-
-/** Controle da data de referência (move a linha "Hoje" para ver a projeção em outra data). */
-export function RefDateSlider({ domain, value, onChange }: { domain: [number, number]; value: number; onChange: (ms: number) => void }) {
-  const { t } = useI18n();
-  const id = useId();
-  const [t0, t1] = domain;
-  const days = Math.max(1, Math.round((t1 - t0) / DAY));
-  const current = Math.round((Math.min(Math.max(value, t0), t1) - t0) / DAY);
-  return (
-    <div>
-      <label htmlFor={id} className="flex flex-wrap items-baseline justify-between gap-2 text-sm font-medium">
-        <span>{t.funder.refDate}</span>
-        <span className="tabular-nums text-muted">{formatDate(isoDay(t0 + current * DAY))}</span>
-      </label>
-      <input
-        id={id}
-        type="range"
-        min={0}
-        max={days}
-        value={current}
-        onChange={(e) => onChange(t0 + Number(e.target.value) * DAY)}
-        className="mt-2 w-full accent-[var(--color-brand)]"
-        data-testid="ref-date"
-      />
-      <p className="mt-1 text-xs text-muted">{t.funder.refHint}</p>
-    </div>
-  );
-}

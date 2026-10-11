@@ -158,7 +158,15 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
   await funder.goto("/financiador/carteira");
   await expect(funder.getByTestId("portfolio-list")).toContainText("AGF-0001");
   await expect(funder.getByTestId("yield-chart").first()).toBeVisible();
-  await funder.getByTestId("ref-date").fill("60");
+  // Escopo pelo chip (refletido na URL) e data pelo teclado na curva.
+  await funder.getByTestId("scope-AGF-0001").click();
+  await expect(funder).toHaveURL(/pos=AGF-0001/);
+  await expect(funder.getByTestId("scope-label")).toContainText("AGF-0001");
+  await funder.getByTestId("yield-chart").focus();
+  await funder.keyboard.press("Shift+ArrowRight");
+  await expect(funder.getByTestId("value-label")).toContainText("Valor em");
+  await funder.keyboard.press("Home");
+  await expect(funder.getByTestId("value-label")).toHaveText("Valor hoje");
   await funder.screenshot({ path: shots("07-carteira", p), fullPage: true });
 
   // Painel AgroFlux: a receita da cessão aparece no faturamento.

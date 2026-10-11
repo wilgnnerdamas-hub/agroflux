@@ -168,18 +168,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <MockBanner />
       <DemoStrip />
       <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
-        <div className={cx(WRAP, "flex h-16 items-stretch gap-3 sm:gap-8")}>
-          <span className="flex items-center">
+        <div className={cx(WRAP, "flex flex-wrap items-stretch gap-x-3 sm:h-16 sm:flex-nowrap sm:gap-8")}>
+          <span className="flex h-14 items-center sm:h-auto">
             <Brand />
           </span>
-          <nav aria-label="Principal" className="-mx-1 flex min-w-0 flex-1 gap-1 overflow-x-auto px-1 [scrollbar-width:none] sm:gap-6">
+          <nav
+            aria-label="Principal"
+            className="order-last -mx-1 flex h-11 w-full min-w-0 gap-5 overflow-x-auto border-t border-divider px-1 [scrollbar-width:none] sm:order-none sm:h-auto sm:w-auto sm:flex-1 sm:gap-6 sm:border-0"
+          >
             {nav.map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
                 aria-current={n.active ? "page" : undefined}
                 className={cx(
-                  "relative flex shrink-0 items-center whitespace-nowrap px-1.5 text-sm transition-colors sm:px-0",
+                  "relative flex shrink-0 items-center whitespace-nowrap text-sm transition-colors",
                   n.active
                     ? "font-medium text-ink after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-brand"
                     : "text-muted hover:text-ink",
@@ -189,7 +192,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          <div className="ml-auto flex h-14 shrink-0 items-center gap-1.5 sm:ml-0 sm:h-auto sm:gap-3">
             <ConnectionDot />
             {role && (
               <Link

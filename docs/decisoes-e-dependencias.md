@@ -97,3 +97,9 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 - Novo recebível: prévia viva do passaporte, contador "N de 9" e botão "Faltam N itens", que continua clicável e mostra a validação. O código da prévia (AGF-000N) é só uma estimativa; quem numera é o backend.
 - Transparência: funil por portão, célula do escrow ("segundas vendas aceitas: 0", mais as tentativas recusadas) e endereços com "copiar".
 - Cortes: "link enviado há X h" não aparece no próximo passo, porque o resumo da lista não traz `requestedAt` e incluir o campo mudaria o contrato. O terciário continua em #69746D, por causa do contraste AA.
+
+### F21 — Carteira do financiador no estilo do Claude Design (11/10)
+- Saíram o controle deslizante de data e o gráfico repetido em cada posição. Entraram um painel com os números do escopo e uma curva única (`PortfolioCurve`, SVG próprio) que muda de data com o mouse, o toque ou o teclado (←/→, Shift, Home/End). Os números do painel acompanham a data apontada.
+- Escopo "Carteira toda" ou uma posição, por chip ou clicando na linha, refletido na URL (`?pos=AGF-0009`). Na carteira toda, os vencimentos intermediários aparecem marcados na curva.
+- A curva usa dias corridos e é contínua: `pago × (face/pago)^(d/prazo)`, como pede o design. A versão em dias úteis subia em degraus. A precificação no backend continua em dias úteis (base 252). O gráfico de prévia na tela do recebível do financiador não mudou.
+- No celular, a navegação do cabeçalho passou para uma segunda linha (em todos os perfis), para o item ativo não ficar cortado.
