@@ -30,6 +30,19 @@
   --color-amber-line: #efe2c4;
   --color-amber-ink: #7a5a14;
 
+  --color-green-mid: #4e8f6e;
+  --color-green-pale: #9dc0ac;
+  --color-step: #c9cfcb;
+  --color-amber-text: #8a5e0e;
+
+  --color-terra: #a8442e;
+  --color-terra-fill: #c46a54;
+  --color-terra-soft: #fbf1ee;
+  --color-terra-line: #f0d3ca;
+
+  --color-rate-soft: #eef4f0;
+  --color-rate-line: #cfe0d5;
+
   --color-ok: #1e6b4a;
   --color-ok-soft: #e6efe9;
   --color-warn: #7a5a14;
@@ -94,6 +107,16 @@ body {
   to { opacity: 1; transform: none; }
 }
 .agf-rise { animation: agf-rise 0.5s var(--ease-agf) both; }
+@keyframes agf-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+.agf-up { animation: agf-up 0.4s var(--ease-agf) both; }
+@keyframes agf-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.agf-grow { transform-origin: left; animation: agf-grow 0.45s var(--ease-agf) both; }
 @keyframes agf-spin { to { transform: rotate(360deg); } }
 .agf-spin { animation: agf-spin 0.8s var(--ease-agf); }
 .agf-bar { transition: width 0.8s var(--ease-agf); }
@@ -104,7 +127,7 @@ body {
 .agf-input:focus { outline: none; border-color: var(--color-brand); box-shadow: 0 0 0 3px var(--color-brand-soft); }
 .agf-input:focus-visible { outline: none; }
 @media (prefers-reduced-motion: reduce) {
-  .agf-pulse, .agf-rise, .agf-spin { animation: none; }
+  .agf-pulse, .agf-rise, .agf-spin, .agf-up, .agf-grow { animation: none; }
   .agf-bar, .agf-fade { transition: none; }
 }
 

@@ -1297,7 +1297,7 @@ Três distribuidoras com ids fixos: `dst_a` "Distribuidora Demo", `dst_b` "Cerra
 |---|---|---|
 | GET | `/pricing/reference` | CDI vigente e origem (`bcb` ou `manual`), data de referência e configurações públicas de preço. |
 | GET | `/admin/overview` | Volume cedido, receita, contagem por etapa, ticket médio, prazo médio, taxa média, mix de rating e perda esperada. |
-| GET | `/admin/receivables` | Todos os recebíveis com distribuidora, etapa, rating, perda esperada e proposta aceita. |
+| GET | `/admin/receivables` | Todos os recebíveis com distribuidora, etapa, situação do aceite (`debtorConfirmation.status`, aditivo em 11/10), rating, perda esperada e proposta aceita. |
 | GET | `/admin/funders` | Por financiador: propostas enviadas e aceitas, volume comprado, taxa média, rendimento médio e saldo de tBRL-DEMO. |
 | GET | `/admin/distributors` | Por distribuidora: recebíveis, volume, volume cedido, CET médio e maior concentração por sacado. |
 | GET | `/admin/revenue` | Lançamentos de receita (um por cessão: taxa AgroFlux, tarifa de registro, assinatura da liquidação) e totais por mês. |

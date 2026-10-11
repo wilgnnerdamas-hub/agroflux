@@ -558,6 +558,8 @@ export interface AdminReceivableRow {
   status: ReceivableStatus;
   distributor: { id: DistributorId; name: string };
   debtor: Debtor;
+  // v1.3.1 (aditivo): situação do aceite, para a trilha de portões e o próximo passo.
+  debtorConfirmation?: { status: DebtorConfirmationStatus };
   product: Product;
   amountCents: number;
   dueDate: string;

@@ -174,7 +174,8 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
   await funder.getByTestId("enter-admin").click();
   await expect(funder.getByTestId("rating-mix")).toBeVisible();
   await funder.getByTestId("tab-revenue").click();
-  await expect(funder.getByTestId("revenue-entry")).toContainText("AGF-0001");
+  await expect(funder.getByTestId("revenue-entry").filter({ visible: true }).first()).toContainText("AGF-0001");
+  await expect(funder).toHaveURL(/aba=faturamento/);
   await funder.screenshot({ path: shots("07b-admin-faturamento", p), fullPage: true });
 
   // Transparência.
@@ -285,12 +286,18 @@ test("distribuidoras demo e configurações do painel", async ({ page }) => {
   await expect(page.getByText("Nenhum recebível cadastrado")).toBeVisible();
 
   // Painel: taxa da AgroFlux configurável.
-  await page.goto("/admin?tab=settings");
+  await page.goto("/admin?aba=configuracoes");
+  // Origem do CDI (segmentado) e IOF (switch) marcam alterações não salvas.
+  await page.getByTestId("cdi-source-bcb").click();
+  await expect(page.getByTestId("unsaved-bar")).toContainText("1 alteração não salva");
+  await page.getByTestId("cdi-source-manual").click();
+  await expect(page.getByTestId("unsaved-bar")).toHaveCount(0);
+  await expect(page.getByTestId("iof-simulated_bank")).toHaveAttribute("aria-checked", "true");
   const fee = page.getByTestId("platform-fee-input");
   await fee.fill("0,80");
   await fee.blur();
   await page.getByRole("button", { name: "Salvar configurações" }).click();
-  await expect(page.getByText("Configurações salvas.")).toBeVisible();
+  await expect(page.getByText("Configurações salvas")).toBeVisible();
   await page.getByTestId("tab-distributors").click();
   await expect(page.getByText("Cerrado Insumos (demo)")).toBeVisible();
 });

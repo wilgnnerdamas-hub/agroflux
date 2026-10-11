@@ -56,3 +56,24 @@ export function useTyping(text: string | null, ms = 2000) {
   }, [text, ms]);
   return { shown: text ? text.slice(0, chars) : "", typing: !!text && chars < text.length };
 }
+
+/** 0 → 1 em `ms` ao montar (ease-out cúbico). Remonte o componente (key) para repetir. */
+export function useIntro(ms = 900) {
+  const [p, setP] = useState(0);
+  useEffect(() => {
+    if (prefersReducedMotion()) {
+      setP(1);
+      return;
+    }
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - t0) / ms);
+      setP(1 - Math.pow(1 - k, 3));
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [ms]);
+  return p;
+}

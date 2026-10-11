@@ -103,3 +103,11 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 - Escopo "Carteira toda" ou uma posição, por chip ou clicando na linha, refletido na URL (`?pos=AGF-0009`). Na carteira toda, os vencimentos intermediários aparecem marcados na curva.
 - A curva usa dias corridos e é contínua: `pago × (face/pago)^(d/prazo)`, como pede o design. A versão em dias úteis subia em degraus. A precificação no backend continua em dias úteis (base 252). O gráfico de prévia na tela do recebível do financiador não mudou.
 - No celular, a navegação do cabeçalho passou para uma segunda linha (em todos os perfis), para o item ativo não ficar cortado.
+
+### F22 — Painel AgroFlux no estilo do Claude Design (11/10)
+- O painel foi dividido em componentes (`components/admin/*`): visão geral, recebíveis, participantes, faturamento e risco, e configurações. Abas de texto com sublinhado, navegação por setas e URL em português (`?aba=risco`; `?tab=` continua aceito). A aba Recebíveis aceita filtros pela URL (`filtro=failed`, `etapa=registered`).
+- Cores de rating por família (AA–B verde, C–D âmbar, E–H terracota), aplicadas ao `RatingBadge` em todo o app.
+- "Repetir cessão" no admin chama o endpoint que já existia (`POST /receivables/:id/assignment`, que aceita `assignment_failed`).
+- Backend: `GET /admin/receivables` ganhou `debtorConfirmation.status` (aditivo, registrado no contrato), para a trilha de portões e o próximo passo.
+- Configurações: alterações não salvas marcadas em âmbar, barra fixa para salvar ou descartar, confirmação ao trocar de aba ou seguir um link interno e aviso ao fechar a página.
+- Limite de "concentração alta" do maior sacado fixo em 50% (`HIGH_CONCENTRATION`), porque não há parâmetro equivalente nas configurações.

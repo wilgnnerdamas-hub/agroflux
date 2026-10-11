@@ -7,15 +7,24 @@ import type { Rating, Risk } from "@/lib/types";
 import { Card, CardTitle, Collapsible, InfoTip, cx } from "./ui";
 
 // Cor do rating: verde nos melhores, âmbar no meio, vermelho nos piores.
+export type RatingFamily = "good" | "watch" | "high";
+export function ratingFamily(r: Rating): RatingFamily {
+  return r === "AA" || r === "A" || r === "B" ? "good" : r === "C" || r === "D" ? "watch" : "high";
+}
+
+/** Cores por família de rating: AA–B verde, C–D âmbar, E–H terracota. */
 export function ratingTone(r: Rating) {
-  if (r === "AA" || r === "A" || r === "B") return "bg-ok-soft text-ok border-ok/25";
-  if (r === "C" || r === "D") return "bg-warn-soft text-warn border-warn/25";
-  return "bg-bad-soft text-bad border-bad/25";
+  return { good: "bg-rate-soft text-brand border-rate-line", watch: "bg-amber-soft text-amber-text border-amber-line", high: "bg-terra-soft text-terra border-terra-line" }[ratingFamily(r)];
+}
+
+/** Cor de barra/coluna da família do rating. */
+export function ratingBar(r: Rating) {
+  return { good: "bg-brand", watch: "bg-amber", high: "bg-terra-fill" }[ratingFamily(r)];
 }
 
 export function RatingBadge({ rating, score, className }: { rating: Rating; score?: number; className?: string }) {
   return (
-    <span className={cx("inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-bold", ratingTone(rating), className)} data-testid="rating-badge">
+    <span className={cx("inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-semibold", ratingTone(rating), className)} data-testid="rating-badge">
       {rating}
       {score != null && <span className="font-medium opacity-80">{score}</span>}
     </span>

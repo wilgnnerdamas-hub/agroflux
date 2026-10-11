@@ -68,6 +68,7 @@ export class AdminService {
           status: r.status,
           distributor: r.distributor,
           debtor: r.debtor,
+          debtorConfirmation: { status: r.debtorConfirmation.status },
           product: r.product,
           amountCents: r.amountCents,
           dueDate: r.dueDate,
