@@ -12,7 +12,8 @@ import { useAsync } from "@/lib/useAsync";
 import type { Receivable } from "@/lib/types";
 import { Alert, Card, Collapsible, ErrorState, LoadingBlock, PageHeader } from "@/components/ui";
 import { ReceivableStatusBadge } from "@/components/status";
-import { FlowSteps } from "@/components/FlowSteps";
+import { GateStepper } from "@/components/Gates";
+import { gateProgress } from "@/lib/gates";
 import { Timeline } from "@/components/Timeline";
 import { RegisterStep } from "@/components/passport/RegisterStep";
 import { DebtorStep } from "@/components/passport/DebtorStep";
@@ -168,7 +169,7 @@ function Passport() {
         back={back}
         title={
           <span className="flex flex-wrap items-center gap-3">
-            {r.reference}
+            <span className="font-mono tracking-[-0.02em]">{r.reference}</span>
             <ReceivableStatusBadge status={r.status} />
             {r.risk && <RatingBadge rating={r.risk.rating} score={r.risk.score} />}
           </span>
@@ -181,8 +182,8 @@ function Passport() {
         }
         actions={
           <div className="text-right">
-            <p className="text-2xl font-bold tabular-nums text-ink">{formatMoney(r.amountCents)}</p>
-            <p className="text-xs text-muted">{t.passport.due} {formatDate(r.dueDate)}</p>
+            <p className="big-num text-[28px] leading-none text-ink">{formatMoney(r.amountCents)}</p>
+            <p className="mt-1.5 text-xs text-muted">{t.passport.due} {formatDate(r.dueDate)}</p>
           </div>
         }
       />
@@ -192,13 +193,13 @@ function Passport() {
         {state.status === "error" && <ErrorState title={t.common.updateError} message={state.error.message} onRetry={refresh} />}
 
         <Card className="py-4 sm:py-5">
-          <FlowSteps receivable={r} />
+          <GateStepper progress={gateProgress({ ...r, offerCount: 0 }, t)} />
         </Card>
 
         {/* Propostas precisam de largura para comparar: nesse passo, o resumo desce para baixo. */}
         <div className={r.status === "published" ? "grid gap-6" : "grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]"}>
           <section aria-labelledby="next-action" className="min-w-0 space-y-3">
-            <h2 id="next-action" className="text-xs font-semibold uppercase tracking-wide text-faint">
+            <h2 id="next-action" className="font-mono text-[11px] uppercase tracking-[0.08em] text-faint">
               {r.status === "assigned" ? t.passport.done : t.passport.nextAction}
             </h2>
             <NextAction r={r} onUpdated={onUpdated} pollTimedOut={pollTimedOut} refresh={refresh} assignmentAvailable={assignmentAvailable} />

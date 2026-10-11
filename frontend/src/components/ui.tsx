@@ -12,10 +12,10 @@ export function cx(...c: (string | false | null | undefined)[]) {
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const btnBase =
-  "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 min-h-[42px]";
+  "inline-flex items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-medium transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60 min-h-[42px]";
 const btnVariant: Record<Variant, string> = {
   primary: "bg-brand text-white hover:bg-brand-hover",
-  secondary: "border border-border-strong bg-surface text-ink hover:bg-subtle",
+  secondary: "border border-border bg-surface text-ink hover:border-ink",
   ghost: "text-brand hover:bg-brand-soft",
   danger: "bg-bad text-white hover:opacity-90",
 };
@@ -61,7 +61,7 @@ export function ButtonLink({
 
 export function Card({ children, className, ...rest }: { children: ReactNode; className?: string } & React.HTMLAttributes<HTMLElement>) {
   return (
-    <section className={cx("rounded-xl border border-border bg-surface p-5 sm:p-6", className)} {...rest}>
+    <section className={cx("rounded-[14px] border border-border bg-surface p-5 sm:p-6", className)} {...rest}>
       {children}
     </section>
   );
@@ -70,7 +70,7 @@ export function Card({ children, className, ...rest }: { children: ReactNode; cl
 export function CardTitle({ children, aside, icon }: { children: ReactNode; aside?: ReactNode; icon?: ReactNode }) {
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-      <h2 className="flex items-center gap-2 text-base font-semibold text-ink">
+      <h2 className="flex items-center gap-2 text-base font-medium text-ink">
         {icon}
         {children}
       </h2>
@@ -96,7 +96,7 @@ export function Badge({ tone = "neutral", children, icon, className }: { tone?: 
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium",
         toneClass[tone],
         className,
       )}
@@ -131,11 +131,11 @@ export function Alert({
   return (
     <div
       role={tone === "bad" ? "alert" : "status"}
-      className={cx("flex gap-3 rounded-lg border p-4 text-sm", toneClass[tone], className)}
+      className={cx("flex gap-3 rounded-[10px] border p-4 text-sm", toneClass[tone], className)}
     >
       {alertIcon[tone]}
       <div className="min-w-0 flex-1">
-        {title && <p className="font-semibold">{title}</p>}
+        {title && <p className="font-medium">{title}</p>}
         {children && <div className={cx(!!title && "mt-0.5", "text-ink/80")}>{children}</div>}
         {action && <div className="mt-3">{action}</div>}
       </div>
@@ -180,9 +180,9 @@ export function ErrorState({ message, onRetry, title }: { message: string; onRet
 
 export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center rounded-xl border border-dashed border-border-strong bg-surface px-6 py-12 text-center">
+    <div className="flex flex-col items-center rounded-[14px] border border-dashed border-border-strong bg-surface px-6 py-12 text-center">
       {icon && <div className="mb-3 text-faint">{icon}</div>}
-      <p className="text-base font-semibold">{title}</p>
+      <p className="text-base font-medium">{title}</p>
       {children && <p className="mt-1 max-w-md text-sm text-muted">{children}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
@@ -214,10 +214,43 @@ export function CopyButton({ value, label }: { value: string; label?: string }) 
   );
 }
 
+/** Botão textual "copiar" → "copiado ✓" (1,4 s), anunciado a leitores de tela. */
+export function CopyText({ value, className }: { value: string; className?: string }) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1400);
+        } catch {
+          /* clipboard indisponível */
+        }
+      }}
+      className={cx("shrink-0 rounded px-1 text-[11px] font-medium agf-fade", copied ? "text-brand" : "text-faint hover:text-ink", className)}
+    >
+      <span aria-live="polite">{copied ? t.common.copiedCheck : t.common.copyShort}</span>
+    </button>
+  );
+}
+
+/** Endereço público em pílula mono, com "copiar". */
+export function AddressPill({ value, short }: { value: string; short: string }) {
+  return (
+    <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-divider bg-row py-0.5 pl-2.5 pr-1.5">
+      <code className="truncate font-mono text-xs text-muted" title={value}>{short}</code>
+      <CopyText value={value} />
+    </span>
+  );
+}
+
 /** Valor técnico longo (hash, assinatura) em fonte mono, quebrável, com botão de copiar. */
 export function MonoValue({ value, copyLabel }: { value: string; copyLabel?: string }) {
   return (
-    <div className="flex items-start gap-1 rounded-md bg-subtle px-2.5 py-1.5">
+    <div className="flex items-start gap-1 rounded-[10px] border border-divider bg-row px-2.5 py-1.5">
       <code className="min-w-0 flex-1 break-all font-mono text-xs leading-5 text-ink">{value}</code>
       <CopyButton value={value} label={copyLabel} />
     </div>
@@ -229,7 +262,7 @@ export function DescList({ items }: { items: { label: string; value: ReactNode }
     <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
       {items.map((it) => (
         <div key={it.label} className="min-w-0">
-          <dt className="text-xs font-medium uppercase tracking-wide text-faint">{it.label}</dt>
+          <dt className="text-xs text-faint">{it.label}</dt>
           <dd className="mt-1 text-sm text-ink">{it.value}</dd>
         </div>
       ))}
@@ -243,7 +276,7 @@ export function PageHeader({ title, subtitle, actions, back }: { title: ReactNod
       {back && <div className="mb-3">{back}</div>}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-ink">{title}</h1>
+          <h1 className="text-[26px] font-medium leading-tight tracking-[-0.03em] text-ink sm:text-[32px]">{title}</h1>
           {subtitle && <div className="mt-1 text-sm text-muted">{subtitle}</div>}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -256,7 +289,7 @@ export function PageHeader({ title, subtitle, actions, back }: { title: ReactNod
 export function ExplorerLink({ href, children, className }: { href: string; children?: ReactNode; className?: string }) {
   const { t } = useI18n();
   return (
-    <a href={href} target="_blank" rel="noreferrer" className={cx("inline-flex items-center gap-1.5 text-sm font-semibold text-chain hover:underline", className)}>
+    <a href={href} target="_blank" rel="noreferrer" className={cx("inline-flex items-center gap-1.5 text-sm font-medium text-chain hover:underline", className)}>
       {children ?? t.common.viewExplorer} <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
       <span className="sr-only">{t.common.openNewTab}</span>
     </a>
@@ -282,23 +315,23 @@ export function Collapsible({
   testId?: string;
 }) {
   return (
-    <details open={defaultOpen} className={cx("group rounded-xl border border-border bg-surface", className)} data-testid={testId}>
+    <details open={defaultOpen} className={cx("group rounded-[14px] border border-border bg-surface", className)} data-testid={testId}>
       <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-4 sm:px-6 [&::-webkit-details-marker]:hidden">
         {icon}
-        <span className="text-base font-semibold text-ink">{title}</span>
+        <span className="text-base font-medium text-ink">{title}</span>
         <span className="ml-auto flex items-center gap-2">
           {aside}
           <ChevronDown className="h-4 w-4 text-muted transition-transform group-open:rotate-180" aria-hidden />
         </span>
       </summary>
-      <div className="border-t border-border px-5 py-5 sm:px-6">{children}</div>
+      <div className="border-t border-divider px-5 py-5 sm:px-6">{children}</div>
     </details>
   );
 }
 
 /** Rótulo pequeno em caixa alta, usado acima de valores técnicos. */
 export function FieldLabel({ children }: { children: ReactNode }) {
-  return <p className="mb-1 text-xs font-medium uppercase tracking-wide text-faint">{children}</p>;
+  return <p className="mb-1 text-xs text-faint">{children}</p>;
 }
 
 /** Dica curta atrás de um ícone ⓘ (abre ao tocar ou focar; fecha ao sair). Para detalhes que não precisam ficar na tela. */
@@ -318,7 +351,7 @@ export function InfoTip({ children, label }: { children: ReactNode; label?: stri
         <Info className="h-4 w-4" aria-hidden />
       </button>
       {open && (
-        <span role="tooltip" className="absolute left-1/2 top-6 z-30 w-64 -translate-x-1/2 rounded-lg border border-border bg-surface p-3 text-xs font-normal normal-case leading-relaxed tracking-normal text-ink shadow-lg">
+        <span role="tooltip" className="absolute left-1/2 top-6 z-30 w-64 -translate-x-1/2 rounded-[10px] border border-border bg-surface p-3 text-xs font-normal normal-case leading-relaxed tracking-normal text-ink shadow-lg">
           {children}
         </span>
       )}

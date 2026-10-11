@@ -1,35 +1,50 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #f5f6f2;
+  /* Linguagem visual do Claude Design (landing e telas logadas). */
+  --color-bg: #f6f5f0;
   --color-surface: #ffffff;
-  --color-subtle: #f0f2ed;
-  --color-border: #dfe3da;
-  --color-border-strong: #c7cdc1;
-  --color-ink: #18211c;
-  --color-muted: #5b6760;
-  --color-faint: #8a958e;
+  --color-subtle: #f3f2ed;
+  --color-row: #fafaf7;
+  --color-border: #dad9d2;
+  --color-divider: #eeede8;
+  --color-border-strong: #c9c8c0;
+  --color-ink: #16201b;
+  --color-muted: #5e6a63;
+  /* Terciário do design (#8A948E) escurecido para AA em texto pequeno. */
+  --color-faint: #69746d;
+  --color-empty: #b5bcb7;
 
-  --color-brand: #1d6b47;
-  --color-brand-hover: #165438;
-  --color-brand-soft: #e5f2ea;
+  --color-brand: #1e6b4a;
+  --color-brand-hover: #16201b;
+  --color-brand-soft: #e6efe9;
+  --color-brand-softer: #f1f6f2;
+  --color-brand-line: #bfd3c6;
 
-  --color-chain: #4b3fd1;
-  --color-chain-soft: #eeecff;
+  --color-chain: #5b4bd6;
+  --color-chain-soft: #f7f6fd;
+  --color-chain-line: #d9d4f7;
 
-  --color-ok: #17784a;
-  --color-ok-soft: #e3f4ea;
-  --color-warn: #9a5b00;
-  --color-warn-soft: #fff3d6;
+  --color-amber: #c98a1b;
+  --color-amber-soft: #fbf5e8;
+  --color-amber-line: #efe2c4;
+  --color-amber-ink: #7a5a14;
+
+  --color-ok: #1e6b4a;
+  --color-ok-soft: #e6efe9;
+  --color-warn: #7a5a14;
+  --color-warn-soft: #fbf5e8;
   --color-bad: #b42318;
   --color-bad-soft: #fdeceb;
   --color-info: #2f55c9;
   --color-info-soft: #e8eefe;
-  --color-sim: #8a4b00;
-  --color-sim-soft: #fff0e0;
+  --color-sim: #7a5a14;
+  --color-sim-soft: #fbf5e8;
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+
+  --ease-agf: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 :root {
@@ -37,7 +52,9 @@
 }
 
 body {
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  background-image: radial-gradient(#d3e0d7 1px, transparent 1px);
+  background-size: 24px 24px;
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -55,13 +72,40 @@ body {
   100% { background-position: 400px 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg, #eceee8 0px, #f6f7f3 120px, #eceee8 240px);
+  background: linear-gradient(90deg, #eeede8 0px, #f8f7f3 120px, #eeede8 240px);
   background-size: 800px 100%;
   animation: shimmer 1.4s infinite linear;
   border-radius: 6px;
 }
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
+}
+
+/* ---------- Telas logadas: microinterações ---------- */
+.tnum { font-variant-numeric: tabular-nums; }
+.big-num { font-weight: 300; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+@keyframes agf-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(30, 107, 74, 0.4); }
+  100% { box-shadow: 0 0 0 6px rgba(30, 107, 74, 0); }
+}
+.agf-pulse { animation: agf-pulse 2s var(--ease-agf) infinite; }
+@keyframes agf-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.agf-rise { animation: agf-rise 0.5s var(--ease-agf) both; }
+@keyframes agf-spin { to { transform: rotate(360deg); } }
+.agf-spin { animation: agf-spin 0.8s var(--ease-agf); }
+.agf-bar { transition: width 0.8s var(--ease-agf); }
+.agf-fade { transition: color 0.3s var(--ease-agf), border-color 0.3s var(--ease-agf), background-color 0.3s var(--ease-agf); }
+.agf-input {
+  transition: border-color 0.2s var(--ease-agf), box-shadow 0.2s var(--ease-agf);
+}
+.agf-input:focus { outline: none; border-color: var(--color-brand); box-shadow: 0 0 0 3px var(--color-brand-soft); }
+.agf-input:focus-visible { outline: none; }
+@media (prefers-reduced-motion: reduce) {
+  .agf-pulse, .agf-rise, .agf-spin { animation: none; }
+  .agf-bar, .agf-fade { transition: none; }
 }
 
 /* ---------- Landing (refino visual do Claude Design) ----------
@@ -132,7 +176,7 @@ body {
   height: 1.05em;
   margin-left: 1px;
   vertical-align: -0.15em;
-  background: var(--lp-green);
+  background: var(--lp-green, var(--color-brand));
   animation: lp-blink 1s steps(1) infinite;
 }
 

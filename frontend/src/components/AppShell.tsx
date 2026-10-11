@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { FlaskConical, Repeat, Sprout } from "lucide-react";
+import { ArrowLeftRight, Sprout } from "lucide-react";
 import { api, API_MODE } from "@/lib/api";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { roleFromPath, useRole } from "@/lib/role";
@@ -12,7 +12,9 @@ import { cx } from "./ui";
 
 type Conn = "checking" | "ok" | "down" | "mock";
 
-/** Estado do backend e da Devnet num ponto discreto; o texto aparece ao passar o mouse e para leitores de tela. */
+const WRAP = "mx-auto w-full max-w-[1200px] px-4 sm:px-8 lg:px-14";
+
+/** "● Solana Devnet": ponto pulsando quando o backend e a rede respondem; o detalhe fica no title e para leitores de tela. */
 function ConnectionDot() {
   const { t } = useI18n();
   const [conn, setConn] = useState<Conn>(API_MODE === "mock" ? "mock" : "checking");
@@ -41,36 +43,32 @@ function ConnectionDot() {
   }, []);
 
   const label = { checking: t.shell.backendChecking, ok: t.shell.backendOk, down: t.shell.backendDown, mock: t.shell.backendMock }[conn];
-  const text = `${t.common.devnet} · ${label}${lowBalance ? ` · ${t.shell.lowBalance}` : ""}`;
-  const color = conn === "ok" ? (lowBalance ? "bg-warn" : "bg-ok") : conn === "down" ? "bg-bad" : "bg-faint";
+  const text = `${t.shell.devnetLabel} · ${label}${lowBalance ? ` · ${t.shell.lowBalance}` : ""}`;
+  const color = conn === "ok" ? (lowBalance ? "bg-amber" : "bg-brand") : conn === "down" ? "bg-bad" : "bg-empty";
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium text-muted" title={text}>
-      <span className={cx("h-2 w-2 rounded-full", color)} aria-hidden />
-      <span className="hidden lg:inline">{t.common.devnet}</span>
+    <span className="inline-flex items-center gap-2 px-1 text-xs text-muted" title={text}>
+      <span className={cx("h-1.5 w-1.5 rounded-full", color, conn === "ok" && !lowBalance && "agf-pulse")} aria-hidden />
+      <span className="hidden lg:inline">{t.shell.devnetLabel}</span>
       <span className="sr-only">{text}</span>
     </span>
   );
 }
 
-export function LanguageToggle({ pill }: { pill?: boolean }) {
+export function LanguageToggle() {
   const { locale, setLocale, t } = useI18n();
   const opts: { v: Locale; label: string }[] = [
     { v: "pt", label: "PT" },
     { v: "en", label: "EN" },
   ];
   return (
-    <div role="group" aria-label={t.shell.language} className={cx("inline-flex border p-0.5", pill ? "rounded-full border-[var(--lp-border)] bg-[var(--lp-surface)]" : "rounded-lg border-border")}>
+    <div role="group" aria-label={t.shell.language} className="inline-flex rounded-full border border-border bg-surface p-0.5">
       {opts.map((o) => (
         <button
           key={o.v}
           type="button"
           onClick={() => setLocale(o.v)}
           aria-pressed={locale === o.v}
-          className={cx(
-            "px-2 py-0.5 text-xs font-semibold",
-            pill ? "rounded-full px-2.5" : "rounded-md",
-            locale === o.v ? (pill ? "bg-[var(--lp-ink)] text-white" : "bg-ink text-white") : "text-muted hover:text-ink",
-          )}
+          className={cx("rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors", locale === o.v ? "bg-ink text-white" : "text-muted hover:text-ink")}
           data-testid={`lang-${o.v}`}
         >
           {o.label}
@@ -80,40 +78,41 @@ export function LanguageToggle({ pill }: { pill?: boolean }) {
   );
 }
 
-function Brand() {
+function Brand({ alwaysText }: { alwaysText?: boolean }) {
   const { t } = useI18n();
   return (
-    <Link href="/" className="flex shrink-0 items-center gap-2 font-bold text-ink">
-      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand text-white">
-        <Sprout className="h-4 w-4" aria-hidden />
+    <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold text-ink">
+      <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-brand text-brand">
+        <Sprout className="h-4 w-4" strokeWidth={1.5} aria-hidden />
       </span>
-      <span className="hidden sm:inline">{t.shell.brand}</span>
+      <span className={alwaysText ? undefined : "hidden sm:inline"}>{t.shell.brand}</span>
     </Link>
   );
 }
 
-// Landing: cabeçalho leve (logo, Transparência, idioma) e página de largura total com fundo pontilhado.
+function MockBanner() {
+  const { t } = useI18n();
+  if (API_MODE !== "mock") return null;
+  return <div className="bg-warn px-4 py-1.5 text-center text-xs font-medium text-white">{t.shell.mockBanner}</div>;
+}
+
+// Landing: cabeçalho leve (logo, Transparência, idioma) e página de largura total.
 function LandingShell({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
   return (
     <div className="lp flex min-h-screen flex-col">
-      {API_MODE === "mock" && <div className="bg-warn px-4 py-1.5 text-center text-xs font-semibold text-white">{t.shell.mockBanner}</div>}
-      <DemoStrip width="max-w-[1200px]" />
-      <header className="border-b border-[var(--lp-border)] bg-[var(--lp-surface)]">
-        <div className="mx-auto flex max-w-[1200px] items-center gap-6 px-4 py-3 sm:px-8 lg:px-14">
-          <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold text-[var(--lp-ink)]">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--lp-green)] text-[var(--lp-green)]">
-              <Sprout className="h-4 w-4" strokeWidth={1.5} aria-hidden />
-            </span>
-            {t.shell.brand}
-          </Link>
+      <MockBanner />
+      <DemoStrip />
+      <header className="border-b border-border bg-surface">
+        <div className={cx(WRAP, "flex items-center gap-6 py-3")}>
+          <Brand alwaysText />
           <nav aria-label="Principal">
-            <Link href="/transparencia" className="rounded-md px-1 py-1 text-sm text-[var(--lp-muted)] hover:text-[var(--lp-ink)]">
+            <Link href="/transparencia" className="rounded-md px-1 py-1 text-sm text-muted hover:text-ink">
               {t.shell.navTransparency}
             </Link>
           </nav>
           <span className="ml-auto">
-            <LanguageToggle pill />
+            <LanguageToggle />
           </span>
         </div>
       </header>
@@ -128,7 +127,7 @@ function PublicShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col">
       <DemoStrip width="max-w-xl" />
       <header className="border-b border-border bg-surface">
-        <div className="mx-auto flex max-w-xl items-center gap-2 px-4 py-2.5">
+        <div className="mx-auto flex h-14 max-w-xl items-center gap-2 px-4">
           <Brand />
           <span className="ml-auto flex items-center gap-2">
             <LanguageToggle />
@@ -147,8 +146,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (pathname.startsWith("/confirmar/")) return <PublicShell>{children}</PublicShell>;
   if (pathname === "/") return <LandingShell>{children}</LandingShell>;
 
-  const isLanding = pathname === "/";
-  const role = roleFromPath(pathname) ?? (isLanding ? null : storedRole);
+  const role = roleFromPath(pathname) ?? storedRole;
   const nav =
     role === "distributor"
       ? [
@@ -167,43 +165,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {API_MODE === "mock" && (
-        <div className="bg-warn text-white">
-          <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-1.5 text-xs font-semibold sm:px-6">
-            <FlaskConical className="h-4 w-4" aria-hidden /> {t.shell.mockBanner}
-          </div>
-        </div>
-      )}
+      <MockBanner />
       <DemoStrip />
       <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5 sm:gap-6 sm:px-6">
-          <Brand />
-          <nav aria-label="Principal" className="-mx-1 flex min-w-0 flex-1 gap-1 overflow-x-auto px-1 [scrollbar-width:none]">
+        <div className={cx(WRAP, "flex h-16 items-stretch gap-3 sm:gap-8")}>
+          <span className="flex items-center">
+            <Brand />
+          </span>
+          <nav aria-label="Principal" className="-mx-1 flex min-w-0 flex-1 gap-1 overflow-x-auto px-1 [scrollbar-width:none] sm:gap-6">
             {nav.map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
                 aria-current={n.active ? "page" : undefined}
                 className={cx(
-                  "shrink-0 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium",
-                  n.active ? "bg-brand-soft text-brand" : "text-muted hover:bg-subtle hover:text-ink",
+                  "relative flex shrink-0 items-center whitespace-nowrap px-1.5 text-sm transition-colors sm:px-0",
+                  n.active
+                    ? "font-medium text-ink after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-brand"
+                    : "text-muted hover:text-ink",
                 )}
               >
                 {n.label}
               </Link>
             ))}
           </nav>
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {!isLanding && <ConnectionDot />}
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+            <ConnectionDot />
             {role && (
               <Link
                 href="/"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted hover:text-ink"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-1 text-xs text-muted transition-colors hover:border-ink hover:text-ink sm:px-3"
                 title={t.shell.switchProfile}
                 data-testid="role-chip"
               >
-                <span className="hidden font-semibold text-ink md:inline">{role === "distributor" ? distributorName : role === "funder" ? t.shell.roleFunder : t.shell.roleAdmin}</span>
-                <Repeat className="h-3.5 w-3.5" aria-hidden />
+                <span className="hidden font-medium text-ink md:inline">{role === "distributor" ? distributorName : role === "funder" ? t.shell.roleFunder : t.shell.roleAdmin}</span>
+                <ArrowLeftRight className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden />
                 <span className="sr-only">{t.shell.switchProfile}</span>
               </Link>
             )}
@@ -211,7 +207,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+      <main className={cx(WRAP, "flex-1 py-8 lg:py-12")}>{children}</main>
     </div>
   );
 }

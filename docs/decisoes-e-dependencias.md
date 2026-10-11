@@ -89,3 +89,11 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 - A faixa "Tudo verificável" usa só assinaturas e endereços reais vindos do backend (recebíveis com etapas na rede e `/transparency`). Sem backend, mostra os endereços públicos dos programas, nunca assinaturas inventadas.
 - Conteúdo do design ajustado à v1.3: proposta em "CDI + spread", e não "% a.m."; o passo "Oferta simulada" virou "Propostas"; a referência segue o padrão AGF-.
 - A entrada "AgroFlux (operação)" e a escolha entre as três distribuidoras foram mantidas, embora o design não as tivesse previsto.
+
+### F20 — Telas da distribuidora no estilo do Claude Design (11/10)
+- Os tokens globais (`@theme`) passaram a usar a paleta da landing, e Geist virou a fonte de todo o app. O cabeçalho (nav sublinhada, "● Solana Devnet" pulsando, perfil e idioma em pílula) e os componentes básicos (`ui.tsx`) são compartilhados, então financiador e admin herdam o estilo, sem mudança de conteúdo.
+- Modelo único de 5 portões em `lib/gates.ts` (cadastro, registro, confirmação, oferta, cessão), calculado a partir dos estados reais. A publicação faz parte do portão 04. Ele é usado na lista, no quadro, no passaporte (`GateStepper`, que substituiu o `FlowSteps`) e na prévia do cadastro.
+- Recebíveis: KPIs com contagem, filtros (ação, aguardando, cedidos), trilha de portões, próximo passo em 3 estados e alternância Lista/Quadro, que fica gravada no navegador.
+- Novo recebível: prévia viva do passaporte, contador "N de 9" e botão "Faltam N itens", que continua clicável e mostra a validação. O código da prévia (AGF-000N) é só uma estimativa; quem numera é o backend.
+- Transparência: funil por portão, célula do escrow ("segundas vendas aceitas: 0", mais as tentativas recusadas) e endereços com "copiar".
+- Cortes: "link enviado há X h" não aparece no próximo passo, porque o resumo da lista não traz `requestedAt` e incluir o campo mudaria o contrato. O terciário continua em #69746D, por causa do contraste AA.

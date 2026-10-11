@@ -40,11 +40,14 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
 
   // Cadastro, com validação primeiro.
   await page.getByRole("link", { name: "Cadastrar o primeiro" }).click();
-  await page.getByRole("button", { name: "Cadastrar recebível" }).click();
+  await expect(page.getByTestId("passport-preview")).toContainText("Rascunho");
+  await page.getByRole("button", { name: /^Faltam \d+ itens$/ }).click();
   await expect(page.getByText("Use um pseudônimo, sem CPF ou CNPJ.")).toBeVisible();
   await fillForm(page);
   await expect(page.getByLabel("Valor de face (R$)")).toHaveValue("150.000,00");
-  await expect(page.getByText("Prazo: 165 dias")).toBeVisible();
+  await expect(page.getByText("165 dias · dentro do limite")).toBeVisible();
+  await expect(page.getByTestId("passport-preview")).toContainText("Pronto para cadastrar");
+  await page.screenshot({ path: shots("00b-novo-recebivel", p), fullPage: true });
   const browserHash = await page.locator("code").first().innerText();
   await page.getByRole("button", { name: "Cadastrar recebível" }).click();
 
@@ -138,7 +141,12 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
 
   // Painel: o próximo passo mostra que acabou.
   await page.getByRole("link", { name: "Recebíveis" }).first().click();
-  await expect(page.getByText("Concluído").filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText("Ver passaporte").filter({ visible: true }).first()).toBeVisible();
+  await page.getByTestId("filter-assigned").click();
+  await expect(page.getByTestId("receivable-row").filter({ visible: true })).toHaveCount(1);
+  await page.getByTestId("view-board").click();
+  await expect(page.getByTestId("board")).toContainText("AGF-0001");
+  await page.getByTestId("view-list").click();
   await page.screenshot({ path: shots("06b-painel", p), fullPage: true });
 
   // O sacado, reabrindo o link, vê para quem pagar.

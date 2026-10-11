@@ -4,7 +4,7 @@ import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { I18nProvider } from "@/lib/i18n";
 
-// Geist: por enquanto só a landing usa (classe .lp em globals.css).
+// Geist e Geist Mono: fontes de toda a interface (tokens em globals.css).
 const geist = Geist({ subsets: ["latin"], weight: ["300", "400", "500", "600"], variable: "--font-geist" });
 const geistMono = Geist_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-geist-mono" });
 
