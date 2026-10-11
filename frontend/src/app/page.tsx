@@ -232,7 +232,7 @@ export default function LandingPage() {
   return (
     <div className="text-[var(--lp-ink)]">
       {/* Hero */}
-      <section className={cx(WRAP, "grid items-center gap-12 py-12 sm:py-16 min-[900px]:grid-cols-2 min-[900px]:gap-16 min-[900px]:py-[88px]")}>
+      <section className={cx(WRAP, "grid items-start gap-12 py-12 sm:py-16 min-[900px]:grid-cols-2 min-[900px]:gap-16 min-[900px]:pb-[88px] min-[900px]:pt-16")}>
         <div>
           <p className="inline-flex items-center gap-2 text-xs font-medium text-[var(--lp-green)]">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--lp-green)]" aria-hidden />
