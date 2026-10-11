@@ -21,6 +21,7 @@ import { ProposalsPanel } from "@/components/passport/ProposalsPanel";
 import { AssignedSummary, AssignmentStep, useAssignmentAvailable } from "@/components/passport/AssignmentStep";
 import { OnChainRecords } from "@/components/passport/OnChainRecords";
 import { ReceivableSummary } from "@/components/passport/ReceivableSummary";
+import { RatingBadge, RiskCard } from "@/components/RiskCard";
 
 const POLL_MS = 2000;
 const POLL_MAX_MS = 75_000;
@@ -169,11 +170,12 @@ function Passport() {
           <span className="flex flex-wrap items-center gap-3">
             {r.reference}
             <ReceivableStatusBadge status={r.status} />
+            {r.risk && <RatingBadge rating={r.risk.rating} score={r.risk.score} />}
           </span>
         }
         subtitle={
           <span>
-            {r.debtor.alias} · {t.status.product[r.product.category]}
+            {r.distributor.name} · {r.debtor.alias} · {t.status.product[r.product.category]}
             {r.registry.registryId && <span className="text-faint"> · {r.registry.registryId}</span>}
           </span>
         }
@@ -201,8 +203,9 @@ function Passport() {
             </h2>
             <NextAction r={r} onUpdated={onUpdated} pollTimedOut={pollTimedOut} refresh={refresh} assignmentAvailable={assignmentAvailable} />
           </section>
-          <div className={r.status === "published" ? "" : "lg:pt-7"}>
+          <div className={r.status === "published" ? "grid gap-6 lg:grid-cols-2" : "space-y-6 lg:pt-7"}>
             <ReceivableSummary receivable={r} />
+            {r.risk && <RiskCard risk={r.risk} compact />}
           </div>
         </div>
 

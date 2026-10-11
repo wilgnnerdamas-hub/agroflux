@@ -1,4 +1,4 @@
-// Tipos do contrato da API AgroFlux v1.2 (docs/api-contract.md).
+// Tipos do contrato da API AgroFlux v1.3 (docs/api-contract.md).
 // Não altere sem atualizar o contrato e avisar as três frentes.
 
 export type ReceivableStatus =
@@ -54,6 +54,9 @@ export type FunderType = "simulated_fidc" | "simulated_bank" | "simulated_cooper
 export type OfferStatus = "available" | "selected" | "unavailable";
 // v1.2 (§3.13)
 export type FunderId = "fnd_a" | "fnd_b" | "fnd_c";
+// v1.3 (§15.4)
+export type DistributorId = "dst_a" | "dst_b" | "dst_c";
+export type Rating = "AA" | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H";
 export type FunderMode = "interactive" | "automatic";
 
 export interface Debtor {
@@ -162,6 +165,59 @@ export interface Assignment {
   funderName: string | null;
   documentLock: string | null;
   doubleSpendProof: DoubleSpendProof | null;
+  // v1.3 (§15.3): taxa AgroFlux + tarifa de registro, enviada à tesouraria na liquidação.
+  platformFeeAmount: number | null;
+  treasuryWallet: string | null;
+}
+
+// v1.3 (§15.2)
+export interface RiskFactor {
+  key: string;
+  label: string;
+  points: number;
+  detail: string;
+}
+
+export interface Risk {
+  score: number;
+  rating: Rating;
+  pdAnnualBps: number;
+  pdTermBps: number;
+  lgdBps: number;
+  expectedLossCents: number;
+  spreadBaseBps: number;
+  factors: RiskFactor[];
+  producerHistory: { isSimulated: true; seasons: number; onTimeRate: number; maxDelayDays: number };
+}
+
+// v1.3 (§15.5)
+export interface Settings {
+  cdi: { source: "bcb" | "manual"; manualAnnualBps: number };
+  platformFeeBps: number;
+  registryFeeCents: number;
+  iofByFunderType: Record<FunderType, boolean>;
+  lgdBps: { withCoobligation: number; withoutCoobligation: number };
+  ratings: Record<Rating, { pdAnnualBps: number; spreadBps: number }>;
+}
+
+export interface RevenueEntry {
+  id: string;
+  receivableId: string;
+  reference: string;
+  distributorId: DistributorId;
+  funderId: FunderId;
+  settledAt: string;
+  faceAmountCents: number;
+  platformFeeCents: number;
+  registryFeeCents: number;
+  settlementSignature: string;
+}
+
+export interface Distributor {
+  id: DistributorId;
+  name: string;
+  wallet: string | null;
+  isSimulated: true;
 }
 
 // v1.2 (§3.11): registradora SIMULADA.
@@ -207,7 +263,7 @@ export interface Receivable {
   reference: string;
   status: ReceivableStatus;
   isDemo: true;
-  distributor: { name: string };
+  distributor: { id: DistributorId; name: string };
   debtor: Debtor;
   product: Product;
   cropSeason: string;
@@ -217,6 +273,8 @@ export interface Receivable {
   dueDate: string;
   termDays: number;
   documents: ReceivableDocument[];
+  // v1.3: calculado pelo backend a cada leitura (não é persistido).
+  risk?: Risk;
   chain: ChainRecord;
   events: ReceivableEvent[];
   selectedOfferId: string | null;
@@ -244,6 +302,9 @@ export interface ReceivableSummary {
   registry: { registryId: string | null };
   listing: { status: Listing["status"] };
   offerCount: number;
+  // v1.3
+  distributor: { id: DistributorId; name: string };
+  risk: { score: number; rating: Rating } | null;
   createdAt: string;
 }
 
@@ -269,6 +330,7 @@ export interface CreateReceivableInput {
   issueDate: string;
   dueDate: string;
   documentKind: DocumentKind;
+  distributorId?: DistributorId;
 }
 
 export interface Offer {
@@ -286,6 +348,21 @@ export interface Offer {
   expiresAt: string;
   createdAt: string;
   updatedAt: string;
+  // v1.3 (§15.1): precificação CDI + spread em dias úteis. Ausentes em propostas antigas.
+  spreadBps?: number;
+  cdiBps?: number;
+  annualRateBps?: number;
+  businessDays?: number;
+  presentValueCents?: number;
+  discountCents?: number;
+  iofCents?: number;
+  funderCashOutCents?: number;
+  platformFeeCents?: number;
+  registryFeeCents?: number;
+  cetAnnualBps?: number;
+  cetMonthlyBps?: number;
+  funderYieldAnnualBps?: number;
+  pricedAt?: string;
 }
 
 export interface OfferList {
@@ -306,6 +383,22 @@ export interface Verification {
   signature: string;
   checks: VerificationCheck[];
 }
+
+// v1.3 (§15.1): referência de preço e simulação sem alterar estado.
+export interface PricingReference {
+  cdiAnnualBps: number;
+  cdiSource: "bcb" | "manual";
+  cdiReferenceDate: string | null;
+  platformFeeBps: number;
+  registryFeeCents: number;
+  pricedAt: string;
+}
+
+export type Quote = Required<Pick<Offer, "spreadBps" | "cdiBps" | "annualRateBps" | "businessDays" | "presentValueCents" | "discountCents" | "iofCents" | "funderCashOutCents" | "platformFeeCents" | "registryFeeCents" | "cetAnnualBps" | "cetMonthlyBps" | "funderYieldAnnualBps" | "pricedAt">> & {
+  netAmountCents: number;
+  monthlyRateBps: number;
+  feesCents: number;
+};
 
 export interface Health {
   status: "ok" | string;
@@ -373,6 +466,9 @@ export interface PortfolioItem {
   paidAmountCents: number;
   monthlyRateBps: number;
   feesCents: number;
+  annualRateBps: number | null;
+  spreadBps: number | null;
+  funderYieldAnnualBps: number | null;
   settledAt: string | null;
   dueDate: string;
   tokenMint: string | null;
@@ -388,8 +484,9 @@ export interface Portfolio {
 }
 
 export interface TransparencyWallet {
-  role: "fee_payer" | "distributor" | "funder";
+  role: "fee_payer" | "distributor" | "funder" | "treasury";
   funderId?: FunderId;
+  distributorId?: DistributorId;
   label: string;
   address: string;
   explorerUrl: string;

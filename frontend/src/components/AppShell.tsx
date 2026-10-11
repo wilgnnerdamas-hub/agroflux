@@ -109,7 +109,7 @@ function PublicShell({ children }: { children: React.ReactNode }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
   const pathname = usePathname();
-  const { role: storedRole } = useRole();
+  const { role: storedRole, distributorName } = useRole();
   if (pathname.startsWith("/confirmar/")) return <PublicShell>{children}</PublicShell>;
 
   const isLanding = pathname === "/";
@@ -125,7 +125,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             { href: "/financiador", label: t.shell.navMarket, active: pathname === "/financiador" || pathname.startsWith("/financiador/recebiveis") },
             { href: "/financiador/carteira", label: t.shell.navPortfolio, active: pathname === "/financiador/carteira" },
           ]
-        : [];
+        : role === "admin"
+          ? [{ href: "/admin", label: t.shell.navAdmin, active: pathname.startsWith("/admin") }]
+          : [];
   nav.push({ href: "/transparencia", label: t.shell.navTransparency, active: pathname === "/transparencia" });
 
   return (
@@ -165,7 +167,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 title={t.shell.switchProfile}
                 data-testid="role-chip"
               >
-                <span className="hidden font-semibold text-ink md:inline">{role === "distributor" ? t.shell.roleDistributor : t.shell.roleFunder}</span>
+                <span className="hidden font-semibold text-ink md:inline">{role === "distributor" ? distributorName : role === "funder" ? t.shell.roleFunder : t.shell.roleAdmin}</span>
                 <Repeat className="h-3.5 w-3.5" aria-hidden />
                 <span className="sr-only">{t.shell.switchProfile}</span>
               </Link>

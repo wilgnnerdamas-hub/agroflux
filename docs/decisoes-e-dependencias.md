@@ -24,6 +24,7 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | F15 | 10/10 | Passaporte enxuto: etapas, "Próxima ação" (um único cartão por estado), resumo do recebível, registros on-chain e histórico recolhíveis. Cartões antigos (`ChainCard`, `DebtorConfirmationCard`, `AssignmentCard`) substituídos por `components/passport/*`. | Pedido da gestão: didático, sem faltar nem sobrar informação. |
 | F16 | 10/10 | Interface em PT (padrão) e EN, com dicionários tipados em `src/lib/i18n` (o EN precisa ter as mesmas chaves). Em inglês, erros e eventos são traduzidos pelo código; a API segue em português. | Jurados internacionais (D18). |
 | F17 | 10/10 | QR code do aceite gerado no navegador (`qrcode`), sem serviço externo. Gráfico de rendimento em SVG próprio (`YieldChart`), com área forte até a data de referência e hachurada depois, e controle deslizante da data. | Sem dependência de gráficos; projeção sempre rotulada como simulada. |
+| F18 | 10/10 | v1.3: entrada escolhe a distribuidora (dst_a/b/c) e o perfil AgroFlux (`/admin`, abas por `?tab=`). Proposta do financiador por spread sobre o CDI, com prévia do backend (`POST /quote`). Tabela de propostas com taxa, líquido, CET e composição (ⓘ). Cartão de risco com fatores. Gráfico por dias úteis (cópia do calendário em `src/lib/calendar.ts`). | §15. |
 
 ## Decisões da gestão
 
@@ -32,6 +33,7 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | G1 | 09/10 | A confirmação do sacado (função A do v1.1) é **obrigatória** antes de selecionar uma oferta simulada. |
 | G2 | 09/10 | O backend da demo vai ser hospedado no **Railway**. |
 | G3 | 10/10 | Refinamento v1.2: registradora simulada no backend, modelo de propostas (financiadores propõem, distribuidora aceita), uma carteira por financiador demo, registradora + termo de coobrigação contra venda dupla, trava on-chain por documento e prova de recusa. Prazo não é critério de corte (equipe em tempo integral). |
+| G4 | 10/10 | v1.3: cálculo de mercado (CDI + spread, dias úteis), painel de administração, risco (scorecard AA–H), taxa da AgroFlux de 0,5% do valor de face paga pela distribuidora e cobrada on-chain na liquidação, três distribuidoras demo e histórico do produtor simulado (rotulado). |
 
 ## Decisões do backend
 
@@ -56,6 +58,9 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 | B17 | 10/10 | Registradora simulada no cadastro: `registryId` sequencial (`registrySeq` no `db.json`), recusa de hash de documento repetido (`409 DUPLICATE_DOCUMENT`) antes de salvar qualquer coisa. Migração completa `registry`, `listing` e os campos novos da cessão em dados antigos. | Unicidade por documento (D13). |
 | B18 | 10/10 | `ListingService` reaproveita a ancoragem de memo (chave `ls:<id>`) para o termo de coobrigação; falha no memo não bloqueia as propostas. Propostas automáticas de B e C nascem no `publish`; A propõe/revisa por `POST /offers` (mesmo id). | §5.16–5.18 do contrato v1.2. |
 | B19 | 10/10 | Escrow v1.2: `settle(amount, document_hash)` com PDA `["document", hash]` (`init`), 5/5 em `anchor test`. Gateway com uma carteira por financiador, `classifySettleError` distingue `DOCUMENT_ALREADY_ASSIGNED`, `inspect` lê mint/metadados/ATA/registros para a verificação, `readBalances` para a transparência. Prova de recusa enviada com `skipPreflight` e só vale se os logs apontarem a trava do documento. Integração real aprovada no validador local. | §6.5 e §6.7. |
+| B20 | 10/10 | Precificação em `src/pricing/`: calendário de dias úteis com feriados móveis pela Páscoa, CDI da API do BCB (SGS 4389, cache 6 h, fallback manual), `PricingService` (preço, risco e `present()`), IOF por tipo de financiador como premissa configurável. O risco é calculado em cada leitura e nunca persistido. | §15.1 e §15.2; testes com caso calculado à mão. |
+| B21 | 10/10 | Escrow v1.3: `settle(amount, fee, document_hash)` com terceira perna para a tesouraria fixa no programa (`TREASURY`); a chave da tesouraria fica só no WSL e o backend guarda o endereço. Campos novos do registro no fim da conta, para ler registros antigos. 7/7 no `anchor test`; gateway real ok no validador local. | §15.3. |
+| B22 | 10/10 | Receita registrada na liquidação (`revenue` no `db.json`, um lançamento por recebível); configurações em `settings` sobrevivem ao reset. Painel `/admin/*` sem senha na demo. | §15.5. |
 
 ## O frontend depende de
 

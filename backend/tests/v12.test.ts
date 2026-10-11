@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { termsHash, termsPayload } from "../src/chain/payload.js";
 import { ChainFailure, ChainUnavailableError, type Confirmed } from "../src/chain/solana.js";
 import { TERMS_TEXT, TERMS_TEXT_SHA256, TERMS_VERSION } from "../src/listing.js";
-import { netAmount } from "../src/offers.js";
 import type { Offer, Receivable } from "../src/types.js";
 import { createConfirmed, createPublished, createRegistered, fakeChain, form, makeApp, PUBLISH_BODY, sha, uniquePdf, validInput } from "./helpers.js";
 
@@ -146,22 +145,24 @@ describe("propostas do financiador e marketplace (v1.2)", () => {
     const built = await makeApp();
     const { id } = await createPublished(built);
 
-    const res = await propose(built, id, { funderId: "fnd_a", monthlyRateBps: 140, feesCents: 10_000 });
+    const res = await propose(built, id, { funderId: "fnd_a", spreadBps: 400, feesCents: 10_000 });
     expect(res.statusCode).toBe(201);
     const { offer } = res.json() as { offer: Offer };
     expect(offer).toMatchObject({
       funder: { id: "fnd_a", name: "Financiador Demo A", type: "simulated_fidc" },
       origin: "proposal",
-      monthlyRateBps: 140,
+      spreadBps: 400,
       feesCents: 10_000,
-      netAmountCents: netAmount(15_000_000, 140, 165, 10_000),
       status: "available",
     });
 
-    const revised = (await propose(built, id, { funderId: "fnd_a", monthlyRateBps: 125, feesCents: 5_000 })).json().offer as Offer;
+    const revised = (await propose(built, id, { funderId: "fnd_a", spreadBps: 350, feesCents: 5_000 })).json().offer as Offer;
     expect(revised.id).toBe(offer.id);
     expect(revised.createdAt).toBe(offer.createdAt);
-    expect(revised.netAmountCents).toBe(netAmount(15_000_000, 125, 165, 5_000));
+    // A proposta gravada tem o mesmo preço da simulação (§15.1).
+    const quote = (await built.app.inject({ method: "POST", url: `/api/v1/receivables/${id}/quote`, payload: { funderId: "fnd_a", spreadBps: 350, feesCents: 5_000 } })).json();
+    expect(revised.netAmountCents).toBe(quote.netAmountCents);
+    expect(revised.netAmountCents).toBeGreaterThan(offer.netAmountCents);
 
     const items: Offer[] = (await built.app.inject({ method: "GET", url: `/api/v1/receivables/${id}/offers` })).json().items;
     expect(items.map((o) => o.funder.id)).toEqual(["fnd_b", "fnd_c", "fnd_a"]);
@@ -181,7 +182,7 @@ describe("propostas do financiador e marketplace (v1.2)", () => {
       debtorAccepted: true,
       offerCount: 3,
       bestOffer: { funderName: best.funder.name, netAmountCents: best.netAmountCents },
-      myOffer: { id: offer.id, monthlyRateBps: 125 },
+      myOffer: { id: offer.id, spreadBps: 350 },
     });
 
     const sel = await built.app.inject({ method: "POST", url: `/api/v1/receivables/${id}/offers/${offer.id}/select` });
@@ -189,7 +190,7 @@ describe("propostas do financiador e marketplace (v1.2)", () => {
     const listed = (await built.app.inject({ method: "GET", url: "/api/v1/receivables" })).json();
     expect(listed.items[0].offerCount).toBe(3);
     // Fora de `published`: sem novas propostas e fora do marketplace.
-    expect((await propose(built, id, { funderId: "fnd_a", monthlyRateBps: 130, feesCents: 0 })).json().error.code).toBe("INVALID_STATE");
+    expect((await propose(built, id, { funderId: "fnd_a", spreadBps: 300, feesCents: 0 })).json().error.code).toBe("INVALID_STATE");
     expect((await built.app.inject({ method: "GET", url: "/api/v1/marketplace" })).json().items).toHaveLength(0);
   });
 
@@ -197,19 +198,20 @@ describe("propostas do financiador e marketplace (v1.2)", () => {
     const built = await makeApp();
     const { id } = await createPublished(built);
     const errors = async (body: object) => (await propose(built, id, body)).json().error.fieldErrors;
-    expect(await errors({ funderId: "fnd_b", monthlyRateBps: 140, feesCents: 0 })).toEqual({ funderId: "Selecione um financiador demo válido." });
-    expect(await errors({ funderId: "fnd_x", monthlyRateBps: 140, feesCents: 0 })).toHaveProperty("funderId");
-    expect(await errors({ funderId: "fnd_a", monthlyRateBps: 49, feesCents: 0 })).toHaveProperty("monthlyRateBps");
-    expect(await errors({ funderId: "fnd_a", monthlyRateBps: 140.5, feesCents: 0 })).toHaveProperty("monthlyRateBps");
-    expect(await errors({ funderId: "fnd_a", monthlyRateBps: 140, feesCents: 100_001 })).toHaveProperty("feesCents");
-    expect((await propose(built, id, { funderId: "fnd_a", monthlyRateBps: 140, feesCents: 0 })).statusCode).toBe(201);
+    expect(await errors({ funderId: "fnd_b", spreadBps: 400, feesCents: 0 })).toEqual({ funderId: "Selecione um financiador demo válido." });
+    expect(await errors({ funderId: "fnd_x", spreadBps: 400, feesCents: 0 })).toHaveProperty("funderId");
+    expect(await errors({ funderId: "fnd_a", spreadBps: 49, feesCents: 0 })).toHaveProperty("spreadBps");
+    expect(await errors({ funderId: "fnd_a", spreadBps: 3_001, feesCents: 0 })).toHaveProperty("spreadBps");
+    expect(await errors({ funderId: "fnd_a", spreadBps: 400.5, feesCents: 0 })).toHaveProperty("spreadBps");
+    expect(await errors({ funderId: "fnd_a", spreadBps: 400, feesCents: 100_001 })).toHaveProperty("feesCents");
+    expect((await propose(built, id, { funderId: "fnd_a", spreadBps: 400, feesCents: 0 })).statusCode).toBe(201);
   });
 
   it("proposta antes da publicação: 409; recebível inexistente: 404", async () => {
     const built = await makeApp();
     const { id } = await createRegistered(built);
-    expect((await propose(built, id, { funderId: "fnd_a", monthlyRateBps: 140, feesCents: 0 })).json().error.code).toBe("INVALID_STATE");
-    expect((await propose(built, "rcv_nao_existe", { funderId: "fnd_a", monthlyRateBps: 140, feesCents: 0 })).statusCode).toBe(404);
+    expect((await propose(built, id, { funderId: "fnd_a", spreadBps: 400, feesCents: 0 })).json().error.code).toBe("INVALID_STATE");
+    expect((await propose(built, "rcv_nao_existe", { funderId: "fnd_a", spreadBps: 400, feesCents: 0 })).statusCode).toBe(404);
   });
 
   it("valor líquido negativo é recusado", async () => {
@@ -221,8 +223,8 @@ describe("propostas do financiador e marketplace (v1.2)", () => {
     await built.app.inject({ method: "POST", url: `/api/v1/confirmations/${link.token}/confirm` });
     await built.confirmations.settle();
     await publish(built, r.id);
-    const res = await propose(built, r.id, { funderId: "fnd_a", monthlyRateBps: 500, feesCents: 100_000 });
-    expect(res.json().error.fieldErrors.monthlyRateBps).toMatch(/negativo/);
+    const res = await propose(built, r.id, { funderId: "fnd_a", spreadBps: 3_000, feesCents: 100_000 });
+    expect(res.json().error.fieldErrors.spreadBps).toMatch(/negativo/);
   });
 
   it("financiadores demo, carteira vazia e transparência sem a cessão ligada", async () => {

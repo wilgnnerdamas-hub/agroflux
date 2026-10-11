@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 import { formatDate, formatMoney, formatMoneyCompact } from "@/lib/format";
+import { businessDaysBetween } from "@/lib/calendar";
 import { useI18n } from "@/lib/i18n";
 import { InfoTip } from "./ui";
 
@@ -17,13 +18,15 @@ export interface YieldPosition {
 }
 
 /**
- * Projeção simulada (contrato v1.2, §5.21): cresce do valor pago até o valor de face no vencimento,
- * em juros compostos pela taxa implícita. Antes da liquidação vale 0; depois do vencimento, o valor de face.
+ * Projeção simulada (contrato v1.3, §15.1): cresce do valor pago até o valor de face no vencimento,
+ * em juros compostos pela taxa implícita, contando dias úteis. Antes da liquidação vale 0; depois do vencimento, o valor de face.
  */
 export function valueAt(p: YieldPosition, t: number): number {
   if (t < p.startMs) return 0;
   if (t >= p.endMs || p.endMs <= p.startMs) return p.faceCents;
-  const f = (t - p.startMs) / (p.endMs - p.startMs);
+  // v1.3: o valor cresce por dias úteis (base 252), como no cálculo do backend.
+  const total = businessDaysBetween(isoDay(p.startMs), isoDay(p.endMs));
+  const f = total > 0 ? businessDaysBetween(isoDay(p.startMs), isoDay(t)) / total : (t - p.startMs) / (p.endMs - p.startMs);
   return p.paidCents * Math.pow(p.faceCents / p.paidCents, f);
 }
 

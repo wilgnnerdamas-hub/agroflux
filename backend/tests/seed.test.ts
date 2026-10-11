@@ -23,17 +23,20 @@ describe("POST /api/v1/demo/reset", () => {
     expect(res.statusCode).toBe(204);
 
     const list = (await app.inject({ method: "GET", url: "/api/v1/receivables" })).json();
-    expect(list.totals).toMatchObject({ count: 3, registeredCount: 2, pendingCount: 0, offerSelectedCount: 0, publishedCount: 1, debtorConfirmedCount: 1 });
+    expect(list.totals).toMatchObject({ count: 5, registeredCount: 3, pendingCount: 0, offerSelectedCount: 0, publishedCount: 2, debtorConfirmedCount: 2 });
     const byRef = Object.fromEntries(list.items.map((i: { reference: string; status: string }) => [i.reference, i.status]));
-    expect(byRef).toEqual({ "AGF-0001": "registered", "AGF-0002": "created", "AGF-0003": "published" });
+    // Sem a função B ligada, o AGF-0004 para em publicado (com ela, chega a cedido).
+    expect(byRef).toEqual({ "AGF-0001": "registered", "AGF-0002": "created", "AGF-0003": "published", "AGF-0004": "published", "AGF-0005": "created" });
+    const dist = Object.fromEntries(list.items.map((i: { reference: string; distributor: { id: string } }) => [i.reference, i.distributor.id]));
+    expect(dist).toEqual({ "AGF-0001": "dst_a", "AGF-0002": "dst_b", "AGF-0003": "dst_c", "AGF-0004": "dst_b", "AGF-0005": "dst_a" });
 
     const pub = list.items.find((i: { reference: string }) => i.reference === "AGF-0003");
     const pubFull = (await app.inject({ method: "GET", url: `/api/v1/receivables/${pub.id}` })).json();
     expect(pubFull.listing.chain.status).toBe("confirmed");
     expect(pubFull.registry.registryId).toBe("REG-DEMO-000003");
     const market = (await app.inject({ method: "GET", url: "/api/v1/marketplace?funderId=fnd_a" })).json();
-    expect(market.items).toHaveLength(1);
-    expect(market.items[0]).toMatchObject({ registryId: "REG-DEMO-000003", debtorAccepted: true, offerCount: 2, myOffer: null });
+    expect(market.items).toHaveLength(2);
+    expect(market.items.find((i: { registryId: string }) => i.registryId === "REG-DEMO-000003")).toMatchObject({ debtorAccepted: true, offerCount: 2, myOffer: null });
     const pv = (await app.inject({ method: "GET", url: `/api/v1/receivables/${pub.id}/verification` })).json();
     expect(pv.verified).toBe(true);
     expect(pv.checks.map((c: { name: string }) => c.name)).toContain("terms_matches");

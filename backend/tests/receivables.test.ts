@@ -18,7 +18,7 @@ describe("POST /api/v1/receivables", () => {
     expect(r.reference).toBe("AGF-0001");
     expect(r.status).toBe("created");
     expect(r.isDemo).toBe(true);
-    expect(r.distributor).toEqual({ name: "Distribuidora Demo" });
+    expect(r.distributor).toEqual({ id: "dst_a", name: "Distribuidora Demo" });
     expect(r.termDays).toBe(165);
     expect(r.documents[0]).toMatchObject({ kind: "test_invoice", filename: "nf-teste.pdf", mimeType: "application/pdf", sizeBytes: PDF.length, sha256: sha(PDF) });
     expect(r.chain).toMatchObject({ status: "none", cluster: "devnet", signature: null });
@@ -92,7 +92,8 @@ describe("GET /api/v1/receivables e /:id", () => {
       id: b.id, reference: "AGF-0002", status: "created", debtor: b.debtor, product: b.product,
       amountCents: 200_000, currency: "BRL", dueDate: b.dueDate, chain: { status: "none" }, selectedOfferId: null,
       debtorConfirmation: { status: "none" }, assignment: { status: "none" },
-      registry: { registryId: "REG-DEMO-000002" }, listing: { status: "none" }, offerCount: 0, createdAt: b.createdAt,
+      registry: { registryId: "REG-DEMO-000002" }, listing: { status: "none" }, offerCount: 0,
+      distributor: { id: "dst_a", name: "Distribuidora Demo" }, risk: { score: expect.any(Number), rating: expect.any(String) }, createdAt: b.createdAt,
     });
     expect(list.totals).toEqual({ count: 2, amountCents: 15_200_000, registeredCount: 0, pendingCount: 0, offerSelectedCount: 0, debtorConfirmedCount: 0, assignedCount: 0, publishedCount: 0 });
 

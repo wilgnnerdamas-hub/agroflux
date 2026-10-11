@@ -1,3 +1,4 @@
+import { isDistributorId } from "./distributors.js";
 // Regras do §8 do contrato. As chaves de fieldErrors usam o caminho com ponto, como o frontend.
 import type { CreateReceivableInput, DocumentKind, ProductCategory } from "./types.js";
 
@@ -76,6 +77,9 @@ export function validateReceivableInput(
 
   const documentKind = input.documentKind as DocumentKind;
   if (!DOCUMENT_KINDS.includes(documentKind)) e.documentKind = "Selecione o tipo de documento.";
+  // v1.3: distribuidora demo (opcional; padrão dst_a).
+  const distributorId = input.distributorId === undefined ? "dst_a" : input.distributorId;
+  if (!isDistributorId(distributorId)) e.distributorId = "Selecione uma distribuidora demo válida.";
 
   if (Object.keys(e).length) return { ok: false, fieldErrors: e };
   return {
@@ -88,6 +92,7 @@ export function validateReceivableInput(
       issueDate,
       dueDate,
       documentKind,
+      distributorId: distributorId as CreateReceivableInput["distributorId"],
     },
   };
 }

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Building2, FileCheck2, Landmark, Search, ShieldCheck, Store, UserCheck } from "lucide-react";
+import { ArrowRight, BarChart3, Building2, FileCheck2, Landmark, Search, ShieldCheck, Store, UserCheck } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { useRole } from "@/lib/role";
+import { DISTRIBUTORS, useRole } from "@/lib/role";
 import { cx } from "@/components/ui";
 
 const QUESTION_ICONS = [FileCheck2, UserCheck, ShieldCheck];
@@ -17,7 +17,7 @@ function RoleCard({ href, icon, title, text, cta, onPick, primary }: { href: str
         "group flex flex-col rounded-2xl border p-6 transition-colors",
         primary ? "border-brand bg-brand text-white hover:bg-brand-hover" : "border-border bg-surface hover:border-brand",
       )}
-      data-testid={href === "/distribuidor" ? "enter-distributor" : "enter-funder"}
+      data-testid={href === "/financiador" ? "enter-funder" : "enter-admin-card"}
     >
       <span className={cx("flex h-11 w-11 items-center justify-center rounded-xl", primary ? "bg-white/15" : "bg-brand-soft text-brand")}>{icon}</span>
       <span className="mt-4 text-lg font-bold">{title}</span>
@@ -43,7 +43,7 @@ export default function LandingPage() {
         <div className="mx-auto mt-8 flex max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
           <Link
             href="/distribuidor"
-            onClick={() => setRole("distributor")}
+            onClick={() => setRole("distributor", "dst_a")}
             className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg bg-brand px-5 text-sm font-semibold text-white hover:bg-brand-hover"
           >
             <Store className="h-4 w-4" aria-hidden /> {l.enterDistributor}
@@ -54,6 +54,14 @@ export default function LandingPage() {
             className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface px-5 text-sm font-semibold text-ink hover:bg-subtle"
           >
             <Landmark className="h-4 w-4" aria-hidden /> {l.enterFunder}
+          </Link>
+          <Link
+            href="/admin"
+            onClick={() => setRole("admin")}
+            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface px-5 text-sm font-semibold text-ink hover:bg-subtle"
+            data-testid="enter-admin"
+          >
+            <BarChart3 className="h-4 w-4" aria-hidden /> {l.enterAdmin}
           </Link>
         </div>
         <p className="mt-3 text-xs text-muted">{l.demoAccess}</p>
@@ -93,16 +101,26 @@ export default function LandingPage() {
 
       <section aria-labelledby="roles">
         <h2 id="roles" className="text-xl font-bold text-ink">{l.rolesTitle}</h2>
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <RoleCard
-            href="/distribuidor"
-            primary
-            icon={<Building2 className="h-5 w-5" aria-hidden />}
-            title={l.distributorCard.title}
-            text={l.distributorCard.text}
-            cta={l.enterDistributor}
-            onPick={() => setRole("distributor")}
-          />
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <div className="flex flex-col rounded-2xl border border-brand bg-brand p-6 text-white" data-testid="enter-distributor">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15"><Building2 className="h-5 w-5" aria-hidden /></span>
+            <span className="mt-4 text-lg font-bold">{l.distributorCard.title}</span>
+            <span className="mt-1 flex-1 text-sm text-white/85">{l.distributorCard.text}</span>
+            <span className="mt-4 text-xs font-semibold uppercase tracking-wide text-white/70">{l.chooseDistributor}</span>
+            <div className="mt-2 flex flex-col gap-2">
+              {DISTRIBUTORS.map((d) => (
+                <Link
+                  key={d.id}
+                  href="/distribuidor"
+                  onClick={() => setRole("distributor", d.id)}
+                  className="inline-flex items-center justify-between rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20"
+                  data-testid={`enter-${d.id}`}
+                >
+                  {d.name} <ArrowRight className="h-4 w-4" aria-hidden />
+                </Link>
+              ))}
+            </div>
+          </div>
           <RoleCard
             href="/financiador"
             icon={<Landmark className="h-5 w-5" aria-hidden />}
@@ -110,6 +128,14 @@ export default function LandingPage() {
             text={l.funderCard.text}
             cta={l.enterFunder}
             onPick={() => setRole("funder")}
+          />
+          <RoleCard
+            href="/admin"
+            icon={<BarChart3 className="h-5 w-5" aria-hidden />}
+            title={l.adminCard.title}
+            text={l.adminCard.text}
+            cta={l.enterAdmin}
+            onPick={() => setRole("admin")}
           />
         </div>
       </section>

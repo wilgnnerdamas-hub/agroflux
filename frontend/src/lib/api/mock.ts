@@ -59,6 +59,7 @@ function emptyAssignment(): Assignment {
     settlementAsset: "tBRL-DEMO", settlementAmount: null, distributorWallet: null, funderWallet: null, escrowProgramId: null,
     mintSignature: null, settlementSignature: null, explorerUrls: { tokenMint: null, mint: null, settlement: null, documentLock: null },
     submittedAt: null, settledAt: null, error: null, funderId: null, funderName: null, documentLock: null, doubleSpendProof: null,
+    platformFeeAmount: null, treasuryWallet: null,
   };
 }
 
@@ -95,7 +96,7 @@ function seed(): Receivable[] {
       reference,
       status: "created",
       isDemo: true,
-      distributor: { name: "Distribuidora Demo" },
+      distributor: { id: "dst_a", name: "Distribuidora Demo" },
       debtor: { alias, state },
       product: { category, description },
       cropSeason: "2026/27",
@@ -178,6 +179,8 @@ function summary(r: Receivable): ReceivableSummary {
     registry: { registryId: r.registry.registryId },
     listing: { status: r.listing.status },
     offerCount: 0,
+    distributor: r.distributor,
+    risk: null,
     createdAt: r.createdAt,
   };
 }
@@ -225,9 +228,9 @@ export function createMockApi(): AgroFluxApi {
         features: { debtorConfirmation: true, assignment: false, marketplace: true, doubleSpendProof: false },
       };
     },
-    async listReceivables() {
+    async listReceivables(distributorId) {
       await delay();
-      const items = [...load()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(summary);
+      const items = [...load()].filter((r) => !distributorId || r.distributor.id === distributorId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(summary);
       return clone({
         items,
         totals: {
@@ -275,7 +278,7 @@ export function createMockApi(): AgroFluxApi {
         reference,
         status: "created",
         isDemo: true,
-        distributor: { name: "Distribuidora Demo" },
+        distributor: { id: "dst_a", name: "Distribuidora Demo" },
         debtor: { alias: input.debtor.alias.trim(), state: input.debtor.state },
         product: { category: input.product.category, description: input.product.description.trim() },
         cropSeason: input.cropSeason,
@@ -432,6 +435,50 @@ export function createMockApi(): AgroFluxApi {
         registry: { name: "Registradora Demo (simulada)", isSimulated: true, titles: all.length },
         stats: { receivables: all.length, registeredOnChain: 0, debtorAccepted: 0, published: 0, assigned: 0, doubleSpendRejected: 0 },
       };
+    },
+
+    // v1.3: o mock não precifica nem tem painel de administração (só o backend real calcula).
+    async getPricingReference() {
+      await delay(150, 300);
+      return { cdiAnnualBps: 1490, cdiSource: "manual", cdiReferenceDate: null, platformFeeBps: 50, registryFeeCents: 2_500, pricedAt: new Date().toISOString().slice(0, 10) };
+    },
+    async quote() {
+      await delay();
+      throw new ApiError("BACKEND_NOT_CONNECTED", "A simulação de preço só existe com o backend real.", 0);
+    },
+    async listDistributors() {
+      await delay(150, 300);
+      return {
+        items: [
+          { id: "dst_a", name: "Distribuidora Demo", wallet: null, isSimulated: true },
+          { id: "dst_b", name: "Cerrado Insumos (demo)", wallet: null, isSimulated: true },
+          { id: "dst_c", name: "Sul Sementes (demo)", wallet: null, isSimulated: true },
+        ],
+      };
+    },
+    async adminOverview() {
+      throw new ApiError("BACKEND_NOT_CONNECTED", "O painel de administração só existe com o backend real.", 0);
+    },
+    async adminReceivables() {
+      throw new ApiError("BACKEND_NOT_CONNECTED", "O painel de administração só existe com o backend real.", 0);
+    },
+    async adminFunders() {
+      throw new ApiError("BACKEND_NOT_CONNECTED", "O painel de administração só existe com o backend real.", 0);
+    },
+    async adminDistributors() {
+      throw new ApiError("BACKEND_NOT_CONNECTED", "O painel de administração só existe com o backend real.", 0);
+    },
+    async adminRevenue() {
+      throw new ApiError("BACKEND_NOT_CONNECTED", "O painel de administração só existe com o backend real.", 0);
+    },
+    async adminRisk() {
+      throw new ApiError("BACKEND_NOT_CONNECTED", "O painel de administração só existe com o backend real.", 0);
+    },
+    async getSettings() {
+      throw new ApiError("BACKEND_NOT_CONNECTED", "O painel de administração só existe com o backend real.", 0);
+    },
+    async updateSettings() {
+      throw new ApiError("BACKEND_NOT_CONNECTED", "O painel de administração só existe com o backend real.", 0);
     },
 
     async retryDebtorConfirmationRegister() {

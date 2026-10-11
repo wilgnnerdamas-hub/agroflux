@@ -51,6 +51,7 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
   // Passaporte: registradora simulada e hash conferem.
   await expect(page.getByRole("heading", { level: 1 })).toContainText("AGF-0001");
   await expect(page.getByText("REG-DEMO-000001").first()).toBeVisible();
+  await expect(page.getByTestId("risk-card")).toBeVisible();
   await expect(page.locator(`code[title="${browserHash}"]`)).toBeVisible();
   await page.screenshot({ path: shots("01-passaporte-criado", p), fullPage: true });
 
@@ -96,8 +97,10 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
   await expect(funder.getByTestId("onchain-records")).toBeVisible();
   await funder.getByRole("button", { name: "Verificar na rede" }).click();
   await expect(funder.getByText("Tudo confere na Devnet")).toBeVisible();
-  await funder.getByTestId("rate-input").fill("1,10");
+  await expect(funder.getByTestId("risk-card")).toBeVisible();
+  await funder.getByTestId("rate-input").fill("1,50");
   await funder.getByTestId("fees-input").fill("50,00");
+  await expect(funder.getByTestId("quote-preview")).toContainText("a.a.");
   await expect(funder.getByTestId("yield-chart").first()).toBeVisible();
   await funder.screenshot({ path: shots("05-financiador-proposta", p), fullPage: true });
   await funder.getByRole("button", { name: "Enviar proposta" }).click();
@@ -149,6 +152,14 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
   await expect(funder.getByTestId("yield-chart").first()).toBeVisible();
   await funder.getByTestId("ref-date").fill("60");
   await funder.screenshot({ path: shots("07-carteira", p), fullPage: true });
+
+  // Painel AgroFlux: a receita da cessão aparece no faturamento.
+  await funder.goto("/");
+  await funder.getByTestId("enter-admin").click();
+  await expect(funder.getByTestId("rating-mix")).toBeVisible();
+  await funder.getByTestId("tab-revenue").click();
+  await expect(funder.getByTestId("revenue-entry")).toContainText("AGF-0001");
+  await funder.screenshot({ path: shots("07b-admin-faturamento", p), fullPage: true });
 
   // Transparência.
   await funder.getByRole("link", { name: "Transparência" }).click();
@@ -237,7 +248,33 @@ test("painel mostra próximo passo e proposta nova", async ({ page, request }) =
   await page.goto("/distribuidor");
   await expect(page.getByText("Escolher proposta (2)").filter({ visible: true })).toBeVisible();
   await expect(page.getByText("nova").filter({ visible: true })).toHaveCount(0);
-  await request.post(`${API}/receivables/${r.id}/offers`, { data: { funderId: "fnd_a", monthlyRateBps: 120, feesCents: 0 } });
+  await request.post(`${API}/receivables/${r.id}/offers`, { data: { funderId: "fnd_a", spreadBps: 300, feesCents: 0 } });
   await expect(page.getByText("Escolher proposta (3)").filter({ visible: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("nova").filter({ visible: true }).first()).toBeVisible();
+});
+
+test("distribuidoras demo e configurações do painel", async ({ page }) => {
+  // Entrar como a Cerrado Insumos e cadastrar: o recebível é dela e não aparece para a Distribuidora Demo.
+  await page.goto("/");
+  await page.getByTestId("enter-dst_b").click();
+  await expect(page.getByTestId("role-chip")).toContainText("Cerrado Insumos");
+  await page.goto("/recebiveis/novo");
+  await fillForm(page);
+  await page.getByRole("button", { name: "Cadastrar recebível" }).click();
+  await expect(page.getByText("Cerrado Insumos (demo)").filter({ visible: true }).first()).toBeVisible();
+  await page.goto("/distribuidor");
+  await expect(page.getByText("AGF-0001").filter({ visible: true })).toBeVisible();
+  await page.goto("/");
+  await page.getByTestId("enter-dst_a").click();
+  await expect(page.getByText("Nenhum recebível cadastrado")).toBeVisible();
+
+  // Painel: taxa da AgroFlux configurável.
+  await page.goto("/admin?tab=settings");
+  const fee = page.getByTestId("platform-fee-input");
+  await fee.fill("0,80");
+  await fee.blur();
+  await page.getByRole("button", { name: "Salvar configurações" }).click();
+  await expect(page.getByText("Configurações salvas.")).toBeVisible();
+  await page.getByTestId("tab-distributors").click();
+  await expect(page.getByText("Cerrado Insumos (demo)")).toBeVisible();
 });

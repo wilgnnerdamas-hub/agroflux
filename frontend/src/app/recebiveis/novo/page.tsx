@@ -6,6 +6,7 @@ import { useId, useRef, useState } from "react";
 import { ArrowLeft, FileUp, Hash, Loader2, ShieldCheck, X } from "lucide-react";
 import { api, toApiError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useRole } from "@/lib/role";
 import { sha256File } from "@/lib/hash";
 import { daysBetween, formatBytes, maskMoneyInput, parseMoneyToCents, todayISO } from "@/lib/format";
 import { UFS } from "@/lib/labels";
@@ -50,6 +51,7 @@ export default function NewReceivablePage() {
   const { t, errorMessage } = useI18n();
   const f = t.form;
   const router = useRouter();
+  const { distributorId } = useRole();
   const [duplicate, setDuplicate] = useState<{ reference: string; id: string | null } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
@@ -118,6 +120,7 @@ export default function NewReceivablePage() {
       issueDate: form.issueDate,
       dueDate: form.dueDate,
       documentKind: form.documentKind,
+      distributorId,
     };
   }
 

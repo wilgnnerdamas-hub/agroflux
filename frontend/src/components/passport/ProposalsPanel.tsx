@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Handshake } from "lucide-react";
 import { api, toApiError } from "@/lib/api";
-import { formatDate, formatMoney, formatRateBps } from "@/lib/format";
+import { formatBps, formatDate, formatMoney, formatRateBps } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { useAsync } from "@/lib/useAsync";
 import type { Offer, Receivable } from "@/lib/types";
@@ -11,7 +11,7 @@ import { Alert, Badge, Button, Card, CardTitle, InfoTip, LoadingBlock, cx } from
 
 
 const POLL_MS = 4000;
-const COLS = "md:grid md:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_8.5rem_auto] md:items-center md:gap-4";
+const COLS = "md:grid md:grid-cols-[minmax(0,1fr)_8rem_9rem_5.5rem_auto] md:items-center md:gap-4";
 const seenKey = (id: string) => `agroflux.offers-seen.${id}`;
 
 /** Marca quantas propostas a distribuidora já viu (o painel usa para o selo "nova"). */
@@ -28,6 +28,45 @@ export function offersSeen(id: string): number {
   } catch {
     return 0;
   }
+}
+
+/** Composição do valor (contrato v1.3, §15.1): do valor de face ao líquido da distribuidora. */
+export function OfferBreakdown({ offer }: { offer: Offer }) {
+  const { t } = useI18n();
+  const p = t.pricing;
+  if (offer.presentValueCents == null) return null;
+  const line = (label: string, cents: number, sign = "", strong = false) => (
+    <div className={cx("flex justify-between gap-4", strong && "border-t border-border pt-1 font-semibold")}>
+      <span>{label}</span>
+      <span className="tabular-nums">{sign}{formatMoney(cents)}</span>
+    </div>
+  );
+  return (
+    <div className="space-y-1">
+      <p className="font-semibold">{p.breakdown} · {p.businessDays(offer.businessDays!)}</p>
+      {line(p.face, offer.grossAmountCents)}
+      {line(p.discount, offer.discountCents!, "− ")}
+      {line(p.funderFees, offer.feesCents, "− ")}
+      {offer.iofCents! > 0 && line(p.iof, offer.iofCents!, "− ")}
+      {line(p.cashOut, offer.funderCashOutCents!, "", true)}
+      {line(p.platformFee, offer.platformFeeCents!, "− ")}
+      {line(p.registryFee, offer.registryFeeCents!, "− ")}
+      {line(p.netFull, offer.netAmountCents, "", true)}
+      <p className="pt-1 text-faint">{p.yield}: {formatBps(offer.funderYieldAnnualBps!)} {p.perYear}</p>
+    </div>
+  );
+}
+
+/** Taxa da proposta: "CDI + 3,20% a.a." (v1.3) ou a taxa mensal antiga. */
+export function OfferRate({ offer }: { offer: Offer }) {
+  const { t } = useI18n();
+  if (offer.spreadBps == null) return <>{formatRateBps(offer.monthlyRateBps)}</>;
+  return (
+    <span className="block leading-tight">
+      {t.pricing.cdiPlus(formatBps(offer.spreadBps))}
+      <span className="block text-xs text-muted">{formatBps(offer.annualRateBps!)} {t.pricing.perYear}</span>
+    </span>
+  );
 }
 
 /** Uma linha por proposta: tabela no computador, cartão empilhado no celular. Nome do financiador sempre inteiro. */
@@ -57,15 +96,18 @@ export function OfferRow({ offer, best, canAccept, onAccept }: { offer: Offer; b
           {t.status.funderType[offer.funder.type]} · {p.origin[offer.origin ?? "automatic"]} · {p.validUntil.toLowerCase()} {formatDate(offer.expiresAt.slice(0, 10))}
         </p>
       </div>
-      {cell(p.rate, formatRateBps(offer.monthlyRateBps))}
-      {cell(p.fees, formatMoney(offer.feesCents))}
+      {cell(p.rate, <OfferRate offer={offer} />)}
       {cell(
         p.colNet,
-        <span className="font-bold text-ink">
-          {formatMoney(offer.netAmountCents)}
-          {best && offer.status === "available" && <span className="block text-xs font-semibold text-brand">{p.best}</span>}
+        <span className="inline-flex items-start gap-1 font-bold text-ink">
+          <span>
+            {formatMoney(offer.netAmountCents)}
+            {best && offer.status === "available" && <span className="block text-xs font-semibold text-brand">{p.best}</span>}
+          </span>
+          {offer.presentValueCents != null && <InfoTip><OfferBreakdown offer={offer} /></InfoTip>}
         </span>,
       )}
+      {cell(t.pricing.cet, offer.cetAnnualBps != null ? `${formatBps(offer.cetAnnualBps)}` : "—")}
       {onAccept && (
         <div className="pt-1 md:pt-0 md:text-right">
           {selected ? (
@@ -94,11 +136,14 @@ export function OfferList({ items, canAccept, onAccept }: { items: Offer[]; canA
     <div>
       <div className={cx("hidden border-b border-border px-1 pb-2 text-xs font-medium uppercase tracking-wide text-faint", COLS)}>
         <span>{p.colFunder}</span>
-        <span>{p.rate}</span>
-        <span>{p.fees}</span>
         <span className="flex items-center gap-1">
-          {p.colNet}
-          <InfoTip>{p.formula}</InfoTip>
+          {p.rate}
+          <InfoTip>{t.pricing.formula}</InfoTip>
+        </span>
+        <span>{p.colNet}</span>
+        <span className="flex items-center gap-1">
+          {t.pricing.cet} {t.pricing.perYear}
+          <InfoTip>{t.pricing.cetHint}</InfoTip>
         </span>
         {onAccept && <span className="sr-only">{p.accept}</span>}
       </div>

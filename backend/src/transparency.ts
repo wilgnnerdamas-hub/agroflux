@@ -4,6 +4,7 @@ import { explorerAddressUrl } from "./assignment.js";
 import type { AssignmentGateway } from "./chain/assignment.js";
 import { MEMO_PROGRAM_ID } from "./chain/payload.js";
 import type { ChainGateway } from "./chain/solana.js";
+import { DISTRIBUTOR_DEFS } from "./distributors.js";
 import { FUNDER_DEFS } from "./funders.js";
 import { REGISTRAR_NAME } from "./receivables.js";
 import type { Store } from "./store.js";
@@ -36,7 +37,8 @@ export async function transparency(store: Store, chain: ChainGateway, gateway: A
     );
     settlementAsset = { symbol: "tBRL-DEMO", mint: p.settlementMint, decimals: 2, explorerUrl: explorerAddressUrl(p.settlementMint) };
     const parties: Omit<TransparencyWallet, "solLamports" | "settlementUnits" | "explorerUrl">[] = [
-      { role: "distributor", label: "Distribuidor demo", address: p.distributorWallet },
+      { role: "treasury", label: "Tesouraria AgroFlux (taxas)", address: p.treasuryWallet },
+      ...DISTRIBUTOR_DEFS.filter((d) => p.distributorWallets[d.id]).map((d) => ({ role: "distributor" as const, distributorId: d.id, label: d.name, address: p.distributorWallets[d.id] })),
       ...FUNDER_DEFS.filter((f) => p.funderWallets[f.id]).map((f) => ({ role: "funder" as const, funderId: f.id, label: f.name, address: p.funderWallets[f.id] })),
     ];
     const balances = await gateway.readBalances(parties.map((w) => w.address)).catch(() => []);

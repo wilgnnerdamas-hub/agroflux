@@ -1,11 +1,11 @@
-// Cessão tokenizada + liquidação atômica, SIMULADAS na Devnet (§3.10, §4.6, §4.7, §5.14, §5.22 e §6.4–6.5 do contrato v1.2).
+// Cessão tokenizada + liquidação atômica, SIMULADAS na Devnet (§3.10, §4.6, §4.7, §5.14, §5.22, §6.4–6.5 e §15.3 do contrato v1.3).
 // Token e moeda sem valor; carteiras de demonstração controladas pelo backend. Não é cessão jurídica.
 import { AssignmentFailure, ASSIGNMENT_ERROR_MESSAGES, type AssignmentGateway } from "./chain/assignment.js";
 import { explorerTxUrl } from "./chain/payload.js";
 import { ChainUnavailableError, type Confirmed } from "./chain/solana.js";
 import { chainUnavailable, invalidState } from "./errors.js";
 import { FUNDER_IDS, funderDef, isFunderId } from "./funders.js";
-import { getReceivable, makeEvent } from "./receivables.js";
+import { getReceivable, makeEvent, newId } from "./receivables.js";
 import { CONFIRM_TIMEOUT_MS } from "./registration.js";
 import type { Store } from "./store.js";
 import type { AssignmentErrorCode, DoubleSpendProof, FunderId, Receivable } from "./types.js";
@@ -54,14 +54,20 @@ export class AssignmentService {
     const at = now();
     const { parties } = this.gateway;
     const documentLock = this.gateway.documentLockAddress(r.documents[0].sha256);
+    // v1.3: o financiador aporta `funderCashOutCents`; a taxa AgroFlux e a tarifa de registro vão para a tesouraria.
+    // Propostas antigas (sem esses campos) liquidam o líquido inteiro, sem taxa.
+    const settlementAmount = offer.funderCashOutCents ?? offer.netAmountCents;
+    const platformFeeAmount = offer.funderCashOutCents != null ? (offer.platformFeeCents ?? 0) + (offer.registryFeeCents ?? 0) : 0;
     r.status = "assignment_pending";
     r.assignment = {
       ...r.assignment,
       status: "pending",
       offerId: offer.id,
-      settlementAmount: offer.netAmountCents,
+      settlementAmount,
+      platformFeeAmount,
+      treasuryWallet: parties.treasuryWallet,
       settlementMint: parties.settlementMint,
-      distributorWallet: parties.distributorWallet,
+      distributorWallet: parties.distributorWallets[r.distributor.id] ?? null,
       funderWallet: parties.funderWallets[funderId] ?? null,
       funderId,
       funderName: funderDef(funderId).name,
@@ -72,7 +78,7 @@ export class AssignmentService {
       error: null,
     };
     r.events.push(
-      makeEvent("assignment_requested", "Cessão tokenizada solicitada (simulação na Devnet)", { offerId: offer.id, settlementAmount: offer.netAmountCents }, { occurredAt: at }),
+      makeEvent("assignment_requested", "Cessão tokenizada solicitada (simulação na Devnet)", { offerId: offer.id, settlementAmount, platformFeeAmount }, { occurredAt: at }),
     );
     r.updatedAt = at;
     store.put(r);
@@ -156,7 +162,7 @@ export class AssignmentService {
         const minted = prev && prevMint
           ? { ...prev, mint: prevMint }
           : await this.gateway.mintAssetToken(
-              { reference: r.reference, payloadHash: r.chain.payloadHash ?? "" },
+              { reference: r.reference, payloadHash: r.chain.payloadHash ?? "", distributorId: r.distributor.id },
               {
                 timeoutMs: this.timeoutMs,
                 onSubmitted: (sig, mint) => {
@@ -174,7 +180,14 @@ export class AssignmentService {
       const settled =
         (await this.landed(this.store.getSubmission(k.settleSig))) ??
         (await this.gateway.settle(
-          { assetMint: a.tokenMint!, amount: a.settlementAmount!, funderId: a.funderId ?? "fnd_a", documentSha256: r.documents[0].sha256 },
+          {
+            assetMint: a.tokenMint!,
+            amount: a.settlementAmount!,
+            fee: a.platformFeeAmount ?? 0,
+            distributorId: r.distributor.id,
+            funderId: a.funderId ?? "fnd_a",
+            documentSha256: r.documents[0].sha256,
+          },
           { timeoutMs: this.timeoutMs, onSubmitted: (sig) => this.store.putSubmission(k.settleSig, sig) },
         ));
       this.markSettled(id, settled);
@@ -192,12 +205,12 @@ export class AssignmentService {
       if (!r || proof?.status !== "pending") return;
       if (!proof.funderId) throw new AssignmentFailure("ESCROW_REJECTED");
       const minted = await this.gateway.mintAssetToken(
-        { reference: `${r.reference}-T`, payloadHash: r.chain.payloadHash ?? "" },
+        { reference: `${r.reference}-T`, payloadHash: r.chain.payloadHash ?? "", distributorId: r.distributor.id },
         { timeoutMs: this.timeoutMs, onSubmitted: (_sig, mint) => this.markProof(id, { tokenMint: mint }) },
       );
       this.markProof(id, { tokenMint: minted.mint });
       const attempt = await this.gateway.attemptDoubleSettle(
-        { assetMint: minted.mint, amount: DOUBLE_SPEND_AMOUNT, funderId: proof.funderId, documentSha256: r.documents[0].sha256 },
+        { assetMint: minted.mint, amount: DOUBLE_SPEND_AMOUNT, fee: 0, distributorId: r.distributor.id, funderId: proof.funderId, documentSha256: r.documents[0].sha256 },
         { timeoutMs: this.timeoutMs, onSubmitted: (sig) => this.markProof(id, { signature: sig, explorerUrl: explorerTxUrl(sig) }) },
       );
       const explorerUrl = explorerTxUrl(attempt.signature);
@@ -305,6 +318,22 @@ export class AssignmentService {
     );
     r.updatedAt = at;
     this.store.put(r);
+    // v1.3 (§15.5): receita da AgroFlux, ligada à transação da liquidação.
+    const offer = this.store.getOffers(id)?.find((o) => o.id === r.assignment.offerId);
+    if (r.assignment.funderId && (r.assignment.platformFeeAmount ?? 0) > 0) {
+      this.store.addRevenue({
+        id: newId("rev"),
+        receivableId: r.id,
+        reference: r.reference,
+        distributorId: r.distributor.id,
+        funderId: r.assignment.funderId,
+        settledAt: r.assignment.settledAt ?? at,
+        faceAmountCents: r.amountCents,
+        platformFeeCents: offer?.platformFeeCents ?? 0,
+        registryFeeCents: offer?.registryFeeCents ?? 0,
+        settlementSignature: c.signature,
+      });
+    }
   }
 
   private markFailed(id: string, code: AssignmentErrorCode) {

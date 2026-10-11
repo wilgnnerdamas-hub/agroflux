@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { ArrowRight, Inbox, UserCheck } from "lucide-react";
 import { api } from "@/lib/api";
-import { formatDate, formatMoney, formatRateBps } from "@/lib/format";
+import { formatBps, formatDate, formatMoney } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { INTERACTIVE_FUNDER_ID } from "@/lib/labels";
 import { useAsync } from "@/lib/useAsync";
 import { useEffect } from "react";
 import { Card, EmptyState, ErrorState, LoadingBlock, PageHeader } from "@/components/ui";
+import { RatingBadge } from "@/components/RiskCard";
 
 const POLL_MS = 8000;
 
@@ -43,11 +44,14 @@ export default function MarketplacePage() {
                 <li key={r.id}>
                   <Link href={`/financiador/recebiveis/${r.id}`} className="group flex h-full flex-col rounded-xl border border-border bg-surface p-5 hover:border-brand">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold">{r.reference}</p>
+                      <p className="flex items-center gap-2 font-semibold">
+                        {r.reference}
+                        {r.risk && <RatingBadge rating={r.risk.rating} score={r.risk.score} />}
+                      </p>
                       <p className="text-lg font-bold tabular-nums">{formatMoney(r.amountCents)}</p>
                     </div>
                     <p className="mt-1 text-sm text-muted">
-                      {t.status.product[r.product.category]} · {r.debtor.state} · {t.dashboard.dueOn(formatDate(r.dueDate))} · {t.common.days(r.termDays)}
+                      {r.distributor.name} · {t.status.product[r.product.category]} · {r.debtor.state} · {t.dashboard.dueOn(formatDate(r.dueDate))} · {t.common.days(r.termDays)}
                     </p>
                     <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
                       {it.debtorAccepted && (
@@ -59,13 +63,20 @@ export default function MarketplacePage() {
                       <div>
                         <dt className="text-xs uppercase tracking-wide text-faint">{f.bestNet}</dt>
                         <dd className="mt-0.5 font-medium tabular-nums">
-                          {it.bestOffer ? `${formatMoney(it.bestOffer.netAmountCents)} · ${formatRateBps(it.bestOffer.monthlyRateBps)}` : "—"}
+                          {it.bestOffer ? formatMoney(it.bestOffer.netAmountCents) : "—"}
                         </dd>
                       </div>
                       <div>
                         <dt className="text-xs uppercase tracking-wide text-faint">{f.yourProposal}</dt>
                         <dd className="mt-0.5 font-medium tabular-nums">
-                          {it.myOffer ? `${formatMoney(it.myOffer.netAmountCents)} · ${formatRateBps(it.myOffer.monthlyRateBps)}` : <span className="text-muted">{f.noProposal}</span>}
+                          {it.myOffer ? (
+                            <>
+                              {formatMoney(it.myOffer.netAmountCents)}
+                              {it.myOffer.spreadBps != null && <span className="block text-xs font-normal text-muted">{t.pricing.cdiPlus(formatBps(it.myOffer.spreadBps))}</span>}
+                            </>
+                          ) : (
+                            <span className="text-muted">{f.noProposal}</span>
+                          )}
                         </dd>
                       </div>
                     </dl>

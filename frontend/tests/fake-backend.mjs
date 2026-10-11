@@ -1,5 +1,5 @@
 // DUBLÊ DE TESTE — usado apenas pelos testes e2e (Playwright).
-// NÃO é uma API alternativa e não deve ser usado na demo: implementa o contrato v1.2 de forma mínima
+// NÃO é uma API alternativa e não deve ser usado na demo: implementa o contrato v1.3 de forma mínima
 // para exercitar o cliente HTTP do frontend. Assinaturas e endereços aqui são marcados como FAKE e não existem na Solana.
 import { createServer } from "node:http";
 import { createHash, randomUUID } from "node:crypto";
@@ -16,6 +16,22 @@ const FUNDERS = [
   { id: "fnd_b", name: "Financiador Demo B", type: "simulated_bank", mode: "automatic", wallet: ASSIGNMENT ? "FAKEFunderB1111" : null, isSimulated: true },
   { id: "fnd_c", name: "Financiador Demo C", type: "simulated_cooperative", mode: "automatic", wallet: ASSIGNMENT ? "FAKEFunderC1111" : null, isSimulated: true },
 ];
+const DISTRIBUTORS = [
+  { id: "dst_a", name: "Distribuidora Demo" },
+  { id: "dst_b", name: "Cerrado Insumos (demo)" },
+  { id: "dst_c", name: "Sul Sementes (demo)" },
+];
+const RATINGS = ["AA", "A", "B", "C", "D", "E", "F", "G", "H"];
+const defaultSettings = () => ({
+  cdi: { source: "manual", manualAnnualBps: 1490 },
+  platformFeeBps: 50,
+  registryFeeCents: 2500,
+  iofByFunderType: { simulated_fidc: false, simulated_bank: true, simulated_cooperative: false },
+  lgdBps: { withCoobligation: 3500, withoutCoobligation: 6000 },
+  ratings: Object.fromEntries(RATINGS.map((r, i) => [r, { pdAnnualBps: [50, 100, 200, 400, 800, 1500, 2500, 4000, 6000][i], spreadBps: [150, 220, 300, 420, 600, 850, 1150, 1600, 2200][i] }])),
+});
+let settings = defaultSettings();
+const revenue = [];
 const db = new Map();
 const tokens = new Map(); // token → { receivableId, used, revoked, expiresAt }
 let n = 0;
@@ -33,9 +49,11 @@ function send(res, status, body) {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "*",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
   });
-  res.end(body === undefined ? "" : JSON.stringify(body));
+  const isRcv = (b) => b && typeof b === "object" && Array.isArray(b.events) && Array.isArray(b.documents);
+  const out = isRcv(body) ? withRisk(body) : body && isRcv(body.receivable) ? { ...body, receivable: withRisk(body.receivable) } : body;
+  res.end(out === undefined ? "" : JSON.stringify(out));
 }
 async function json(req) {
   const chunks = [];
@@ -46,13 +64,53 @@ async function json(req) {
     return {};
   }
 }
-const summary = (r) => ({ id: r.id, reference: r.reference, status: r.status, debtor: r.debtor, product: r.product, amountCents: r.amountCents, currency: "BRL", dueDate: r.dueDate, chain: { status: r.chain.status }, selectedOfferId: r.selectedOfferId, debtorConfirmation: { status: r.debtorConfirmation.status }, assignment: { status: r.assignment.status }, registry: { registryId: r.registry.registryId }, listing: { status: r.listing.status }, offerCount: (r.offers ?? []).length, createdAt: r.createdAt });
+// Risco simplificado (o cálculo oficial é do backend): base 600, mais aceite e coobrigação.
+function risk(r) {
+  const accepted = r.debtorConfirmation.chain?.status === "confirmed";
+  const published = r.listing.status === "published";
+  const factors = [
+    { key: "acceptance", label: "Aceite do sacado", points: accepted ? 80 : -30, detail: accepted ? "Aceite registrado na Solana Devnet." : "Ainda sem aceite." },
+    { key: "coobligation", label: "Coobrigação da distribuidora", points: published ? 40 : 0, detail: published ? "Termo aceito." : "Termo ainda não aceito." },
+    { key: "history_payments", label: "Pagamentos em dia (histórico simulado)", points: 70, detail: "95% em dia." },
+  ];
+  const score = 600 + factors.reduce((t, f) => t + f.points, 0);
+  const rating = score >= 850 ? "AA" : score >= 750 ? "A" : score >= 650 ? "B" : score >= 550 ? "C" : "D";
+  const cfg = settings.ratings[rating];
+  const lgdBps = published ? settings.lgdBps.withCoobligation : settings.lgdBps.withoutCoobligation;
+  const pdTermBps = Math.round(cfg.pdAnnualBps * (r.termDays / 365));
+  return { score, rating, pdAnnualBps: cfg.pdAnnualBps, pdTermBps, lgdBps, expectedLossCents: Math.round((pdTermBps / 10000) * (lgdBps / 10000) * r.amountCents), spreadBaseBps: cfg.spreadBps, factors, producerHistory: { isSimulated: true, seasons: 6, onTimeRate: 0.95, maxDelayDays: 8 } };
+}
+const withRisk = (r) => ({ ...r, risk: risk(r) });
+
+// Preço simplificado com as mesmas fórmulas do backend (dias úteis aproximados por 252/365 dos corridos).
+function quote(r, funderType, spreadBps, feesCents) {
+  const dc = Math.max(1, days(new Date().toISOString().slice(0, 10), r.dueDate));
+  const du = Math.max(1, Math.round((dc * 252) / 365));
+  const cdi = settings.cdi.manualAnnualBps / 10000;
+  const annual = (1 + cdi) * (1 + spreadBps / 10000) - 1;
+  const pv = Math.round(r.amountCents / Math.pow(1 + annual, du / 252));
+  const iof = settings.iofByFunderType[funderType] ? Math.round(pv * (0.000041 * Math.min(dc, 365) + 0.0038)) : 0;
+  const cashOut = pv - feesCents - iof;
+  const platform = Math.round((r.amountCents * settings.platformFeeBps) / 10000);
+  const net = cashOut - platform - settings.registryFeeCents;
+  const bps = (x) => Math.round(x * 10000);
+  const cet = Math.pow(r.amountCents / net, 252 / du) - 1;
+  return {
+    spreadBps, feesCents, cdiBps: settings.cdi.manualAnnualBps, annualRateBps: bps(annual), monthlyRateBps: bps(Math.pow(1 + annual, 1 / 12) - 1),
+    businessDays: du, presentValueCents: pv, discountCents: r.amountCents - pv, iofCents: iof, funderCashOutCents: cashOut,
+    platformFeeCents: platform, registryFeeCents: settings.registryFeeCents, netAmountCents: net,
+    cetAnnualBps: bps(cet), cetMonthlyBps: bps(Math.pow(1 + cet, 1 / 12) - 1), funderYieldAnnualBps: bps(Math.pow(r.amountCents / (pv - feesCents), 252 / du) - 1),
+    pricedAt: new Date().toISOString().slice(0, 10),
+  };
+}
+
+const summary = (r) => ({ id: r.id, reference: r.reference, status: r.status, debtor: r.debtor, product: r.product, amountCents: r.amountCents, currency: "BRL", dueDate: r.dueDate, chain: { status: r.chain.status }, selectedOfferId: r.selectedOfferId, debtorConfirmation: { status: r.debtorConfirmation.status }, assignment: { status: r.assignment.status }, registry: { registryId: r.registry.registryId }, listing: { status: r.listing.status }, offerCount: (r.offers ?? []).length, distributor: r.distributor, risk: (({ score, rating }) => ({ score, rating }))(risk(r)), createdAt: r.createdAt });
 const emptyDc = () => ({ status: "none", isSimulated: true, requestedAt: null, expiresAt: null, respondedAt: null, chain: null });
-const emptyAssignment = () => ({ status: "none", isSimulated: true, cluster: "devnet", offerId: null, tokenMint: null, settlementMint: null, settlementAsset: "tBRL-DEMO", settlementAmount: null, distributorWallet: null, funderWallet: null, escrowProgramId: null, mintSignature: null, settlementSignature: null, explorerUrls: { tokenMint: null, mint: null, settlement: null, documentLock: null }, submittedAt: null, settledAt: null, error: null, funderId: null, funderName: null, documentLock: null, doubleSpendProof: null });
+const emptyAssignment = () => ({ platformFeeAmount: null, treasuryWallet: null, status: "none", isSimulated: true, cluster: "devnet", offerId: null, tokenMint: null, settlementMint: null, settlementAsset: "tBRL-DEMO", settlementAmount: null, distributorWallet: null, funderWallet: null, escrowProgramId: null, mintSignature: null, settlementSignature: null, explorerUrls: { tokenMint: null, mint: null, settlement: null, documentLock: null }, submittedAt: null, settledAt: null, error: null, funderId: null, funderName: null, documentLock: null, doubleSpendProof: null });
 const dcSummary = (r, expiresAt) => ({ isSimulated: true, disclaimer: "Simulação — sem verificação de identidade do sacado.", reference: r.reference, distributor: r.distributor, product: r.product, amountCents: r.amountCents, currency: "BRL", dueDate: r.dueDate, status: r.debtorConfirmation.status, expiresAt, registryId: r.registry.registryId, paymentDomicile: r.registry.paymentDomicile });
 const REGISTERED = ["registered", "published", "offer_selected", "assignment_pending", "assigned", "assignment_failed"];
 const net = (gross, bps, term, fees) => gross - Math.round(gross * (bps / 10000) * (term / 30)) - fees;
-const offer = (r, f, bps, fees, origin) => ({ id: `ofr_${r.id}_${f.id}`, receivableId: r.id, isSimulated: true, funder: { id: f.id, name: f.name, type: f.type }, origin, grossAmountCents: r.amountCents, monthlyRateBps: bps, feesCents: fees, netAmountCents: net(r.amountCents, bps, r.termDays, fees), termDays: r.termDays, status: "available", expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(), createdAt: now(), updatedAt: now() });
+const offer = (r, f, spreadBps, fees, origin) => ({ id: `ofr_${r.id}_${f.id}`, receivableId: r.id, isSimulated: true, funder: { id: f.id, name: f.name, type: f.type }, origin, grossAmountCents: r.amountCents, termDays: r.termDays, status: "available", expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(), createdAt: now(), updatedAt: now(), ...quote(r, f.type, spreadBps, fees) });
 
 const server = createServer(async (req, res) => {
   if (req.method === "OPTIONS") return send(res, 204);
@@ -62,11 +120,42 @@ const server = createServer(async (req, res) => {
   const find = (id) => db.get(id);
   try {
     if (req.method === "GET" && p === "/health") return send(res, 200, { status: "ok", version: "fake-test", cluster: "devnet", solana: { reachable: true, feePayerBalanceLamports: 2_000_000_000 }, features: { debtorConfirmation: true, assignment: ASSIGNMENT, marketplace: true, doubleSpendProof: ASSIGNMENT } });
-    if (req.method === "POST" && p === "/__reset") { db.clear(); tokens.clear(); n = 0; failedOnce = false; return send(res, 204); }
+    if (req.method === "POST" && p === "/__reset") { db.clear(); tokens.clear(); n = 0; failedOnce = false; settings = defaultSettings(); revenue.length = 0; return send(res, 204); }
+    if (req.method === "GET" && p === "/distributors") return send(res, 200, { items: DISTRIBUTORS.map((d) => ({ ...d, wallet: null, isSimulated: true })) });
+    if (req.method === "GET" && p === "/pricing/reference") return send(res, 200, { cdiAnnualBps: settings.cdi.manualAnnualBps, cdiSource: "manual", cdiReferenceDate: null, platformFeeBps: settings.platformFeeBps, registryFeeCents: settings.registryFeeCents, pricedAt: now().slice(0, 10) });
+    if (p === "/admin/settings") {
+      if (req.method === "GET") return send(res, 200, settings);
+      if (req.method === "PUT") {
+        const b = await json(req);
+        if (b.platformFeeBps !== undefined && !(Number.isInteger(b.platformFeeBps) && b.platformFeeBps >= 0 && b.platformFeeBps <= 500)) return err(res, 422, "VALIDATION_ERROR", "Alguns campos precisam de ajuste.", { fieldErrors: { platformFeeBps: "Informe a taxa entre 0% e 5% do valor de face." } });
+        settings = { ...settings, ...b, cdi: { ...settings.cdi, ...(b.cdi ?? {}) } };
+        return send(res, 200, settings);
+      }
+    }
+    if (req.method === "GET" && p.startsWith("/admin/")) {
+      const all = [...db.values()];
+      const assigned = all.filter((r) => r.status === "assigned");
+      if (p === "/admin/overview") {
+        const byStatus = {};
+        all.forEach((r) => (byStatus[r.status] = (byStatus[r.status] ?? 0) + 1));
+        const ratingMix = Object.fromEntries(RATINGS.map((k) => [k, 0]));
+        all.forEach((r) => ratingMix[risk(r).rating]++);
+        return send(res, 200, { isSimulated: true, receivables: all.length, portfolioCents: all.reduce((t, r) => t + r.amountCents, 0), assignedCount: assigned.length, assignedVolumeCents: assigned.reduce((t, r) => t + r.amountCents, 0), revenueCents: revenue.reduce((t, e) => t + e.platformFeeCents + e.registryFeeCents, 0), averageTicketCents: all.length ? Math.round(all.reduce((t, r) => t + r.amountCents, 0) / all.length) : null, averageTermDays: null, averageAnnualRateBps: null, averageCetAnnualBps: null, byStatus, ratingMix, expectedLossCents: 0 });
+      }
+      if (p === "/admin/receivables") return send(res, 200, { items: all.map((r) => ({ id: r.id, reference: r.reference, status: r.status, distributor: r.distributor, debtor: r.debtor, product: r.product, amountCents: r.amountCents, dueDate: r.dueDate, registryId: r.registry.registryId, rating: risk(r).rating, score: risk(r).score, expectedLossCents: risk(r).expectedLossCents, offerCount: r.offers.length, acceptedOffer: null, createdAt: r.createdAt })) });
+      if (p === "/admin/funders") return send(res, 200, { items: FUNDERS.map((f) => ({ id: f.id, name: f.name, type: f.type, mode: f.mode, proposals: all.filter((r) => r.offers.some((o) => o.funder.id === f.id)).length, accepted: all.filter((r) => r.offers.some((o) => o.funder.id === f.id && o.status === "selected")).length, boughtCount: assigned.filter((r) => r.assignment.funderId === f.id).length, boughtFaceCents: assigned.filter((r) => r.assignment.funderId === f.id).reduce((t, r) => t + r.amountCents, 0), averageAnnualRateBps: null, averageYieldAnnualBps: null, wallet: f.wallet, settlementUnits: null })) });
+      if (p === "/admin/distributors") return send(res, 200, { items: DISTRIBUTORS.map((d) => { const mine = all.filter((r) => r.distributor.id === d.id); return { id: d.id, name: d.name, receivables: mine.length, volumeCents: mine.reduce((t, r) => t + r.amountCents, 0), assignedCount: mine.filter((r) => r.status === "assigned").length, assignedVolumeCents: mine.filter((r) => r.status === "assigned").reduce((t, r) => t + r.amountCents, 0), averageCetAnnualBps: null, topDebtor: mine[0] ? { alias: mine[0].debtor.alias, shareBps: 10000 } : null }; }) });
+      if (p === "/admin/revenue") return send(res, 200, { isSimulated: true, treasuryWallet: "FAKETreasury1111", totals: { platformFeeCents: revenue.reduce((t, e) => t + e.platformFeeCents, 0), registryFeeCents: revenue.reduce((t, e) => t + e.registryFeeCents, 0), count: revenue.length }, byMonth: revenue.length ? [{ month: now().slice(0, 7), platformFeeCents: revenue.reduce((t, e) => t + e.platformFeeCents, 0), registryFeeCents: revenue.reduce((t, e) => t + e.registryFeeCents, 0), count: revenue.length }] : [], entries: revenue });
+      if (p === "/admin/risk") {
+        const group = (key) => { const m = new Map(); all.forEach((r) => { const g = m.get(key(r)) ?? { key: key(r), count: 0, amountCents: 0, expectedLossCents: 0 }; g.count++; g.amountCents += r.amountCents; g.expectedLossCents += risk(r).expectedLossCents; m.set(key(r), g); }); return [...m.values()]; };
+        return send(res, 200, { isSimulated: true, ratings: RATINGS.map((rating) => ({ rating, count: all.filter((r) => risk(r).rating === rating).length, amountCents: 0, expectedLossCents: 0, pdAnnualBps: settings.ratings[rating].pdAnnualBps, spreadBps: settings.ratings[rating].spreadBps })), expectedLossCents: all.reduce((t, r) => t + risk(r).expectedLossCents, 0), portfolioCents: all.reduce((t, r) => t + r.amountCents, 0), byDebtor: group((r) => r.debtor.alias), byState: group((r) => r.debtor.state), byCategory: group((r) => r.product.category) });
+      }
+    }
     if (req.method === "GET" && p === "/terms") return send(res, 200, TERMS);
     if (req.method === "GET" && p === "/funders") return send(res, 200, { items: FUNDERS });
     if (req.method === "GET" && p === "/receivables") {
-      const all = [...db.values()];
+      const dist = url.searchParams.get("distributorId");
+      const all = [...db.values()].filter((r) => !dist || r.distributor.id === dist);
       const items = all.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(summary);
       return send(res, 200, { items, totals: { count: items.length, amountCents: items.reduce((s, i) => s + i.amountCents, 0), registeredCount: items.filter((i) => REGISTERED.includes(i.status)).length, pendingCount: items.filter((i) => i.status === "registration_pending").length, offerSelectedCount: items.filter((i) => i.status === "offer_selected").length, debtorConfirmedCount: items.filter((i) => i.debtorConfirmation.status === "confirmed").length, assignedCount: items.filter((i) => i.status === "assigned").length, publishedCount: items.filter((i) => i.status === "published").length } });
     }
@@ -89,7 +178,7 @@ const server = createServer(async (req, res) => {
       const registryId = `REG-DEMO-${String(n).padStart(6, "0")}`;
       const doc = { id: `doc_test${n}`, kind: data.documentKind, filename: file.name, mimeType: file.type, sizeBytes: bytes.length, sha256: sha, uploadedAt: now() };
       const r = {
-        id, reference, status: "created", isDemo: true, distributor: { name: "Distribuidora Demo" }, debtor: data.debtor, product: data.product, cropSeason: data.cropSeason, amountCents: data.amountCents, currency: "BRL", issueDate: data.issueDate, dueDate: data.dueDate, termDays: days(data.issueDate, data.dueDate), documents: [doc],
+        id, reference, status: "created", isDemo: true, distributor: DISTRIBUTORS.find((d) => d.id === (data.distributorId ?? "dst_a")) ?? DISTRIBUTORS[0], debtor: data.debtor, product: data.product, cropSeason: data.cropSeason, amountCents: data.amountCents, currency: "BRL", issueDate: data.issueDate, dueDate: data.dueDate, termDays: days(data.issueDate, data.dueDate), documents: [doc],
         chain: { status: "none", cluster: "devnet", signature: null, slot: null, blockTime: null, explorerUrl: null, programId: null, memo: null, payloadHash: null, submittedAt: null, confirmedAt: null, error: null },
         events: [ev("receivable_created", `Recebível ${reference} cadastrado`, { reference }), ev("document_attached", "Documento de teste anexado", { documentId: doc.id, sha256: sha, filename: file.name }), ev("registry_registered", `Título registrado na registradora (simulada) sob o número ${registryId}`, { registryId }, { actor: "system" })],
         selectedOfferId: null, debtorConfirmation: emptyDc(), assignment: emptyAssignment(),
@@ -153,17 +242,24 @@ const server = createServer(async (req, res) => {
       const f = FUNDERS.find((x) => x.id === b.funderId && x.mode === "interactive");
       const fe = {};
       if (!f) fe.funderId = "Selecione um financiador demo válido.";
-      if (!Number.isInteger(b.monthlyRateBps) || b.monthlyRateBps < 50 || b.monthlyRateBps > 500) fe.monthlyRateBps = "Informe uma taxa entre 0,50% e 5,00% ao mês.";
+      if (!Number.isInteger(b.spreadBps) || b.spreadBps < 50 || b.spreadBps > 3000) fe.spreadBps = "Informe um spread entre 0,50% e 30,00% ao ano.";
       if (!Number.isInteger(b.feesCents) || b.feesCents < 0 || b.feesCents > 100000) fe.feesCents = "Informe tarifas entre R$ 0 e R$ 1.000.";
       if (Object.keys(fe).length) return err(res, 422, "VALIDATION_ERROR", "Alguns campos precisam de ajuste.", { fieldErrors: fe });
       if (r.status !== "published") return err(res, 409, "INVALID_STATE", "Este recebível não está aberto para propostas.");
-      const fresh = offer(r, f, b.monthlyRateBps, b.feesCents, "proposal");
+      const fresh = offer(r, f, b.spreadBps, b.feesCents, "proposal");
       const i = r.offers.findIndex((o) => o.funder.id === f.id);
       if (i >= 0) r.offers[i] = { ...fresh, createdAt: r.offers[i].createdAt };
       else r.offers.push(fresh);
       r.events.push(ev("offer_proposed", `${i >= 0 ? "Proposta revisada" : "Proposta recebida"} de ${f.name} (simulação)`, { offerId: fresh.id, funderId: f.id }));
       r.updatedAt = now();
       return send(res, 201, { offer: r.offers.find((o) => o.funder.id === f.id), receivable: r });
+    }
+    if ((mm = m(/^\/receivables\/([^/]+)\/quote$/)) && req.method === "POST") {
+      const r = find(mm[1]);
+      if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
+      const b = await json(req);
+      if (!Number.isInteger(b.spreadBps) || b.spreadBps < 50 || b.spreadBps > 3000) return err(res, 422, "VALIDATION_ERROR", "Alguns campos precisam de ajuste.", { fieldErrors: { spreadBps: "Informe um spread entre 0,50% e 30,00% ao ano." } });
+      return send(res, 200, quote(r, "simulated_fidc", b.spreadBps, b.feesCents ?? 0));
     }
     if ((mm = m(/^\/receivables\/([^/]+)\/offers\/([^/]+)\/select$/)) && req.method === "POST") {
       const r = find(mm[1]);
@@ -190,7 +286,8 @@ const server = createServer(async (req, res) => {
       const th = createHash("sha256").update(`${r.id}:terms`).digest("hex");
       r.status = "published";
       r.listing = { status: "published", publishedAt: now(), terms: { version: TERMS.version, textSha256: TERMS.textSha256, termsHash: th, acceptedAt: now() }, chain: { status: "pending", signature: null, explorerUrl: null, memo: JSON.stringify({ app: "agroflux", v: 1, evt: "receivable_published", rid: r.id, th }), error: null } };
-      r.offers = [offer(r, FUNDERS[1], 180, 8000, "automatic"), offer(r, FUNDERS[2], 230, 20000, "automatic")];
+      const base = risk(r).spreadBaseBps;
+      r.offers = [offer(r, FUNDERS[1], base + 60, 8000, "automatic"), offer(r, FUNDERS[2], base + 120, 20000, "automatic")];
       r.events.push(ev("listing_published", "Publicado para financiadores com termo de coobrigação aceito (simulação)", { termsHash: th }), ev("offers_generated", "Propostas automáticas dos financiadores demo recebidas (simulação)", { offerIds: r.offers.map((o) => o.id) }, { actor: "system" }));
       r.updatedAt = now();
       setTimeout(() => {
@@ -215,7 +312,7 @@ const server = createServer(async (req, res) => {
       if (!f) return err(res, 404, "NOT_FOUND", "Financiador não encontrado.");
       const items = [...db.values()].filter((r) => r.assignment.funderId === f.id && ["assignment_pending", "assigned"].includes(r.status)).map((r) => {
         const o = r.offers.find((x) => x.id === r.assignment.offerId);
-        return { receivableId: r.id, reference: r.reference, registryId: r.registry.registryId, status: r.status === "assigned" ? "settled" : "settling", product: r.product, debtorState: r.debtor.state, faceAmountCents: r.amountCents, paidAmountCents: r.assignment.settlementAmount, monthlyRateBps: o.monthlyRateBps, feesCents: o.feesCents, settledAt: r.assignment.settledAt, dueDate: r.dueDate, tokenMint: r.assignment.tokenMint, settlementSignature: r.assignment.settlementSignature, explorerUrls: { tokenMint: r.assignment.explorerUrls.tokenMint, settlement: r.assignment.explorerUrls.settlement } };
+        return { receivableId: r.id, reference: r.reference, registryId: r.registry.registryId, status: r.status === "assigned" ? "settled" : "settling", product: r.product, debtorState: r.debtor.state, faceAmountCents: r.amountCents, paidAmountCents: o.presentValueCents - o.feesCents, monthlyRateBps: o.monthlyRateBps, feesCents: o.feesCents, annualRateBps: o.annualRateBps, spreadBps: o.spreadBps, funderYieldAnnualBps: o.funderYieldAnnualBps, settledAt: r.assignment.settledAt, dueDate: r.dueDate, tokenMint: r.assignment.tokenMint, settlementSignature: r.assignment.settlementSignature, explorerUrls: { tokenMint: r.assignment.explorerUrls.tokenMint, settlement: r.assignment.explorerUrls.settlement } };
       });
       const s = items.filter((i) => i.status === "settled");
       const paid = s.reduce((a, i) => a + i.paidAmountCents, 0);
@@ -228,7 +325,7 @@ const server = createServer(async (req, res) => {
         isSimulated: true, cluster: "devnet", checkedAt: now(),
         programs: [{ role: "memo", label: "SPL Memo", address: "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr", explorerUrl: addrUrl("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr") }, ...(ASSIGNMENT ? [{ role: "escrow", label: "Escrow AgroFlux (Anchor)", address: "FAKE_ESCROW", explorerUrl: addrUrl("FAKE_ESCROW") }] : [])],
         settlementAsset: ASSIGNMENT ? { symbol: "tBRL-DEMO", mint: "FAKE_TBRL_MINT", decimals: 2, explorerUrl: addrUrl("FAKE_TBRL_MINT") } : null,
-        wallets: ASSIGNMENT ? FUNDERS.map((f) => ({ role: "funder", funderId: f.id, label: f.name, address: f.wallet, explorerUrl: addrUrl(f.wallet), solLamports: 0, settlementUnits: 100000000 })) : [],
+        wallets: ASSIGNMENT ? [{ role: "treasury", label: "Tesouraria AgroFlux (taxas)", address: "FAKETreasury1111", explorerUrl: addrUrl("FAKETreasury1111"), solLamports: 0, settlementUnits: revenue.reduce((t, e) => t + e.platformFeeCents + e.registryFeeCents, 0) }, ...FUNDERS.map((f) => ({ role: "funder", funderId: f.id, label: f.name, address: f.wallet, explorerUrl: addrUrl(f.wallet), solLamports: 0, settlementUnits: 100000000 }))] : [],
         registry: { name: "Registradora Demo (simulada)", isSimulated: true, titles: all.length },
         stats: { receivables: all.length, registeredOnChain: all.filter((r) => r.chain.status === "confirmed").length, debtorAccepted: all.filter((r) => r.debtorConfirmation.chain?.status === "confirmed").length, published: all.filter((r) => r.listing.status === "published").length, assigned: all.filter((r) => r.status === "assigned").length, doubleSpendRejected: all.filter((r) => r.assignment.doubleSpendProof?.status === "rejected").length },
       });
@@ -242,7 +339,7 @@ const server = createServer(async (req, res) => {
       const f = FUNDERS.find((x) => x.id === o.funder.id);
       const lock = `FAKE_DOC_LOCK_${r.id}`;
       r.status = "assignment_pending";
-      r.assignment = { ...r.assignment, status: "pending", offerId: o.id, settlementAmount: o.netAmountCents, settlementMint: "FAKE_TBRL_MINT", distributorWallet: "FAKEDistributor1111", funderWallet: f.wallet, funderId: f.id, funderName: f.name, escrowProgramId: "FAKE_ESCROW", documentLock: lock, explorerUrls: { ...r.assignment.explorerUrls, documentLock: addrUrl(lock) }, submittedAt: now(), error: null };
+      r.assignment = { ...r.assignment, status: "pending", offerId: o.id, settlementAmount: o.funderCashOutCents, platformFeeAmount: o.platformFeeCents + o.registryFeeCents, treasuryWallet: "FAKETreasury1111", settlementMint: "FAKE_TBRL_MINT", distributorWallet: "FAKEDistributor1111", funderWallet: f.wallet, funderId: f.id, funderName: f.name, escrowProgramId: "FAKE_ESCROW", documentLock: lock, explorerUrls: { ...r.assignment.explorerUrls, documentLock: addrUrl(lock) }, submittedAt: now(), error: null };
       r.events.push(ev("assignment_requested", "Cessão tokenizada solicitada (simulação na Devnet)", { offerId: o.id, settlementAmount: o.netAmountCents }));
       r.updatedAt = now();
       setTimeout(() => {
@@ -257,6 +354,7 @@ const server = createServer(async (req, res) => {
         r.status = "assigned";
         r.assignment = { ...r.assignment, status: "settled", settlementSignature: sig, settledAt: now(), explorerUrls: { ...r.assignment.explorerUrls, settlement: txUrl(sig) } };
         r.registry = { ...r.registry, creditor: { kind: "funder", name: f.name, wallet: f.wallet }, paymentDomicile: { payeeName: f.name, instruction: `Pagar ao credor atual: ${f.name} (simulado).`, updatedAt: now() } };
+        revenue.push({ id: `rev_${r.id}`, receivableId: r.id, reference: r.reference, distributorId: r.distributor.id, funderId: f.id, settledAt: now(), faceAmountCents: r.amountCents, platformFeeCents: o.platformFeeCents, registryFeeCents: o.registryFeeCents, settlementSignature: sig });
         r.events.push(
           ev("assignment_settled", "Liquidação atômica confirmada na Solana Devnet (simulação, tBRL-DEMO sem valor)", { signature: sig }, { actor: "system", onChain: true, chain: { signature: sig, explorerUrl: txUrl(sig) } }),
           ev("registry_creditor_updated", `Registradora (simulada): credor atualizado para ${f.name}`, { funderId: f.id }, { actor: "system" }),

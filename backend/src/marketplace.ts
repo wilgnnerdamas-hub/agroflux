@@ -2,6 +2,7 @@
 import { notFound } from "./errors.js";
 import { funderDef, isFunderId, toFunder, type FunderWallets } from "./funders.js";
 import { toSummary } from "./receivables.js";
+import type { PricingService } from "./pricing/service.js";
 import type { Store } from "./store.js";
 import type { Marketplace, Portfolio, PortfolioItem } from "./types.js";
 
@@ -9,7 +10,7 @@ export const MARKETPLACE_DISCLAIMER = "Recebíveis fictícios publicados para de
 
 const byNewest = <T extends { createdAt: string }>(a: T, b: T) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0);
 
-export function marketplace(store: Store, funderId?: string): Marketplace {
+export function marketplace(store: Store, pricing: PricingService, funderId?: string): Marketplace {
   const items = store
     .all()
     .filter((r) => r.status === "published")
@@ -18,7 +19,7 @@ export function marketplace(store: Store, funderId?: string): Marketplace {
       const offers = (store.getOffers(r.id) ?? []).filter((o) => o.status === "available");
       const best = offers.reduce<(typeof offers)[number] | null>((b, o) => (!b || o.netAmountCents > b.netAmountCents ? o : b), null);
       return {
-        receivable: { ...toSummary(r, offers.length), cropSeason: r.cropSeason, issueDate: r.issueDate, termDays: r.termDays },
+        receivable: { ...toSummary(r, offers.length, pricing.summaryRisk(r)), cropSeason: r.cropSeason, issueDate: r.issueDate, termDays: r.termDays },
         registryId: r.registry.registryId,
         debtorAccepted: r.debtorConfirmation.status === "confirmed" && r.debtorConfirmation.chain?.status === "confirmed",
         offerCount: offers.length,
@@ -46,7 +47,11 @@ export function portfolio(store: Store, funderId: string, wallets: FunderWallets
         product: r.product,
         debtorState: r.debtor.state,
         faceAmountCents: r.amountCents,
-        paidAmountCents: a.settlementAmount ?? offer?.netAmountCents ?? 0,
+        // v1.3: o financiador investe o valor presente menos as tarifas dele (o IOF, quando há, é recolhido à parte).
+        paidAmountCents: offer?.presentValueCents != null ? offer.presentValueCents - offer.feesCents : (a.settlementAmount ?? offer?.netAmountCents ?? 0),
+        annualRateBps: offer?.annualRateBps ?? null,
+        spreadBps: offer?.spreadBps ?? null,
+        funderYieldAnnualBps: offer?.funderYieldAnnualBps ?? null,
         monthlyRateBps: offer?.monthlyRateBps ?? 0,
         feesCents: offer?.feesCents ?? 0,
         settledAt: a.settledAt,

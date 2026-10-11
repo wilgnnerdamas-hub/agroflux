@@ -131,7 +131,9 @@ export async function verifyReceivable(store: Store, chain: ChainGateway, id: st
           s.amount === a.settlementAmount &&
           s.funder === a.funderWallet &&
           s.distributor === a.distributorWallet &&
-          s.settlementMint === a.settlementMint,
+          s.settlementMint === a.settlementMint &&
+          // v1.3: taxa da AgroFlux e tesouraria (registros antigos não têm esses campos).
+          (s.fee === null || (s.fee === (a.platformFeeAmount ?? 0) && s.treasury === a.treasuryWallet)),
         label: "Registro da liquidação confere (valor e carteiras)",
       },
     );

@@ -1,7 +1,7 @@
-# AgroFlux — Contrato da API (v1.2)
+# AgroFlux — Contrato da API (v1.3)
 
-> **Status:** v1.2, definida pela gestão em 10/10/2026 (v1.1 de 09/10/2026; v1.0 de 09/10/2026).
-> As partes novas estão marcadas com **[v1.1]** e **[v1.2]**.
+> **Status:** v1.3, definida pela gestão em 10/10/2026 (v1.2 e v1.1 de 10/10 e 09/10/2026; v1.0 de 09/10/2026).
+> As partes novas estão marcadas com **[v1.1]**, **[v1.2]** e **[v1.3]**. A v1.3 está concentrada no §15.
 > **Vale para:** frontend, backend e blockchain.
 > **Regra de mudança:** nenhum campo, estado ou endpoint muda sem atualizar este arquivo e avisar as três frentes (ver §13).
 
@@ -1198,3 +1198,110 @@ Enquanto a API não estiver pronta, o frontend pode rodar com `NEXT_PUBLIC_API_M
 | 1.0 | 09/10/2026 | Versão inicial. |
 | 1.1 | 09/10/2026 | Aprovada pela gestão. Confirmação do sacado (§3.9, §4.5, §5.10–5.13, §6.3), cessão tokenizada (§3.10, §4.6, §4.7, §5.14, §6.4), confirmação obrigatória antes da seleção (G1), `features` no health e novos totais. |
 | 1.2 | 10/10/2026 | (Ajuste do mesmo dia: avisos de simulação concentrados na faixa fixa e no painel "Sobre a demo"; `offerCount` no resumo da lista.) Definida pela gestão. Registradora simulada (§3.11), publicação com termo de coobrigação (§3.12, §5.16–5.17, §6.6), propostas e financiadores demo (§3.13, §5.18–5.21), trava por documento e prova de recusa (§3.10.1, §5.22, §6.5), verificação da cessão (§6.7), transparência (§5.23), estado `published` e `DUPLICATE_DOCUMENT`. |
+| 1.3 | 10/10/2026 | Definida pela gestão (G4). Precificação CDI + spread em dias úteis, risco (score, rating AA–H, perda esperada), taxa da AgroFlux on-chain (escrow com terceira perna), três distribuidoras demo e painel de administração (§15). |
+
+---
+
+## 15. v1.3 — precificação de mercado, risco, taxa da AgroFlux, distribuidoras e administração **[v1.3]**
+
+Definida pela gestão em 10/10/2026 (decisão G4). Tudo continua **simulado**, rotulado no painel "Sobre a demo" (R8).
+
+### 15.1 Precificação (substitui o cálculo de referência do §3.7)
+
+Juros compostos sobre **dias úteis** (base 252), como no mercado de antecipação e nos FIDCs.
+
+| Grandeza | Fórmula |
+|---|---|
+| `du` | Dias úteis entre a data de cálculo (hoje, no fuso de Brasília) e o vencimento, sem contar hoje e contando o vencimento, excluindo sábados, domingos e feriados nacionais (calendário com Carnaval, Sexta-feira Santa e Corpus Christi derivados da Páscoa). |
+| Taxa anual | `taxa = (1 + CDI) × (1 + spread) − 1` |
+| Valor presente | `VP = face ÷ (1 + taxa) ^ (du ÷ 252)` |
+| Deságio | `face − VP` |
+| IOF | Só se o tipo de financiador estiver configurado com IOF (padrão: banco). `IOF = VP × (alíquota diária × min(dias corridos, 365) + adicional)`. Padrão: 0,0041% ao dia + 0,38%. Premissa a validar com especialista tributário. |
+| Taxa AgroFlux | `face × 0,5%` (configurável), paga pela distribuidora. |
+| Tarifa de registro | Valor fixo por título (padrão R$ 25,00), receita da AgroFlux (repasse da registradora simulada). |
+| Saída do financiador | `aporte = VP − tarifas do financiador − IOF`. É o que sai da carteira do financiador na liquidação. |
+| Líquido da distribuidora | `líquido = aporte − taxa AgroFlux − tarifa de registro` |
+| CET da distribuidora | `(face ÷ líquido) ^ (252 ÷ du) − 1` ao ano; equivalente mensal `(1 + CET) ^ (1 ÷ 12) − 1` |
+| Rendimento do financiador | `(face ÷ (VP − tarifas)) ^ (252 ÷ du) − 1` ao ano |
+
+**CDI:** buscado na API pública do Banco Central (SGS, série 4389, CDI anualizado base 252), com cache de 6 horas. Se a consulta falhar, vale o valor manual das configurações. O `GET /pricing/reference` informa a origem.
+
+**Spread:** `spread-base do rating` (§15.2) `+ ajuste do financiador`. Os financiadores automáticos aplicam ajustes fixos (B: +0,60 p.p.; C: +1,20 p.p.). O financiador A informa o próprio spread.
+
+#### `Offer` ganha (os campos antigos continuam)
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `spreadBps` | integer | Spread anual em pontos-base. |
+| `cdiBps` | integer | CDI anual usado no cálculo, em pontos-base (2 casas: `1490` = 14,90%). |
+| `annualRateBps` | integer | Taxa anual total. |
+| `businessDays` | integer | `du`. |
+| `presentValueCents` | integer | `VP`. |
+| `iofCents` | integer | |
+| `funderCashOutCents` | integer | `aporte`; vira o `settlementAmount` da cessão. |
+| `platformFeeCents` | integer | Taxa AgroFlux. |
+| `registryFeeCents` | integer | Tarifa de registro. |
+| `cetAnnualBps`, `cetMonthlyBps` | integer | CET da distribuidora. |
+| `funderYieldAnnualBps` | integer | Rendimento anual do financiador. |
+| `pricedAt` | date | Data de cálculo. |
+
+`netAmountCents` passa a ser o **líquido da distribuidora**. `monthlyRateBps` passa a ser o equivalente mensal da taxa anual, só para exibição. `discountCents` = deságio.
+
+`POST /receivables/:id/offers` (§5.18) passa a receber `{ funderId, spreadBps, feesCents }`. `spreadBps` é um inteiro de 50 a 3000 (0,50% a 30,00% a.a.).
+
+### 15.2 Risco
+
+`Receivable` ganha `risk`, calculado pelo backend a cada leitura:
+
+| Campo | Descrição |
+|---|---|
+| `score` | 0 a 1000 (base 500, soma dos fatores, limitado). |
+| `rating` | `AA`, `A`, `B`, `C`, `D`, `E`, `F`, `G`, `H` (escala da Res. CMN 2.682). Limites: ≥ 850 AA, ≥ 750 A, ≥ 650 B, ≥ 550 C, ≥ 450 D, ≥ 350 E, ≥ 250 F, ≥ 150 G, abaixo H. |
+| `pdAnnualBps` | Probabilidade de inadimplência anual do rating (tabela configurável). |
+| `pdTermBps` | Probabilidade no prazo: `1 − (1 − PD anual) ^ (dias corridos ÷ 365)`. |
+| `lgdBps` | Perda dada a inadimplência: 60% sem coobrigação, 35% com (configurável). |
+| `expectedLossCents` | `PD no prazo × LGD × face`. |
+| `spreadBaseBps` | Spread-base do rating (configurável). |
+| `factors` | `{ key, label, points, detail }[]`, explicando o score. |
+| `producerHistory` | `{ isSimulated: true, seasons, onTimeRate, maxDelayDays }`. Histórico **fictício e determinístico** do pseudônimo. |
+
+Fatores: aceite do sacado on-chain, coobrigação, documento único registrado, prazo, alinhamento do vencimento à colheita da safra, valor, risco climático da UF, concentração da distribuidora no sacado, histórico do produtor (simulado) e histórico na plataforma.
+
+`ReceivableSummary` e `MarketplaceItem.receivable` ganham `risk: { score, rating }`.
+
+### 15.3 Taxa da AgroFlux on-chain (escrow v1.3)
+
+A instrução passa a `settle(amount, fee, document_hash)`, com as contas novas `treasury` e `treasury_settlement` (ATA de tBRL-DEMO da tesouraria, criada se preciso). Na **mesma transação**:
+
+1. token: distribuidora → financiador;
+2. `amount − fee` de tBRL-DEMO: financiador → distribuidora;
+3. `fee` de tBRL-DEMO: financiador → **tesouraria AgroFlux**.
+
+`fee ≤ amount`. A tesouraria é **fixa no programa** (constante `TREASURY`), e outra conta é recusada (`InvalidTreasury`). O registro da liquidação ganha `fee` e `treasury`, no fim da conta (os campos antigos mantêm a posição). A tesouraria só recebe; a chave dela não fica no backend (`AGROFLUX_TREASURY` guarda só o endereço público).
+
+`Assignment` ganha `platformFeeAmount` (taxa AgroFlux + tarifa de registro, na menor unidade do tBRL-DEMO) e `treasuryWallet`. `settlementAmount` = `aporte`. A verificação (§6.7) passa a conferir a taxa e a tesouraria em `settlement_record_matches`.
+
+### 15.4 Distribuidoras demo
+
+Três distribuidoras com ids fixos: `dst_a` "Distribuidora Demo", `dst_b` "Cerrado Insumos (demo)" e `dst_c` "Sul Sementes (demo)". Cada uma tem uma carteira de demonstração (`DEMO_DISTRIBUTOR_SECRET`, `DEMO_DISTRIBUTOR_B_SECRET`, `DEMO_DISTRIBUTOR_C_SECRET`).
+
+- `Receivable.distributor` passa a `{ id, name }`.
+- `CreateReceivableInput` ganha `distributorId` (opcional, padrão `dst_a`).
+- `GET /receivables?distributorId=dst_b` filtra a lista.
+- `GET /distributors` lista as distribuidoras.
+- O token e a liquidação usam a carteira da distribuidora do recebível.
+
+### 15.5 Administração (`/admin`, sem senha na demo)
+
+| Método | Rota | Uso |
+|---|---|---|
+| GET | `/pricing/reference` | CDI vigente e origem (`bcb` ou `manual`), data de referência e configurações públicas de preço. |
+| GET | `/admin/overview` | Volume cedido, receita, contagem por etapa, ticket médio, prazo médio, taxa média, mix de rating e perda esperada. |
+| GET | `/admin/receivables` | Todos os recebíveis com distribuidora, etapa, rating, perda esperada e proposta aceita. |
+| GET | `/admin/funders` | Por financiador: propostas enviadas e aceitas, volume comprado, taxa média, rendimento médio e saldo de tBRL-DEMO. |
+| GET | `/admin/distributors` | Por distribuidora: recebíveis, volume, volume cedido, CET médio e maior concentração por sacado. |
+| GET | `/admin/revenue` | Lançamentos de receita (um por cessão: taxa AgroFlux, tarifa de registro, assinatura da liquidação) e totais por mês. |
+| GET | `/admin/risk` | Distribuição por rating, perda esperada total e concentração por sacado, UF e categoria. |
+| GET / PUT | `/admin/settings` | CDI manual e uso do BCB, taxa AgroFlux (bps), tarifa de registro, IOF por tipo de financiador, PD e spread por rating, LGD com e sem coobrigação. Validação por campo (`422 VALIDATION_ERROR`). |
+
+Valores de receita são registrados na liquidação e ficam no `db.json` (`revenue`).

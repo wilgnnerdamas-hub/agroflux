@@ -1,13 +1,17 @@
-// POST /demo/reset (§5.9): apaga os recebíveis e recria 3 exemplos fictícios, todos com transações REAIS quando há.
+// POST /demo/reset (§5.9): apaga os recebíveis e recria exemplos fictícios, com transações REAIS quando há.
 // AGF-0001: registrado na Devnet. AGF-0002: só cadastrado, para registrar ao vivo.
 // AGF-0003 (v1.2): registrado, aceito pelo sacado e publicado, para a tela do financiador começar com um recebível.
+// v1.3: três distribuidoras; AGF-0004 já cedido (cessão real, com taxa da AgroFlux) quando a função B está ligada;
+// AGF-0005 é um segundo título do Produtor Demo 01 (mostra concentração e histórico no risco).
+import type { AssignmentService } from "./assignment.js";
 import type { ConfirmationService } from "./confirmation.js";
 import { ApiError } from "./errors.js";
 import { TERMS_VERSION, type ListingService } from "./listing.js";
+import { selectOffer } from "./offers.js";
 import { createReceivable } from "./receivables.js";
 import type { Registrar } from "./registration.js";
 import type { Store } from "./store.js";
-import type { CreateReceivableInput } from "./types.js";
+import type { CreateReceivableInput, Offer } from "./types.js";
 
 const isoDaysFromToday = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
@@ -35,7 +39,7 @@ export function demoPdf(title: string): Buffer {
   return Buffer.from(body, "latin1");
 }
 
-type Stage = "created" | "registered" | "published";
+type Stage = "created" | "registered" | "published" | "assigned";
 
 const EXAMPLES: { input: () => CreateReceivableInput; filename: string; title: string; stage: Stage }[] = [
   {
@@ -50,6 +54,7 @@ const EXAMPLES: { input: () => CreateReceivableInput; filename: string; title: s
       issueDate: isoDaysFromToday(-7),
       dueDate: isoDaysFromToday(150),
       documentKind: "test_invoice",
+      distributorId: "dst_a",
     }),
   },
   {
@@ -64,6 +69,7 @@ const EXAMPLES: { input: () => CreateReceivableInput; filename: string; title: s
       issueDate: isoDaysFromToday(-2),
       dueDate: isoDaysFromToday(120),
       documentKind: "test_contract",
+      distributorId: "dst_b",
     }),
   },
   {
@@ -78,13 +84,50 @@ const EXAMPLES: { input: () => CreateReceivableInput; filename: string; title: s
       issueDate: isoDaysFromToday(-5),
       dueDate: isoDaysFromToday(180),
       documentKind: "test_invoice",
+      distributorId: "dst_c",
+    }),
+  },
+  {
+    stage: "assigned",
+    filename: "nf-teste-demo-04.pdf",
+    title: "Nota fiscal de teste 04",
+    input: () => ({
+      debtor: { alias: "Produtor Demo 07", state: "BA" },
+      product: { category: "fertilizer", description: "Fertilizante fosfatado MAP (demo)" },
+      cropSeason: "2026/27",
+      amountCents: 31_000_000,
+      issueDate: isoDaysFromToday(-10),
+      dueDate: isoDaysFromToday(200),
+      documentKind: "test_invoice",
+      distributorId: "dst_b",
+    }),
+  },
+  {
+    stage: "created",
+    filename: "nf-teste-demo-05.pdf",
+    title: "Nota fiscal de teste 05",
+    input: () => ({
+      debtor: { alias: "Produtor Demo 01", state: "MT" },
+      product: { category: "seed", description: "Semente de milho safrinha (demo)" },
+      cropSeason: "2026/27",
+      amountCents: 6_000_000,
+      issueDate: isoDaysFromToday(-1),
+      dueDate: isoDaysFromToday(160),
+      documentKind: "test_invoice",
+      distributorId: "dst_a",
     }),
   },
 ];
 
 const fail = (reason: string) => new ApiError(503, "CHAIN_UNAVAILABLE", `Dados da demo recriados, mas um exemplo falhou: ${reason}`);
 
-export async function resetDemo(store: Store, registrar: Registrar, confirmations: ConfirmationService, listings: ListingService) {
+export async function resetDemo(
+  store: Store,
+  registrar: Registrar,
+  confirmations: ConfirmationService,
+  listings: ListingService,
+  assignments: AssignmentService | null = null,
+) {
   store.reset();
   for (const ex of EXAMPLES) {
     const r = createReceivable(store, ex.input(), { filename: ex.filename, mimeType: "application/pdf", bytes: demoPdf(ex.title) });
@@ -93,7 +136,7 @@ export async function resetDemo(store: Store, registrar: Registrar, confirmation
     await registrar.settle(r.id);
     let after = store.get(r.id);
     if (after?.status !== "registered") throw fail(after?.chain.error?.message ?? "o registro não foi confirmado");
-    if (ex.stage !== "published") continue;
+    if (ex.stage !== "published" && ex.stage !== "assigned") continue;
 
     // Aceite do sacado (simulado) e publicação com o termo, como na demo ao vivo.
     const { token } = confirmations.request(r.id);
@@ -105,5 +148,15 @@ export async function resetDemo(store: Store, registrar: Registrar, confirmation
     await listings.settle(r.id);
     after = store.get(r.id);
     if (after?.listing.chain?.status !== "confirmed") throw fail(after?.listing.chain?.error?.message ?? "o termo não foi confirmado");
+    if (ex.stage !== "assigned" || !assignments) continue;
+
+    // Cessão real: aceita a melhor proposta automática e liquida (com a taxa da AgroFlux).
+    const best = (store.getOffers(r.id) ?? []).reduce<Offer | null>((b, o) => (!b || o.netAmountCents > b.netAmountCents ? o : b), null);
+    if (!best) throw fail("nenhuma proposta automática para ceder");
+    selectOffer(store, r.id, best.id);
+    await assignments.request(r.id);
+    await assignments.settle(r.id);
+    after = store.get(r.id);
+    if (after?.status !== "assigned") throw fail(after?.assignment.error?.message ?? "a cessão não foi liquidada");
   }
 }

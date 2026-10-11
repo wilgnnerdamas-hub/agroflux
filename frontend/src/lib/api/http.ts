@@ -1,6 +1,16 @@
 import type { AgroFluxApi } from "./client";
 import { ApiError } from "./errors";
 import type {
+  AdminDistributorRow,
+  AdminFunderRow,
+  AdminOverview,
+  AdminReceivableRow,
+  AdminRevenue,
+  AdminRisk,
+  Distributor,
+  PricingReference,
+  Quote,
+  Settings,
   ConfirmationSummary,
   Funder,
   Marketplace,
@@ -55,7 +65,7 @@ export function createHttpApi(baseUrl: string): AgroFluxApi {
   return {
     mode: "http",
     health: () => request<Health>("/health"),
-    listReceivables: () => request<ReceivableList>("/receivables"),
+    listReceivables: (distributorId) => request<ReceivableList>(`/receivables${distributorId ? `?distributorId=${encodeURIComponent(distributorId)}` : ""}`),
     getReceivable: (id) => request<Receivable>(`/receivables/${encodeURIComponent(id)}`),
     async createReceivable(input: CreateReceivableInput, document: File, clientSha256?: string) {
       const form = new FormData();
@@ -130,5 +140,22 @@ export function createHttpApi(baseUrl: string): AgroFluxApi {
       return r.receivable;
     },
     getTransparency: () => request<Transparency>("/transparency"),
+    getPricingReference: () => request<PricingReference>("/pricing/reference"),
+    quote: (id, input) =>
+      request<Quote>(`/receivables/${encodeURIComponent(id)}/quote`, {
+        method: "POST",
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+      }),
+    listDistributors: () => request<{ items: Distributor[] }>("/distributors"),
+    adminOverview: () => request<AdminOverview>("/admin/overview"),
+    adminReceivables: () => request<{ items: AdminReceivableRow[] }>("/admin/receivables"),
+    adminFunders: () => request<{ items: AdminFunderRow[] }>("/admin/funders"),
+    adminDistributors: () => request<{ items: AdminDistributorRow[] }>("/admin/distributors"),
+    adminRevenue: () => request<AdminRevenue>("/admin/revenue"),
+    adminRisk: () => request<AdminRisk>("/admin/risk"),
+    getSettings: () => request<Settings>("/admin/settings"),
+    updateSettings: (patch) =>
+      request<Settings>("/admin/settings", { method: "PUT", body: JSON.stringify(patch), headers: { "Content-Type": "application/json" } }),
   };
 }

@@ -1,4 +1,4 @@
-// Cessão tokenizada na Devnet (contrato v1.2, §6.4 e §6.5). SIMULAÇÃO: token e moeda sem valor.
+// Cessão tokenizada na Devnet (contrato v1.3, §6.4, §6.5 e §15.3). SIMULAÇÃO: token e moeda sem valor.
 // 1) Token da cessão: Token-2022, supply 1, decimals 0, metadados só com referência e payloadHash, mint revogado.
 // 2) Liquidação atômica pelo programa Anchor de escrow (blockchain/programs/agroflux-escrow), com trava por documento.
 import {
@@ -22,12 +22,15 @@ import {
 import { createInitializeInstruction, createUpdateAuthorityInstruction, createUpdateFieldInstruction, pack, type TokenMetadata } from "@solana/spl-token-metadata";
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction, type Signer } from "@solana/web3.js";
 import bs58 from "bs58";
+import type { DistributorWallets } from "../distributors.js";
 import type { FunderWallets } from "../funders.js";
-import type { AssignmentErrorCode, FunderId } from "../types.js";
+import type { AssignmentErrorCode, DistributorId, FunderId } from "../types.js";
 import { ChainUnavailableError, classifySendError, parseSecret, type Confirmed, type SendOptions } from "./solana.js";
 
 export interface AssignmentParties {
-  distributorWallet: string;
+  // v1.3: uma carteira por distribuidora demo e a tesouraria da AgroFlux (só o endereço público).
+  distributorWallets: DistributorWallets;
+  treasuryWallet: string;
   // v1.2: uma carteira por financiador demo.
   funderWallets: FunderWallets;
   settlementMint: string;
@@ -37,6 +40,9 @@ export interface AssignmentParties {
 export interface SettleInput {
   assetMint: string;
   amount: number;
+  // v1.3: parte de `amount` que vai para a tesouraria da AgroFlux.
+  fee: number;
+  distributorId: DistributorId;
   funderId: FunderId;
   // sha256 (hex) do documento: semente da trava on-chain (§6.5).
   documentSha256: string;
@@ -47,7 +53,7 @@ export interface AssignmentInspection {
   mint: { supply: number; decimals: number; mintAuthorityRevoked: boolean } | null;
   metadataPayloadHash: string | null;
   funderBalance: number | null;
-  settlement: { assetMint: string; settlementMint: string; distributor: string; funder: string; amount: number } | null;
+  settlement: { assetMint: string; settlementMint: string; distributor: string; funder: string; amount: number; fee: number | null; treasury: string | null } | null;
   documentLock: { documentSha256: string; assetMint: string; funder: string; amount: number } | null;
 }
 
@@ -63,7 +69,7 @@ export interface AssignmentGateway {
   ping(): Promise<void>;
   // Cria o token da cessão. `onSubmitted` recebe a assinatura e o endereço da mint antes do envio.
   mintAssetToken(
-    input: { reference: string; payloadHash: string },
+    input: { reference: string; payloadHash: string; distributorId: DistributorId },
     opts: { timeoutMs: number; onSubmitted?: (signature: string, mint: string) => void },
   ): Promise<Confirmed & { mint: string }>;
   // Liquidação atômica: token da cessão ao financiador e `amount` de tBRL-DEMO ao distribuidor, na mesma transação.
@@ -144,15 +150,18 @@ export function settleInstruction(p: {
   assetMint: PublicKey;
   settlementMint: PublicKey;
   amount: number;
+  fee: number;
+  treasury: PublicKey;
   documentSha256: string;
 }): TransactionInstruction {
   const ata = (mint: PublicKey, owner: PublicKey, program: PublicKey) => getAssociatedTokenAddressSync(mint, owner, false, program);
   const hash = Buffer.from(p.documentSha256, "hex");
   if (hash.length !== 32) throw new Error("documentSha256 inválido");
-  const data = Buffer.alloc(48);
+  const data = Buffer.alloc(56);
   SETTLE_DISCRIMINATOR.copy(data, 0);
   data.writeBigUInt64LE(BigInt(p.amount), 8);
-  hash.copy(data, 16);
+  data.writeBigUInt64LE(BigInt(p.fee), 16);
+  hash.copy(data, 24);
   const w = (pubkey: PublicKey, isSigner = false) => ({ pubkey, isSigner, isWritable: true });
   const r = (pubkey: PublicKey, isSigner = false) => ({ pubkey, isSigner, isWritable: false });
   return new TransactionInstruction({
@@ -170,6 +179,8 @@ export function settleInstruction(p: {
       w(ata(p.settlementMint, p.distributor, TOKEN_PROGRAM_ID)),
       w(settlementPda(p.programId, p.assetMint)),
       w(documentLockPda(p.programId, p.documentSha256)),
+      r(p.treasury),
+      w(ata(p.settlementMint, p.treasury, TOKEN_PROGRAM_ID)),
       r(TOKEN_2022_PROGRAM_ID),
       r(TOKEN_PROGRAM_ID),
       r(ASSOCIATED_TOKEN_PROGRAM_ID),
@@ -181,7 +192,17 @@ export function settleInstruction(p: {
 // Leitura das contas Anchor do escrow (8 bytes de discriminador + campos na ordem do struct).
 export function decodeSettlement(data: Buffer) {
   const key = (o: number) => new PublicKey(data.subarray(o, o + 32)).toBase58();
-  return { assetMint: key(8), settlementMint: key(40), distributor: key(72), funder: key(104), amount: Number(data.readBigUInt64LE(136)) };
+  // v1.3: `fee` e `treasury` ficam depois de `settled_at` (144) e `bump` (152). Registros antigos não têm.
+  const v13 = data.length >= 193;
+  return {
+    assetMint: key(8),
+    settlementMint: key(40),
+    distributor: key(72),
+    funder: key(104),
+    amount: Number(data.readBigUInt64LE(136)),
+    fee: v13 ? Number(data.readBigUInt64LE(153)) : null,
+    treasury: v13 ? key(161) : null,
+  };
 }
 
 export function decodeDocumentLock(data: Buffer) {
@@ -192,7 +213,8 @@ export function decodeDocumentLock(data: Buffer) {
 export interface AssignmentEnv {
   rpcUrl: string;
   feePayerSecret: string;
-  distributorSecret: string;
+  distributorSecrets: Record<DistributorId, string>;
+  treasury: string;
   funderSecrets: Record<FunderId, string>;
   settlementMint: string;
   escrowProgramId: string;
@@ -201,7 +223,8 @@ export interface AssignmentEnv {
 export function createAssignmentGateway(env: AssignmentEnv): AssignmentGateway {
   const connection = new Connection(env.rpcUrl, "confirmed");
   const payer = parseSecret(env.feePayerSecret);
-  const distributor = parseSecret(env.distributorSecret);
+  const distributors = Object.fromEntries(Object.entries(env.distributorSecrets).map(([id, s]) => [id, parseSecret(s)])) as Record<DistributorId, Keypair>;
+  const treasury = new PublicKey(env.treasury);
   const funders = Object.fromEntries(Object.entries(env.funderSecrets).map(([id, s]) => [id, parseSecret(s)])) as Record<FunderId, Keypair>;
   const settlementMint = new PublicKey(env.settlementMint);
   const programId = new PublicKey(env.escrowProgramId);
@@ -289,15 +312,23 @@ export function createAssignmentGateway(env: AssignmentEnv): AssignmentGateway {
     }
   }
 
+  function distributorKeypair(id: DistributorId) {
+    const kp = distributors[id];
+    if (!kp) throw new AssignmentFailure("ESCROW_REJECTED");
+    return kp;
+  }
+
   const ix = (input: SettleInput, funder: Keypair) =>
     settleInstruction({
       programId,
       payer: payer.publicKey,
-      distributor: distributor.publicKey,
+      distributor: distributorKeypair(input.distributorId).publicKey,
       funder: funder.publicKey,
       assetMint: new PublicKey(input.assetMint),
       settlementMint,
       amount: input.amount,
+      fee: input.fee,
+      treasury,
       documentSha256: input.documentSha256,
     });
 
@@ -308,7 +339,8 @@ export function createAssignmentGateway(env: AssignmentEnv): AssignmentGateway {
 
   return {
     parties: {
-      distributorWallet: distributor.publicKey.toBase58(),
+      distributorWallets: Object.fromEntries(Object.entries(distributors).map(([id, kp]) => [id, kp.publicKey.toBase58()])) as DistributorWallets,
+      treasuryWallet: treasury.toBase58(),
       funderWallets: Object.fromEntries(Object.entries(funders).map(([id, kp]) => [id, kp.publicKey.toBase58()])) as FunderWallets,
       settlementMint: settlementMint.toBase58(),
       escrowProgramId: programId.toBase58(),
@@ -322,7 +354,8 @@ export function createAssignmentGateway(env: AssignmentEnv): AssignmentGateway {
       }
     },
 
-    async mintAssetToken({ reference, payloadHash }, { timeoutMs, onSubmitted }) {
+    async mintAssetToken({ reference, payloadHash, distributorId }, { timeoutMs, onSubmitted }) {
+      const distributor = distributorKeypair(distributorId);
       const mint = Keypair.generate();
       const metadata: TokenMetadata = {
         mint: mint.publicKey,
@@ -378,13 +411,13 @@ export function createAssignmentGateway(env: AssignmentEnv): AssignmentGateway {
       const funder = funderKeypair(input.funderId);
       await assertFunderBalance(funder, input.amount);
       const documentLock = documentLockPda(programId, input.documentSha256).toBase58();
-      return sendAndPoll(() => [ix(input, funder)], [distributor, funder], timeoutMs, (e) => classifySettleError(e, { documentLock }), onSubmitted);
+      return sendAndPoll(() => [ix(input, funder)], [distributorKeypair(input.distributorId), funder], timeoutMs, (e) => classifySettleError(e, { documentLock }), onSubmitted);
     },
 
     async attemptDoubleSettle(input, { timeoutMs, onSubmitted }) {
       const funder = funderKeypair(input.funderId);
       const deadline = Date.now() + timeoutMs;
-      const { tx, signature } = await prepare(() => [ix(input, funder)], [distributor, funder]);
+      const { tx, signature } = await prepare(() => [ix(input, funder)], [distributorKeypair(input.distributorId), funder]);
       onSubmitted?.(signature);
       try {
         // Sem simulação prévia: a transação entra na rede e a recusa do programa fica registrada.

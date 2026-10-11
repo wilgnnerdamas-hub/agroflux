@@ -1,4 +1,14 @@
 import type {
+  AdminDistributorRow,
+  AdminFunderRow,
+  AdminOverview,
+  AdminReceivableRow,
+  AdminRevenue,
+  AdminRisk,
+  Distributor,
+  PricingReference,
+  Quote,
+  Settings,
   ConfirmationSummary,
   Funder,
   Marketplace,
@@ -19,7 +29,7 @@ import type {
 export interface AgroFluxApi {
   readonly mode: "http" | "mock";
   health(): Promise<Health>;
-  listReceivables(): Promise<ReceivableList>;
+  listReceivables(distributorId?: string): Promise<ReceivableList>;
   createReceivable(input: CreateReceivableInput, document: File, clientSha256?: string): Promise<Receivable>;
   getReceivable(id: string): Promise<Receivable>;
   registerReceivable(id: string, idempotencyKey: string): Promise<Receivable>;
@@ -38,10 +48,22 @@ export interface AgroFluxApi {
   getTerms(): Promise<Terms>;
   publish(id: string, termsVersion: string, idempotencyKey: string): Promise<Receivable>;
   retryPublishRegister(id: string, idempotencyKey: string): Promise<Receivable>;
-  proposeOffer(id: string, input: { funderId: string; monthlyRateBps: number; feesCents: number }): Promise<{ offer: Offer; receivable: Receivable }>;
+  proposeOffer(id: string, input: { funderId: string; spreadBps: number; feesCents: number }): Promise<{ offer: Offer; receivable: Receivable }>;
   listFunders(): Promise<{ items: Funder[] }>;
   getMarketplace(funderId: string): Promise<Marketplace>;
   getPortfolio(funderId: string): Promise<Portfolio>;
   requestDoubleSpendProof(id: string): Promise<Receivable>;
   getTransparency(): Promise<Transparency>;
+  // v1.3 (§15).
+  getPricingReference(): Promise<PricingReference>;
+  quote(id: string, input: { funderId: string; spreadBps: number; feesCents: number }): Promise<Quote>;
+  listDistributors(): Promise<{ items: Distributor[] }>;
+  adminOverview(): Promise<AdminOverview>;
+  adminReceivables(): Promise<{ items: AdminReceivableRow[] }>;
+  adminFunders(): Promise<{ items: AdminFunderRow[] }>;
+  adminDistributors(): Promise<{ items: AdminDistributorRow[] }>;
+  adminRevenue(): Promise<AdminRevenue>;
+  adminRisk(): Promise<AdminRisk>;
+  getSettings(): Promise<Settings>;
+  updateSettings(patch: unknown): Promise<Settings>;
 }

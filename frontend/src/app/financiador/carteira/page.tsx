@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
-import { formatDate, formatMoney, formatRateBps } from "@/lib/format";
+import { formatBps, formatDate, formatMoney, formatRateBps } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { INTERACTIVE_FUNDER_ID } from "@/lib/labels";
 import { useAsync } from "@/lib/useAsync";
@@ -97,7 +97,7 @@ export default function PortfolioPage() {
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                     <div><dt className="text-xs uppercase text-faint">{f.paid}</dt><dd className="font-semibold tabular-nums">{formatMoney(i.paidAmountCents)}</dd></div>
                     <div><dt className="text-xs uppercase text-faint">{f.face}</dt><dd className="font-semibold tabular-nums">{formatMoney(i.faceAmountCents)}</dd></div>
-                    <div><dt className="text-xs uppercase text-faint">{t.proposals.rate}</dt><dd className="tabular-nums">{formatRateBps(i.monthlyRateBps)}</dd></div>
+                    <div><dt className="text-xs uppercase text-faint">{t.proposals.rate}</dt><dd className="tabular-nums">{i.annualRateBps != null ? `${formatBps(i.annualRateBps)} ${t.pricing.perYear}` : formatRateBps(i.monthlyRateBps)}</dd></div>
                     <div><dt className="text-xs uppercase text-faint">{f.dueOn}</dt><dd className="tabular-nums">{formatDate(i.dueDate)}</dd></div>
                   </dl>
                   {i.status === "settled" && (

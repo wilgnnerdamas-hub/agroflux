@@ -7,6 +7,7 @@ import { ApiError, chainUnavailable, invalidState } from "./errors.js";
 import { generateAutomaticOffers } from "./offers.js";
 import { getReceivable, makeEvent, sha256Hex } from "./receivables.js";
 import { CONFIRM_TIMEOUT_MS } from "./registration.js";
+import type { PricingService } from "./pricing/service.js";
 import type { Store } from "./store.js";
 import type { ChainErrorCode, Receivable, Terms } from "./types.js";
 
@@ -32,6 +33,7 @@ export class ListingService {
   constructor(
     private readonly store: Store,
     private readonly chain: ChainGateway,
+    private readonly pricing: PricingService,
     private readonly timeoutMs = CONFIRM_TIMEOUT_MS,
     private readonly log: (msg: string, err?: unknown) => void = () => {},
   ) {}
@@ -70,6 +72,8 @@ export class ListingService {
     } catch (e) {
       throw chainUnavailable(e instanceof ChainUnavailableError ? e.message : undefined);
     }
+    // O preço das propostas automáticas usa o CDI do dia (consulta externa com cache).
+    await this.pricing.reference();
     const r = getReceivable(store, id);
     if (sameClick()) return r;
     check(r);
@@ -87,8 +91,9 @@ export class ListingService {
     r.events.push(
       makeEvent("listing_published", "Publicado para financiadores com termo de coobrigação aceito (simulação)", { termsHash: th, termsVersion: TERMS_VERSION }, { occurredAt: acceptedAt }),
     );
-    generateAutomaticOffers(store, r);
     r.updatedAt = acceptedAt;
+    store.put(r);
+    await generateAutomaticOffers(store, this.pricing, r);
     store.put(r);
     if (key) store.putIdempotency(key, id);
     this.track(id, this.run(id));

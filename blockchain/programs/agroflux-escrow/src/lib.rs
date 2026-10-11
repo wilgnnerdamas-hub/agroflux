@@ -1,9 +1,10 @@
-//! AgroFlux — programa de escrow da cessão tokenizada (contrato v1.2, §6.4 e §6.5). SIMULAÇÃO NA DEVNET.
+//! AgroFlux — programa de escrow da cessão tokenizada (contrato v1.3, §6.4, §6.5 e §15.3). SIMULAÇÃO NA DEVNET.
 //!
 //! Uma única instrução, `settle`, faz a liquidação atômica:
 //! 1. confere os termos (token da cessão único e sem autoridade de mint, moeda com 2 casas, valor, carteiras);
 //! 2. transfere o token da cessão do distribuidor para o financiador;
-//! 3. transfere `amount` da moeda de teste (tBRL-DEMO) do financiador para o distribuidor;
+//! 3. transfere `amount - fee` da moeda de teste (tBRL-DEMO) do financiador para o distribuidor e `fee` para a
+//!    tesouraria da AgroFlux (v1.3), na mesma transação;
 //! 4. grava o registro da liquidação (PDA por token da cessão), o que impede liquidar o mesmo token duas vezes;
 //! 5. grava a trava do documento (PDA por hash do documento), o que impede ceder o mesmo documento de novo,
 //!    mesmo com outro token.
@@ -20,14 +21,17 @@ declare_id!("B3PdnyjFAJua4FbzdfotdZLN3S6LfAXKwavbJNkLxRXa");
 
 pub const SETTLEMENT_SEED: &[u8] = b"settlement";
 pub const DOCUMENT_SEED: &[u8] = b"document";
+/// Tesouraria da AgroFlux (v1.3): única conta que pode receber a taxa da plataforma.
+pub const TREASURY: Pubkey = pubkey!("8j5HxEYAX1hFToDWjBQsvvKYafAc67qr76xjq5K53XVq");
 pub const SETTLEMENT_DECIMALS: u8 = 2;
 
 #[program]
 pub mod agroflux_escrow {
     use super::*;
 
-    pub fn settle(ctx: Context<Settle>, amount: u64, document_hash: [u8; 32]) -> Result<()> {
+    pub fn settle(ctx: Context<Settle>, amount: u64, fee: u64, document_hash: [u8; 32]) -> Result<()> {
         require!(amount > 0, EscrowError::InvalidAmount);
+        require!(fee <= amount, EscrowError::InvalidFee);
         let asset_mint = &ctx.accounts.asset_mint;
         require!(asset_mint.supply == 1 && asset_mint.decimals == 0, EscrowError::AssetNotUnique);
         require!(asset_mint.mint_authority.is_none(), EscrowError::MintAuthorityNotRevoked);
@@ -51,8 +55,8 @@ pub mod agroflux_escrow {
             0,
         )?;
 
-        // Perna 2: tBRL-DEMO, financiador → distribuidor. Sem saldo, o programa de token falha
-        // e a perna 1 é desfeita junto (não há conferência prévia de saldo de propósito: os testes
+        // Perna 2: tBRL-DEMO, financiador → distribuidor (valor menos a taxa). Sem saldo, o programa de token
+        // falha e a perna 1 é desfeita junto (não há conferência prévia de saldo de propósito: os testes
         // provam a reversão).
         token_interface::transfer_checked(
             CpiContext::new(
@@ -64,9 +68,26 @@ pub mod agroflux_escrow {
                     authority: ctx.accounts.funder.to_account_info(),
                 },
             ),
-            amount,
+            amount - fee,
             SETTLEMENT_DECIMALS,
         )?;
+
+        // Perna 3 (v1.3): taxa da AgroFlux, financiador → tesouraria.
+        if fee > 0 {
+            token_interface::transfer_checked(
+                CpiContext::new(
+                    ctx.accounts.settlement_token_program.to_account_info(),
+                    TransferChecked {
+                        from: ctx.accounts.funder_settlement.to_account_info(),
+                        mint: ctx.accounts.settlement_mint.to_account_info(),
+                        to: ctx.accounts.treasury_settlement.to_account_info(),
+                        authority: ctx.accounts.funder.to_account_info(),
+                    },
+                ),
+                fee,
+                SETTLEMENT_DECIMALS,
+            )?;
+        }
 
         let settled_at = Clock::get()?.unix_timestamp;
         ctx.accounts.settlement.set_inner(Settlement {
@@ -77,6 +98,8 @@ pub mod agroflux_escrow {
             amount,
             settled_at,
             bump: ctx.bumps.settlement,
+            fee,
+            treasury: ctx.accounts.treasury.key(),
         });
         ctx.accounts.document_lock.set_inner(DocumentLock {
             document_hash,
@@ -89,6 +112,7 @@ pub mod agroflux_escrow {
         emit!(Settled {
             asset_mint: asset_mint.key(),
             document_hash,
+            fee,
             settlement_mint: ctx.accounts.settlement_mint.key(),
             distributor: ctx.accounts.distributor.key(),
             funder: ctx.accounts.funder.key(),
@@ -100,7 +124,7 @@ pub mod agroflux_escrow {
 }
 
 #[derive(Accounts)]
-#[instruction(amount: u64, document_hash: [u8; 32])]
+#[instruction(amount: u64, fee: u64, document_hash: [u8; 32])]
 pub struct Settle<'info> {
     /// Paga taxas e aluguel das contas novas (carteira do backend).
     #[account(mut)]
@@ -170,6 +194,18 @@ pub struct Settle<'info> {
     )]
     pub document_lock: Account<'info, DocumentLock>,
 
+    /// CHECK: tesouraria da AgroFlux; só recebe. O endereço é fixo no programa (v1.3).
+    #[account(address = TREASURY @ EscrowError::InvalidTreasury)]
+    pub treasury: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = settlement_mint,
+        associated_token::authority = treasury,
+        associated_token::token_program = settlement_token_program,
+    )]
+    pub treasury_settlement: Box<InterfaceAccount<'info, TokenAccount>>,
+
     pub asset_token_program: Program<'info, Token2022>,
     pub settlement_token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -186,6 +222,9 @@ pub struct Settlement {
     pub amount: u64,
     pub settled_at: i64,
     pub bump: u8,
+    // v1.3 (no fim, para manter a posição dos campos antigos).
+    pub fee: u64,
+    pub treasury: Pubkey,
 }
 
 #[account]
@@ -203,6 +242,7 @@ pub struct DocumentLock {
 pub struct Settled {
     pub asset_mint: Pubkey,
     pub document_hash: [u8; 32],
+    pub fee: u64,
     pub settlement_mint: Pubkey,
     pub distributor: Pubkey,
     pub funder: Pubkey,
@@ -224,4 +264,8 @@ pub enum EscrowError {
     AssetNotHeld,
     #[msg("Distribuidor e financiador precisam ser carteiras diferentes.")]
     SameParty,
+    #[msg("A taxa não pode ser maior que o valor da liquidação.")]
+    InvalidFee,
+    #[msg("A tesouraria informada não é a da AgroFlux.")]
+    InvalidTreasury,
 }

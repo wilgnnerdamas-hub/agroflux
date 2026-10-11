@@ -5,7 +5,12 @@ import { ApiError } from "./errors.js";
 import { listFunders } from "./funders.js";
 import { getTerms, type ListingService } from "./listing.js";
 import { marketplace, portfolio } from "./marketplace.js";
-import { listOffers, proposeOffer, selectOffer } from "./offers.js";
+import { listOffers, proposeOffer, quoteOffer, selectOffer } from "./offers.js";
+import type { AdminService } from "./admin.js";
+import { listDistributors } from "./distributors.js";
+import type { PricingService } from "./pricing/service.js";
+import { mergeSettings } from "./pricing/settings.js";
+import type { Receivable } from "./types.js";
 import { transparency } from "./transparency.js";
 import type { AssignmentService } from "./assignment.js";
 import type { ConfirmationService } from "./confirmation.js";
@@ -17,7 +22,7 @@ import type { Health } from "./types.js";
 import { detectMime, validateReceivableInput } from "./validation.js";
 import { verifyReceivable } from "./verification.js";
 
-export const API_VERSION = "1.2.0";
+export const API_VERSION = "1.3.0";
 const FILE_MESSAGE = "Envie um PDF, PNG ou JPEG de até 5 MB.";
 
 export interface RouteDeps {
@@ -28,6 +33,8 @@ export interface RouteDeps {
   listings: ListingService;
   assignments: AssignmentService | null;
   assignmentGateway: AssignmentGateway | null;
+  pricing: PricingService;
+  admin: AdminService;
   demoResetEnabled: boolean;
 }
 
@@ -36,6 +43,7 @@ type OfferParams = { Params: { id: string; offerId: string } };
 type TokenParams = { Params: { token: string } };
 type FunderParams = { Params: { id: string } };
 type MarketQuery = { Querystring: { funderId?: string } };
+type ListQuery = { Querystring: { distributorId?: string } };
 
 const idempotencyKey = (req: FastifyRequest) => {
   const header = req.headers["idempotency-key"];
@@ -60,8 +68,10 @@ async function readMultipart(req: FastifyRequest) {
 }
 
 export async function routes(api: FastifyInstance, deps: RouteDeps) {
-  const { store, chain, registrar, confirmations, listings, assignments, assignmentGateway, demoResetEnabled } = deps;
+  const { store, chain, registrar, confirmations, listings, assignments, assignmentGateway, pricing, admin, demoResetEnabled } = deps;
   const wallets = assignmentGateway?.parties.funderWallets ?? null;
+  // v1.3: toda resposta com recebível leva o risco calculado na hora.
+  const out = (r: Receivable) => pricing.present(r);
 
   api.get("/health", async (): Promise<Health> => {
     const solana = await chain.health();
@@ -75,7 +85,7 @@ export async function routes(api: FastifyInstance, deps: RouteDeps) {
     };
   });
 
-  api.get("/receivables", async () => listReceivables(store));
+  api.get<ListQuery>("/receivables", async (req) => listReceivables(store, pricing, req.query.distributorId));
 
   api.post("/receivables", async (req, reply) => {
     const { data, document } = await readMultipart(req);
@@ -100,49 +110,68 @@ export async function routes(api: FastifyInstance, deps: RouteDeps) {
     const header = req.headers["x-client-sha256"];
     const clientSha256 = Array.isArray(header) ? header[0] : header;
     const receivable = createReceivable(store, result.value, { ...document, mimeType }, clientSha256);
-    return reply.status(201).send(receivable);
+    return reply.status(201).send(out(receivable));
   });
 
-  api.get<IdParams>("/receivables/:id", async (req) => getReceivable(store, req.params.id));
+  api.get<IdParams>("/receivables/:id", async (req) => out(getReceivable(store, req.params.id)));
 
   api.post<IdParams>("/receivables/:id/register", async (req, reply) => {
     const header = req.headers["idempotency-key"];
     const key = (Array.isArray(header) ? header[0] : header)?.trim() || undefined;
     const receivable = await registrar.register(req.params.id, key);
-    return reply.status(202).send({ receivable });
+    return reply.status(202).send({ receivable: out(receivable) });
   });
 
   api.get<IdParams>("/receivables/:id/verification", async (req) => verifyReceivable(store, chain, req.params.id, assignmentGateway));
 
   api.get<IdParams>("/receivables/:id/offers", async (req) => listOffers(store, req.params.id));
 
-  api.post<OfferParams>("/receivables/:id/offers/:offerId/select", async (req) =>
-    selectOffer(store, req.params.id, req.params.offerId),
-  );
+  api.post<OfferParams>("/receivables/:id/offers/:offerId/select", async (req) => out(selectOffer(store, req.params.id, req.params.offerId)));
 
   // v1.2: publicação com termo de coobrigação, propostas, visão do financiador e transparência (§5.15–5.23).
   api.get("/terms", async () => getTerms());
   api.post<IdParams>("/receivables/:id/publish", async (req, reply) => {
     const receivable = await listings.publish(req.params.id, req.body, idempotencyKey(req));
-    return reply.status(202).send({ receivable });
+    return reply.status(202).send({ receivable: out(receivable) });
   });
   api.post<IdParams>("/receivables/:id/publish/register", async (req, reply) => {
     const receivable = await listings.retryRegister(req.params.id, idempotencyKey(req));
-    return reply.status(202).send({ receivable });
+    return reply.status(202).send({ receivable: out(receivable) });
   });
-  api.post<IdParams>("/receivables/:id/offers", async (req, reply) => reply.status(201).send(proposeOffer(store, req.params.id, req.body)));
+  api.post<IdParams>("/receivables/:id/offers", async (req, reply) => {
+    const { offer, receivable } = await proposeOffer(store, pricing, req.params.id, req.body);
+    return reply.status(201).send({ offer, receivable: out(receivable) });
+  });
+  // v1.3 (§15.1): simulação de preço, sem alterar estado.
+  api.post<IdParams>("/receivables/:id/quote", async (req) => quoteOffer(store, pricing, req.params.id, req.body));
+  api.get("/pricing/reference", async () => pricing.reference());
+  api.get("/distributors", async () => ({ items: listDistributors(assignmentGateway?.parties.distributorWallets ?? null) }));
   api.get("/funders", async () => ({ items: listFunders(wallets) }));
-  api.get<MarketQuery>("/marketplace", async (req) => marketplace(store, req.query.funderId));
+  api.get<MarketQuery>("/marketplace", async (req) => marketplace(store, pricing, req.query.funderId));
   api.get<FunderParams>("/funders/:id/portfolio", async (req) => portfolio(store, req.params.id, wallets));
   api.get("/transparency", async () => transparency(store, chain, assignmentGateway));
 
+  // v1.3 (§15.5): painel de administração (sem senha na demo).
+  api.get("/admin/overview", async () => admin.overview());
+  api.get("/admin/receivables", async () => admin.receivables());
+  api.get("/admin/funders", async () => admin.funders());
+  api.get("/admin/distributors", async () => admin.distributors());
+  api.get("/admin/revenue", async () => admin.revenue());
+  api.get("/admin/risk", async () => admin.risk());
+  api.get("/admin/settings", async () => store.getSettings());
+  api.put("/admin/settings", async (req) => {
+    const next = mergeSettings(store.getSettings(), req.body);
+    store.putSettings(next);
+    return next;
+  });
+
   // v1.1: confirmação do sacado (§5.10–5.13).
   api.post<IdParams>("/receivables/:id/debtor-confirmation", async (req, reply) =>
-    reply.status(201).send(confirmations.request(req.params.id)),
+    reply.status(201).send((({ receivable, ...rest }) => ({ ...rest, receivable: out(receivable) }))(confirmations.request(req.params.id))),
   );
   api.post<IdParams>("/receivables/:id/debtor-confirmation/register", async (req, reply) => {
     const receivable = await confirmations.retryRegister(req.params.id, idempotencyKey(req));
-    return reply.status(202).send({ receivable });
+    return reply.status(202).send({ receivable: out(receivable) });
   });
   api.get<TokenParams>("/confirmations/:token", async (req) => confirmations.getSummary(req.params.token));
   api.post<TokenParams>("/confirmations/:token/confirm", async (req, reply) =>
@@ -154,18 +183,18 @@ export async function routes(api: FastifyInstance, deps: RouteDeps) {
   if (assignments) {
     api.post<IdParams>("/receivables/:id/assignment", async (req, reply) => {
       const receivable = await assignments.request(req.params.id, idempotencyKey(req));
-      return reply.status(202).send({ receivable });
+      return reply.status(202).send({ receivable: out(receivable) });
     });
     api.post<IdParams>("/receivables/:id/assignment/double-spend-test", async (req, reply) => {
       const receivable = await assignments.requestDoubleSpendProof(req.params.id);
-      return reply.status(202).send({ receivable });
+      return reply.status(202).send({ receivable: out(receivable) });
     });
   }
 
   // Só existe com DEMO_RESET_ENABLED=true; sem isso, cai no 404 padrão.
   if (demoResetEnabled) {
     api.post("/demo/reset", async (_req, reply) => {
-      await resetDemo(store, registrar, confirmations, listings);
+      await resetDemo(store, registrar, confirmations, listings, assignments);
       return reply.status(204).send();
     });
   }

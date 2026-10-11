@@ -41,12 +41,17 @@ function wallet(key: string, label: string): Keypair {
 }
 
 const distributor = wallet("DEMO_DISTRIBUTOR_SECRET", "distribuidor demo");
+// v1.3: distribuidoras B e C (só recebem tBRL-DEMO; as contas de token são criadas na liquidação).
+const distributorB = wallet("DEMO_DISTRIBUTOR_B_SECRET", "distribuidora demo B");
+const distributorC = wallet("DEMO_DISTRIBUTOR_C_SECRET", "distribuidora demo C");
 const funders = [
   { label: "Financiador Demo A", kp: wallet("DEMO_FUNDER_SECRET", "financiador demo A") },
   { label: "Financiador Demo B", kp: wallet("DEMO_FUNDER_B_SECRET", "financiador demo B") },
   { label: "Financiador Demo C", kp: wallet("DEMO_FUNDER_C_SECRET", "financiador demo C") },
 ];
 console.log(`Distribuidor demo:  ${distributor.publicKey.toBase58()}`);
+console.log(`Distribuidora B:    ${distributorB.publicKey.toBase58()}`);
+console.log(`Distribuidora C:    ${distributorC.publicKey.toBase58()}`);
 for (const f of funders) console.log(`${f.label}: ${f.kp.publicKey.toBase58()}`);
 
 let mint = get("TBRL_MINT");

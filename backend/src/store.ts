@@ -3,7 +3,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { emptyAssignment, emptyDebtorConfirmation, emptyListing, emptyRegistry } from "./receivables.js";
-import type { Offer, Receivable } from "./types.js";
+import { defaultSettings } from "./pricing/settings.js";
+import type { Offer, Receivable, RevenueEntry, Settings } from "./types.js";
 
 export interface DbShape {
   seq: number;
@@ -16,6 +17,9 @@ export interface DbShape {
   submissions: Record<string, string>;
   // v1.1: hash do token de confirmação → estado do link. O token em si nunca é guardado.
   confirmationTokens: Record<string, ConfirmationToken>;
+  // v1.3: configurações de operação e lançamentos de receita da AgroFlux.
+  settings: Settings;
+  revenue: RevenueEntry[];
 }
 
 export interface ConfirmationToken {
@@ -24,17 +28,22 @@ export interface ConfirmationToken {
   state: "active" | "used" | "revoked";
 }
 
-const empty = (): DbShape => ({ seq: 0, registrySeq: 0, receivables: {}, offers: {}, idempotency: {}, submissions: {}, confirmationTokens: {} });
+const empty = (): DbShape => ({ seq: 0, registrySeq: 0, receivables: {}, offers: {}, idempotency: {}, submissions: {}, confirmationTokens: {}, settings: defaultSettings(), revenue: [] });
 
 // Dados gravados por versões anteriores não têm os blocos novos: completa ao carregar.
 function migrate(db: DbShape): DbShape {
   db.registrySeq ??= 0;
+  db.settings = { ...defaultSettings(), ...db.settings };
+  db.revenue ??= [];
   for (const r of Object.values(db.receivables)) {
     r.debtorConfirmation ??= emptyDebtorConfirmation();
     const a = emptyAssignment();
     r.assignment = { ...a, ...r.assignment, explorerUrls: { ...a.explorerUrls, ...r.assignment?.explorerUrls } };
     r.registry ??= emptyRegistry();
     r.listing ??= emptyListing();
+    // v1.3: dados antigos pertencem à Distribuidora Demo.
+    r.distributor = { id: (r.distributor as { id?: Receivable["distributor"]["id"] }).id ?? "dst_a", name: r.distributor.name };
+    delete r.risk;
   }
   for (const offers of Object.values(db.offers)) {
     for (const o of offers) {
@@ -77,6 +86,8 @@ export class Store {
   }
 
   put(r: Receivable) {
+    // O risco é calculado a cada leitura e não é persistido.
+    if (r.risk) delete r.risk;
     this.db.receivables[r.id] = r;
     this.save();
   }
@@ -135,8 +146,29 @@ export class Store {
     return fs.existsSync(file) ? fs.readFileSync(file) : null;
   }
 
+  getSettings(): Settings {
+    return this.db.settings;
+  }
+
+  putSettings(s: Settings) {
+    this.db.settings = s;
+    this.save();
+  }
+
+  revenue(): RevenueEntry[] {
+    return this.db.revenue;
+  }
+
+  addRevenue(entry: RevenueEntry) {
+    if (this.db.revenue.some((e) => e.receivableId === entry.receivableId)) return;
+    this.db.revenue.push(entry);
+    this.save();
+  }
+
   reset() {
-    this.db = empty();
+    // As configurações da operação sobrevivem ao reset da demo.
+    const settings = this.db.settings;
+    this.db = { ...empty(), settings };
     fs.rmSync(this.uploadsDir, { recursive: true, force: true });
     fs.mkdirSync(this.uploadsDir, { recursive: true });
     this.save();

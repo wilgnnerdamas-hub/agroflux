@@ -1,4 +1,4 @@
-// Testes do escrow da cessão (contrato v1.2, §6.4 e §6.5): caminho feliz e casos de falha, provando que nenhuma perna acontece.
+// Testes do escrow da cessão (contrato v1.3, §6.4, §6.5 e §15.3): caminho feliz e casos de falha, provando que nenhuma perna acontece.
 import * as anchor from "@anchor-lang/core";
 import { Program } from "@anchor-lang/core";
 import {
@@ -89,9 +89,11 @@ const settlementPda = (assetMint: PublicKey) =>
 const documentPda = (hash: number[]) =>
   PublicKey.findProgramAddressSync([Buffer.from("document"), Buffer.from(hash)], program.programId)[0];
 
-function settle(assetMint: PublicKey, amount: number, hash: number[], who: Keypair = funder) {
+const TREASURY = new PublicKey("8j5HxEYAX1hFToDWjBQsvvKYafAc67qr76xjq5K53XVq");
+
+function settle(assetMint: PublicKey, amount: number, hash: number[], who: Keypair = funder, fee = 0) {
   return program.methods
-    .settle(new anchor.BN(amount), hash)
+    .settle(new anchor.BN(amount), new anchor.BN(fee), hash)
     .accounts({
       payer: payer.publicKey,
       distributor: distributor.publicKey,
@@ -214,6 +216,54 @@ describe("agroflux-escrow", () => {
     // A trava continua apontando para o primeiro token.
     const lock = await program.account.documentLock.fetch(documentPda(hash));
     assert.ok(lock.assetMint.equals(first));
+  });
+
+  it("v1.3: taxa da AgroFlux vai para a tesouraria na mesma transação", async () => {
+    const asset = await createAssetToken("AGF-0006");
+    const fBefore = await balance(tbrl, funder.publicKey, TOKEN_PROGRAM_ID);
+    const dBefore = (await balance(tbrl, distributor.publicKey, TOKEN_PROGRAM_ID)) ?? 0;
+    const tBefore = (await balance(tbrl, TREASURY, TOKEN_PROGRAM_ID)) ?? 0;
+    await settle(asset, 10_000, docHash("doc-6"), funder, 750);
+    assert.equal(await balance(tbrl, funder.publicKey, TOKEN_PROGRAM_ID), fBefore! - 10_000);
+    assert.equal(await balance(tbrl, distributor.publicKey, TOKEN_PROGRAM_ID), dBefore + 9_250);
+    assert.equal(await balance(tbrl, TREASURY, TOKEN_PROGRAM_ID), tBefore + 750);
+    const record = await program.account.settlement.fetch(settlementPda(asset));
+    assert.equal(record.fee.toNumber(), 750);
+    assert.ok(record.treasury.equals(TREASURY));
+  });
+
+  it("v1.3: recusa taxa maior que o valor e tesouraria diferente", async () => {
+    const asset = await createAssetToken("AGF-0007");
+    let err: unknown;
+    try {
+      await settle(asset, 100, docHash("doc-7"), funder, 101);
+    } catch (e) {
+      err = e;
+    }
+    assert.match(String(err), /InvalidFee/);
+
+    const other = Keypair.generate().publicKey;
+    err = undefined;
+    try {
+      await program.methods
+        .settle(new anchor.BN(100), new anchor.BN(10), docHash("doc-7"))
+        .accountsPartial({
+          payer: payer.publicKey,
+          distributor: distributor.publicKey,
+          funder: funder.publicKey,
+          assetMint: asset,
+          settlementMint: tbrl,
+          settlementTokenProgram: TOKEN_PROGRAM_ID,
+          treasury: other,
+          treasurySettlement: getAssociatedTokenAddressSync(tbrl, other),
+        })
+        .signers([distributor, funder])
+        .rpc({ commitment: "confirmed" });
+    } catch (e) {
+      err = e;
+    }
+    assert.match(String(err), /InvalidTreasury|ConstraintAddress|2012/);
+    assert.equal(await balance(asset, distributor.publicKey, TOKEN_2022_PROGRAM_ID), 1);
   });
 
   it("recusa token com autoridade de mint ativa (termos divergentes)", async () => {

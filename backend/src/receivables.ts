@@ -17,6 +17,8 @@ import type {
   ReceivableSummary,
 } from "./types.js";
 import { daysBetween } from "./validation.js";
+import { distributorName } from "./distributors.js";
+import type { PricingService } from "./pricing/service.js";
 
 export const newId = (prefix: string) => `${prefix}_${randomBytes(8).toString("hex")}`;
 export const sha256Hex = (bytes: Buffer | string) => createHash("sha256").update(bytes).digest("hex");
@@ -69,6 +71,8 @@ export function emptyAssignment(): Assignment {
     funderName: null,
     documentLock: null,
     doubleSpendProof: null,
+    platformFeeAmount: null,
+    treasuryWallet: null,
   };
 }
 
@@ -149,7 +153,7 @@ export function createReceivable(
     reference,
     status: "created",
     isDemo: true,
-    distributor: { name: DISTRIBUTOR_NAME },
+    distributor: { id: input.distributorId ?? "dst_a", name: distributorName(input.distributorId ?? "dst_a") },
     debtor: input.debtor,
     product: input.product,
     cropSeason: input.cropSeason,
@@ -178,7 +182,14 @@ export function createReceivable(
     selectedOfferId: null,
     debtorConfirmation: emptyDebtorConfirmation(),
     assignment: emptyAssignment(),
-    registry: { ...emptyRegistry(), status: "registered", registryId, registeredAt: createdAt, documentSha256: sha256 },
+    registry: {
+      ...emptyRegistry(),
+      status: "registered",
+      registryId,
+      registeredAt: createdAt,
+      documentSha256: sha256,
+      creditor: { kind: "distributor", name: distributorName(input.distributorId ?? "dst_a"), wallet: null },
+    },
     listing: emptyListing(),
     createdAt,
     updatedAt: createdAt,
@@ -193,7 +204,7 @@ export function getReceivable(store: Store, id: string): Receivable {
   return r;
 }
 
-const toSummary = (r: Receivable, offerCount = 0): ReceivableSummary => ({
+const toSummary = (r: Receivable, offerCount = 0, risk: ReceivableSummary["risk"] = null): ReceivableSummary => ({
   id: r.id,
   reference: r.reference,
   status: r.status,
@@ -209,16 +220,21 @@ const toSummary = (r: Receivable, offerCount = 0): ReceivableSummary => ({
   registry: { registryId: r.registry.registryId },
   listing: { status: r.listing.status },
   offerCount,
+  distributor: r.distributor,
+  risk,
   createdAt: r.createdAt,
 });
 export { toSummary };
 
 const REGISTERED: Receivable["status"][] = ["registered", "published", "offer_selected", "assignment_pending", "assigned", "assignment_failed"];
 
-export function listReceivables(store: Store): ReceivableList {
-  const all = store.all().sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+export function listReceivables(store: Store, pricing: PricingService | null = null, distributorId?: string): ReceivableList {
+  const all = store
+    .all()
+    .filter((r) => !distributorId || r.distributor.id === distributorId)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
   return {
-    items: all.slice(0, 100).map((r) => toSummary(r, store.getOffers(r.id)?.length ?? 0)),
+    items: all.slice(0, 100).map((r) => toSummary(r, store.getOffers(r.id)?.length ?? 0, pricing ? pricing.summaryRisk(r) : null)),
     totals: {
       count: all.length,
       amountCents: all.reduce((s, r) => s + r.amountCents, 0),

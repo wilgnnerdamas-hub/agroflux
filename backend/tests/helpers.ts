@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { buildApp } from "../src/app.js";
 import type { AssignmentGateway } from "../src/chain/assignment.js";
 import type { ChainGateway } from "../src/chain/solana.js";
+import { fixedCdi, type CdiProvider } from "../src/pricing/cdi.js";
 import { loadConfig } from "../src/config.js";
 
 export const PDF = Buffer.from("%PDF-1.4\n% documento de teste AgroFlux\n%%EOF\n");
@@ -60,6 +61,7 @@ export async function createConfirmed(built: Awaited<ReturnType<typeof makeApp>>
   return r;
 }
 
+export const TODAY = "2026-10-10";
 export const PUBLISH_BODY = { acceptTerms: true, termsVersion: "coobrigacao-demo-v1" };
 
 // Cria, registra, confirma e publica (termo aceito): pronto para receber e aceitar propostas.
@@ -81,11 +83,20 @@ export async function createRegistered(built: Awaited<ReturnType<typeof makeApp>
 
 export async function makeApp(
   chain: ChainGateway = fakeChain(),
-  opts: { dataDir?: string; confirmTimeoutMs?: number; env?: Record<string, string>; assignmentGateway?: AssignmentGateway } = {},
+  opts: { dataDir?: string; confirmTimeoutMs?: number; env?: Record<string, string>; assignmentGateway?: AssignmentGateway; cdiProvider?: CdiProvider; today?: string } = {},
 ) {
   const dataDir = opts.dataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "agroflux-test-"));
   const config = loadConfig({ FRONTEND_ORIGIN: "http://localhost:3000", DATA_DIR: dataDir, ...opts.env });
-  const built = await buildApp({ config, chain, confirmTimeoutMs: opts.confirmTimeoutMs, assignmentGateway: opts.assignmentGateway });
+  // v1.3: CDI fixo (14,90% a.a.) e data de cálculo fixa, para o preço ser determinístico e sem rede externa.
+  const today = opts.today ?? TODAY;
+  const built = await buildApp({
+    config,
+    chain,
+    confirmTimeoutMs: opts.confirmTimeoutMs,
+    assignmentGateway: opts.assignmentGateway,
+    cdiProvider: opts.cdiProvider ?? fixedCdi(1490),
+    today: () => today,
+  });
   return { ...built, dataDir };
 }
 

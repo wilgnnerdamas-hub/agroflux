@@ -91,3 +91,8 @@ export function daysBetween(fromISO: string, toISO: string): number {
   };
   return Math.round((toUTC(toISO) - toUTC(fromISO)) / 86_400_000);
 }
+
+/** Pontos-base em percentual: 1835 → "18,35%". */
+export function formatBps(bps: number, digits = 2): string {
+  return `${(bps / 100).toLocaleString(LOCALE, { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
+}

@@ -74,8 +74,8 @@ describe("propostas simuladas (v1.2)", () => {
     const r = { id: "rcv_abc", amountCents: 15_000_000, termDays: 157 };
     expect(offerTerms(r)).toEqual(offerTerms({ ...r }));
     for (const t of offerTerms(r)) {
-      expect(t.monthlyRateBps).toBeGreaterThanOrEqual(120);
-      expect(t.monthlyRateBps).toBeLessThanOrEqual(250);
+      expect(t.jitterBps).toBeGreaterThanOrEqual(0);
+      expect(t.jitterBps).toBeLessThanOrEqual(30);
       expect(t.feesCents).toBeGreaterThanOrEqual(5_000);
       expect(t.feesCents).toBeLessThanOrEqual(30_000);
     }
@@ -102,7 +102,11 @@ describe("propostas simuladas (v1.2)", () => {
     for (const o of first.items as Offer[]) {
       expect(o).toMatchObject({ receivableId: id, isSimulated: true, origin: "automatic", grossAmountCents: 15_000_000, termDays: 165, status: "available" });
       expect(o.id).toMatch(/^ofr_/);
-      expect(o.netAmountCents).toBe(netAmount(o.grossAmountCents, o.monthlyRateBps, o.termDays, o.feesCents));
+      // v1.3: CDI + spread em dias úteis; líquido = aporte − taxa AgroFlux − tarifa de registro.
+      expect(o.cdiBps).toBe(1490);
+      expect(o.funderCashOutCents).toBe(o.presentValueCents! - o.feesCents - o.iofCents!);
+      expect(o.netAmountCents).toBe(o.funderCashOutCents! - o.platformFeeCents! - o.registryFeeCents!);
+      expect(o.platformFeeCents).toBe(75_000);
     }
     expect(first.items.map((o: Offer) => o.funder.id)).toEqual(["fnd_b", "fnd_c"]);
     expect(first.items.map((o: Offer) => o.funder.type)).toEqual(["simulated_bank", "simulated_cooperative"]);

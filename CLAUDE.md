@@ -88,6 +88,12 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
     **v1.2 em produção (10/10):** fluxo completo testado na Devnet real (verificação 11/11, prova de recusa on-chain);
     roteiro novo em `docs/roteiro-demo.md`. Falta: gravação de reserva.
 
+**10/10 (madrugada): v1.3** (contrato §15, decisão G4)
+16. Precificação CDI + spread em dias úteis, risco AA–H, taxa AgroFlux on-chain (escrow com 3ª perna para a tesouraria),
+    três distribuidoras demo e painel `/admin`. Escrow 7/7, backend 91 testes, e2e 14/14. Falta: atualizar o programa
+    na Devnet junto com o deploy (o backend v1.2 em produção não fala com o programa v1.3) e criar no Railway
+    `DEMO_DISTRIBUTOR_B_SECRET` e `DEMO_DISTRIBUTOR_C_SECRET`.
+
 **12/10: só correções críticas e submissão.**
 
 ## Comandos do backend (dentro de `backend/`)

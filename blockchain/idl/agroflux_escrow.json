@@ -341,6 +341,67 @@
           }
         },
         {
+          "name": "treasury",
+          "address": "8j5HxEYAX1hFToDWjBQsvvKYafAc67qr76xjq5K53XVq"
+        },
+        {
+          "name": "treasury_settlement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "treasury"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_token_program"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
           "name": "asset_token_program",
           "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
         },
@@ -359,6 +420,10 @@
       "args": [
         {
           "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "fee",
           "type": "u64"
         },
         {
@@ -446,6 +511,16 @@
       "code": 6005,
       "name": "SameParty",
       "msg": "Distribuidor e financiador precisam ser carteiras diferentes."
+    },
+    {
+      "code": 6006,
+      "name": "InvalidFee",
+      "msg": "A taxa não pode ser maior que o valor da liquidação."
+    },
+    {
+      "code": 6007,
+      "name": "InvalidTreasury",
+      "msg": "A tesouraria informada não é a da AgroFlux."
     }
   ],
   "types": [
@@ -505,6 +580,10 @@
             }
           },
           {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
             "name": "settlement_mint",
             "type": "pubkey"
           },
@@ -559,6 +638,14 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
           }
         ]
       }

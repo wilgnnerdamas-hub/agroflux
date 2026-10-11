@@ -88,7 +88,7 @@ export default function TransparencyPage() {
                 {d.wallets.map((w) => (
                   <AddressRow
                     key={w.address}
-                    label={w.role === "fee_payer" ? tr.feePayer : w.role === "distributor" ? t.assignment.distributorWallet : w.label}
+                    label={w.role === "fee_payer" ? tr.feePayer : w.role === "treasury" ? `${t.admin.treasury} AgroFlux` : w.label}
                     address={w.address}
                     url={w.explorerUrl}
                     aside={

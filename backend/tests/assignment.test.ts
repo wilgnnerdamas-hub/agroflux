@@ -7,6 +7,8 @@ const MINT = "AssetMint1111111111111111111111111111111111";
 const SIG = (n: string) => `TestSig${n}`.padEnd(88, "1");
 
 const WALLETS = { fnd_a: "FunderA111", fnd_b: "FunderB111", fnd_c: "FunderC111" };
+const DISTRIBUTORS = { dst_a: "Distributor111", dst_b: "DistributorB111", dst_c: "DistributorC111" };
+const TREASURY = "Treasury111";
 const LOCK = "DocLock111";
 let inspectPayloadHash: string | null = null;
 
@@ -17,7 +19,7 @@ function fakeAssignment(over: Partial<AssignmentGateway> = {}): AssignmentGatewa
   return {
     calls,
     settled,
-    parties: { distributorWallet: "Distributor111", funderWallets: WALLETS, settlementMint: "TbrlMint111", escrowProgramId: "Escrow111" },
+    parties: { distributorWallets: DISTRIBUTORS, treasuryWallet: TREASURY, funderWallets: WALLETS, settlementMint: "TbrlMint111", escrowProgramId: "Escrow111" },
     ping: async () => {},
     mintAssetToken: async (_input, opts) => {
       calls.mint++;
@@ -42,7 +44,7 @@ function fakeAssignment(over: Partial<AssignmentGateway> = {}): AssignmentGatewa
         mint: { supply: 1, decimals: 0, mintAuthorityRevoked: true },
         metadataPayloadHash: inspectPayloadHash,
         funderBalance: 1,
-        settlement: s ? { assetMint: s.assetMint, settlementMint: "TbrlMint111", distributor: "Distributor111", funder: WALLETS[funderId], amount: s.amount } : null,
+        settlement: s ? { assetMint: s.assetMint, settlementMint: "TbrlMint111", distributor: "Distributor111", funder: WALLETS[funderId], amount: s.amount, fee: s.fee, treasury: TREASURY } : null,
         documentLock: s ? { documentSha256, assetMint: s.assetMint, funder: WALLETS[funderId], amount: s.amount } : null,
       };
     },
@@ -91,7 +93,7 @@ describe("cessão tokenizada (função B)", () => {
     expect(res.statusCode).toBe(202);
     const pending = res.json().receivable;
     expect(pending.status).toBe("assignment_pending");
-    expect(pending.assignment).toMatchObject({ status: "pending", offerId: offer.id, settlementAmount: offer.netAmountCents, settlementAsset: "tBRL-DEMO", isSimulated: true });
+    expect(pending.assignment).toMatchObject({ status: "pending", offerId: offer.id, settlementAmount: offer.funderCashOutCents, platformFeeAmount: offer.platformFeeCents + offer.registryFeeCents, treasuryWallet: TREASURY, settlementAsset: "tBRL-DEMO", isSimulated: true });
 
     await built.assignments!.settle();
     const r = (await built.app.inject({ method: "GET", url: `/api/v1/receivables/${id}` })).json();
@@ -110,7 +112,21 @@ describe("cessão tokenizada (função B)", () => {
       documentLock: LOCK,
       error: null,
     });
-    expect(gw.settled[0]).toMatchObject({ assetMint: MINT, amount: offer.netAmountCents, funderId: "fnd_b", documentSha256: r.documents[0].sha256 });
+    expect(gw.settled[0]).toMatchObject({
+      assetMint: MINT,
+      amount: offer.funderCashOutCents,
+      fee: offer.platformFeeCents + offer.registryFeeCents,
+      distributorId: "dst_a",
+      funderId: "fnd_b",
+      documentSha256: r.documents[0].sha256,
+    });
+    // O líquido da distribuidora é o aporte menos a taxa da AgroFlux e a tarifa de registro.
+    expect(offer.funderCashOutCents - offer.platformFeeCents - offer.registryFeeCents).toBe(offer.netAmountCents);
+    // v1.3: receita da AgroFlux registrada na liquidação.
+    const rev = (await built.app.inject({ method: "GET", url: "/api/v1/admin/revenue" })).json();
+    expect(rev.totals).toEqual({ platformFeeCents: 75_000, registryFeeCents: 2_500, count: 1 });
+    expect(rev.entries[0]).toMatchObject({ reference: r.reference, distributorId: "dst_a", funderId: "fnd_b", settlementSignature: SIG("Settle") });
+    expect(rev.treasuryWallet).toBe(TREASURY);
     // v1.2: a registradora simulada passou o crédito ao financiador e mudou o domicílio de pagamento.
     expect(r.registry.creditor).toEqual({ kind: "funder", name: "Financiador Demo B", wallet: "FunderB111" });
     expect(r.registry.paymentDomicile.payeeName).toBe("Financiador Demo B");
@@ -118,13 +134,14 @@ describe("cessão tokenizada (função B)", () => {
     expect(r.assignment.explorerUrls.tokenMint).toBe(`https://explorer.solana.com/address/${MINT}?cluster=devnet`);
     expect(r.assignment.explorerUrls.settlement).toContain(SIG("Settle"));
     expect(r.events.map((e: { type: string }) => e.type).slice(-4)).toEqual(["assignment_requested", "assignment_token_minted", "assignment_settled", "registry_creditor_updated"]);
-    expect(r.events.at(-2)).toMatchObject({ onChain: true, data: { settlementAmount: offer.netAmountCents, settlementAsset: "tBRL-DEMO" } });
+    expect(r.events.at(-2)).toMatchObject({ onChain: true, data: { settlementAmount: offer.funderCashOutCents, settlementAsset: "tBRL-DEMO" } });
 
     // v1.2: carteira do financiador B mostra a cessão; a de A continua vazia.
     const pf = (await built.app.inject({ method: "GET", url: "/api/v1/funders/fnd_b/portfolio" })).json();
     expect(pf.items).toHaveLength(1);
-    expect(pf.items[0]).toMatchObject({ reference: r.reference, status: "settled", faceAmountCents: 15_000_000, paidAmountCents: offer.netAmountCents, monthlyRateBps: offer.monthlyRateBps });
-    expect(pf.totals).toEqual({ count: 1, paidAmountCents: offer.netAmountCents, faceAmountCents: 15_000_000, projectedIncomeCents: 15_000_000 - offer.netAmountCents });
+    expect(pf.items[0]).toMatchObject({ reference: r.reference, status: "settled", faceAmountCents: 15_000_000, paidAmountCents: offer.presentValueCents - offer.feesCents, annualRateBps: offer.annualRateBps, spreadBps: offer.spreadBps });
+    const paid = offer.presentValueCents - offer.feesCents;
+    expect(pf.totals).toEqual({ count: 1, paidAmountCents: paid, faceAmountCents: 15_000_000, projectedIncomeCents: 15_000_000 - paid });
     expect((await built.app.inject({ method: "GET", url: "/api/v1/funders/fnd_a/portfolio" })).json().items).toHaveLength(0);
 
     const list = (await built.app.inject({ method: "GET", url: "/api/v1/receivables" })).json();
@@ -268,7 +285,7 @@ describe("cessão tokenizada (função B)", () => {
 
     const t = (await built.app.inject({ method: "GET", url: "/api/v1/transparency" })).json();
     expect(t.stats).toMatchObject({ assigned: 1, doubleSpendRejected: 1, published: 1 });
-    expect(t.wallets.map((w: { role: string }) => w.role)).toEqual(["distributor", "funder", "funder", "funder"]);
+    expect(t.wallets.map((w: { role: string }) => w.role)).toEqual(["treasury", "distributor", "distributor", "distributor", "funder", "funder", "funder"]);
     expect(t.programs.map((p: { role: string }) => p.role)).toEqual(["memo", "escrow", "token_2022"]);
   });
 

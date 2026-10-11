@@ -9,9 +9,11 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { nextStep, type NextStep } from "@/lib/nextStep";
 import { useAsync } from "@/lib/useAsync";
+import { useRole } from "@/lib/role";
 import type { ReceivableList, ReceivableSummary } from "@/lib/types";
 import { ButtonLink, EmptyState, ErrorState, PageHeader, Skeleton, cx } from "@/components/ui";
 import { offersSeen } from "@/components/passport/ProposalsPanel";
+import { RatingBadge } from "@/components/RiskCard";
 
 const REFRESH_MS = 6000;
 
@@ -75,7 +77,9 @@ function KpiRow({ data }: { data?: ReceivableList }) {
 export default function DistributorDashboard() {
   const { t } = useI18n();
   const d = t.dashboard;
-  const { state, reload } = useAsync(() => api.listReceivables());
+  // v1.3: cada distribuidora demo vê só os próprios recebíveis.
+  const { distributorId, distributorName } = useRole();
+  const { state, reload } = useAsync(() => api.listReceivables(distributorId), [distributorId]);
   const data = state.data;
   const isNew = useNewOffers(data?.items);
 
@@ -99,6 +103,7 @@ export default function DistributorDashboard() {
     <>
       <PageHeader
         title={d.title}
+        subtitle={distributorName}
         actions={
           <ButtonLink href="/recebiveis/novo">
             <Plus className="h-4 w-4" aria-hidden /> {d.new}
@@ -159,7 +164,12 @@ export default function DistributorDashboard() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums">{formatMoney(r.amountCents)}</td>
                       <td className="whitespace-nowrap px-4 py-3 tabular-nums">{formatDate(r.dueDate)}</td>
-                      <td className="px-4 py-3"><StepPill step={nextStep(r, t)} /></td>
+                      <td className="px-4 py-3">
+                        <span className="flex items-center gap-2">
+                          <StepPill step={nextStep(r, t)} />
+                          {r.risk && <RatingBadge rating={r.risk.rating} />}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">{proposals(r)}</td>
                       <td className="px-2 py-3 text-faint group-hover:text-ink"><ChevronRight className="h-4 w-4" aria-hidden /></td>
                     </tr>

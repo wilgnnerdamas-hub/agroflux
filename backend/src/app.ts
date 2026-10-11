@@ -8,6 +8,9 @@ import { AssignmentService } from "./assignment.js";
 import { createAssignmentGateway, type AssignmentGateway } from "./chain/assignment.js";
 import { ConfirmationService } from "./confirmation.js";
 import { ListingService } from "./listing.js";
+import { AdminService } from "./admin.js";
+import { createCdiProvider, type CdiProvider } from "./pricing/cdi.js";
+import { PricingService } from "./pricing/service.js";
 import { Registrar } from "./registration.js";
 import { routes } from "./routes.js";
 import { Store } from "./store.js";
@@ -21,16 +24,19 @@ export interface AppDeps {
   confirmTimeoutMs?: number;
   // Dublê da cessão nos testes. Em produção é criado a partir do config.
   assignmentGateway?: AssignmentGateway;
+  // v1.3: CDI e data de cálculo injetáveis nos testes.
+  cdiProvider?: CdiProvider;
+  today?: () => string;
 }
 
-export async function buildApp({ config, chain, store = new Store(config.dataDir), confirmTimeoutMs, assignmentGateway }: AppDeps) {
+export async function buildApp({ config, chain, store = new Store(config.dataDir), confirmTimeoutMs, assignmentGateway, cdiProvider, today }: AppDeps) {
   const app = Fastify({
     logger: process.env.NODE_ENV === "test" ? false : { level: "info" },
   });
 
   await app.register(cors, {
     origin: config.frontendOrigins,
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Accept", "Idempotency-Key", "X-Client-Sha256"],
   });
   await app.register(multipart, {
@@ -47,7 +53,10 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
   registrar.resumePending();
   const confirmations = new ConfirmationService(store, chain, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
   confirmations.resumePending();
-  const listings = new ListingService(store, chain, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
+  const bcb = cdiProvider ?? createCdiProvider();
+  const cdi: CdiProvider = config.cdiFromBcb || cdiProvider ? bcb : (opts) => bcb({ ...opts, source: "manual" });
+  const pricing = new PricingService(store, cdi, today);
+  const listings = new ListingService(store, chain, pricing, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
   listings.resumePending();
 
   // Função B só liga com ASSIGNMENT_ENABLED=true e a configuração completa (§5.14).
@@ -65,7 +74,7 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
       assignments.resumePending();
     } else {
       app.log.warn(
-        "ASSIGNMENT_ENABLED=true, mas faltam DEMO_DISTRIBUTOR_SECRET, DEMO_FUNDER_SECRET, DEMO_FUNDER_B_SECRET, DEMO_FUNDER_C_SECRET, TBRL_MINT ou ESCROW_PROGRAM_ID. Cessão desligada.",
+        "ASSIGNMENT_ENABLED=true, mas faltam carteiras (DEMO_DISTRIBUTOR_SECRET, _B_, _C_, DEMO_FUNDER_SECRET, _B_, _C_), TBRL_MINT ou ESCROW_PROGRAM_ID. Cessão desligada.",
       );
     }
   }
@@ -79,7 +88,9 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
     listings,
     assignments,
     assignmentGateway: activeGateway,
+    pricing,
+    admin: new AdminService(store, pricing, activeGateway),
     demoResetEnabled: config.demoResetEnabled,
   });
-  return { app, registrar, confirmations, listings, assignments, store };
+  return { app, registrar, confirmations, listings, assignments, store, pricing };
 }
