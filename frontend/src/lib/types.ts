@@ -188,6 +188,9 @@ export interface Risk {
   spreadBaseBps: number;
   factors: RiskFactor[];
   producerHistory: { isSimulated: true; seasons: number; onTimeRate: number; maxDelayDays: number };
+  // 11/10 (aditivo): modelo que estimou a PD e a fonte do índice climático.
+  model?: { name: string; version: string; auc: number; synthetic: true };
+  climate?: { index: number; source: "open-meteo" | "table" };
 }
 
 // v1.3 (§15.5)
@@ -621,4 +624,13 @@ export interface AdminRisk {
   byDebtor: AdminRiskGroup[];
   byState: AdminRiskGroup[];
   byCategory: AdminRiskGroup[];
+  // 11/10 (aditivo): modelo de risco e validação.
+  model?: {
+    name: string;
+    version: string;
+    trainedAt: string;
+    dataset: { synthetic: true; rows: number; trainRows: number; testRows: number; seed: number; defaultRate: number };
+    metrics: { auc: number; ks: number; brier: number; defaultRate: number; deciles: { predicted: number; observed: number; count: number }[] };
+    features: { key: string; label: string; coef: number }[];
+  };
 }

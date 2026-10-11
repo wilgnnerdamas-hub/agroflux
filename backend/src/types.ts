@@ -188,6 +188,9 @@ export interface Risk {
   spreadBaseBps: number;
   factors: RiskFactor[];
   producerHistory: { isSimulated: true; seasons: number; onTimeRate: number; maxDelayDays: number };
+  // 11/10 (aditivo): modelo que estimou a PD e a fonte do índice climático.
+  model?: { name: string; version: string; auc: number; synthetic: true };
+  climate?: { index: number; source: "open-meteo" | "table" };
 }
 
 // v1.3 (§15.5)

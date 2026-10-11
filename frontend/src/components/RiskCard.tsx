@@ -54,9 +54,13 @@ export function RiskCard({ risk, compact = false }: { risk: Risk; compact?: bool
   );
   return (
     <Card data-testid="risk-card">
-      <CardTitle icon={<Gauge className="h-4 w-4 text-muted" aria-hidden />} aside={<InfoTip>{k.hint}</InfoTip>}>
+      <CardTitle
+        icon={<Gauge className="h-4 w-4 text-muted" aria-hidden />}
+        aside={<InfoTip>{risk.model ? k.hintModel(risk.model.auc.toLocaleString(locale === "pt" ? "pt-BR" : "en-US", { maximumFractionDigits: 2 })) : k.hint}</InfoTip>}
+      >
         {k.title}
       </CardTitle>
+      {risk.model && <p className="-mt-2 mb-4 font-mono text-[11px] uppercase tracking-[0.06em] text-faint" data-testid="risk-model-tag">{k.modelTag}</p>}
       <div className="flex items-center gap-4">
         <span className={cx("flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border text-xl font-bold", ratingTone(risk.rating))}>{risk.rating}</span>
         <div className="min-w-0 flex-1">

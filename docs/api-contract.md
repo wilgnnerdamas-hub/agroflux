@@ -1249,23 +1249,29 @@ Juros compostos sobre **dias úteis** (base 252), como no mercado de antecipaç�
 
 `POST /receivables/:id/offers` (§5.18) passa a receber `{ funderId, spreadBps, feesCents }`. `spreadBps` é um inteiro de 50 a 3000 (0,50% a 30,00% a.a.).
 
-### 15.2 Risco
+### 15.2 Risco (revisto em 11/10: modelo estatístico)
 
-`Receivable` ganha `risk`, calculado pelo backend a cada leitura:
+`Receivable` ganha `risk`, calculado pelo backend a cada leitura por um **modelo de regressão logística** treinado em base **sintética** de 5.000 operações (`backend/src/risk-model`, `npm run risk:train`, determinístico pela semente). O modelo estima a PD no prazo a partir das características do recebível:
 
 | Campo | Descrição |
 |---|---|
-| `score` | 0 a 1000 (base 500, soma dos fatores, limitado). |
-| `rating` | `AA`, `A`, `B`, `C`, `D`, `E`, `F`, `G`, `H` (escala da Res. CMN 2.682). Limites: ≥ 850 AA, ≥ 750 A, ≥ 650 B, ≥ 550 C, ≥ 450 D, ≥ 350 E, ≥ 250 F, ≥ 150 G, abaixo H. |
-| `pdAnnualBps` | Probabilidade de inadimplência anual do rating (tabela configurável). |
-| `pdTermBps` | Probabilidade no prazo: `1 − (1 − PD anual) ^ (dias corridos ÷ 365)`. |
+| `score` | 0 a 1000. `500 + 72,13 × (log-odds da operação média − log-odds da operação)`: +50 pontos dobram a chance de pagar. |
+| `rating` | `AA` a `H` (escala da Res. CMN 2.682), pela PD anual estimada: cada rating cobre a faixa em torno da PD de referência da tabela configurável (média geométrica entre ratings vizinhos). |
+| `pdAnnualBps` | PD anual estimada pelo modelo: `1 − (1 − PD no prazo) ^ (365 ÷ dias)`. |
+| `pdTermBps` | PD no prazo estimada pelo modelo. |
 | `lgdBps` | Perda dada a inadimplência: 60% sem coobrigação, 35% com (configurável). |
 | `expectedLossCents` | `PD no prazo × LGD × face`. |
 | `spreadBaseBps` | Spread-base do rating (configurável). |
-| `factors` | `{ key, label, points, detail }[]`, explicando o score. |
+| `factors` | `{ key, label, points, detail }[]`: contribuição de cada característica em pontos de score, em relação à média da base de treino. |
 | `producerHistory` | `{ isSimulated: true, seasons, onTimeRate, maxDelayDays }`. Histórico **fictício e determinístico** do pseudônimo. |
+| `model` | `{ name, version, auc, synthetic: true }` (aditivo). |
+| `climate` | `{ index, source: "open-meteo" \| "table" }` (aditivo). |
 
-Fatores: aceite do sacado on-chain, coobrigação, documento único registrado, prazo, alinhamento do vencimento à colheita da safra, valor, risco climático da UF, concentração da distribuidora no sacado, histórico do produtor (simulado) e histórico na plataforma.
+Características (`factors[].key`): `acceptance`, `declined`, `coobligation`, `term`, `harvest_window`, `harvest_before`, `log_amount`, `climate`, `concentration`, `on_time`, `seasons`, `platform_accepted`, `platform_declined`.
+
+**Clima real:** `climate` compara a chuva dos últimos 12 meses com a média dos 10 anos anteriores num município agrícola de referência da UF (Open-Meteo, Historical Weather API). Seca abaixo de −10% e excesso acima de +15% elevam o índice (0 a 1). Cache de 12 h; sem leitura, usa uma tabela de reserva. `CLIMATE_SOURCE=off` desliga.
+
+`GET /admin/risk` ganha `model` (aditivo): nome, versão, base (sintética, linhas, treino/teste, taxa de inadimplência), métricas na base de teste (AUC, KS, Brier, calibração por decil) e os coeficientes padronizados.
 
 `ReceivableSummary` e `MarketplaceItem.receivable` ganham `risk: { score, rating }`.
 

@@ -5,7 +5,7 @@ import { formatBps, formatDateTime, formatMoney, shorten } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { useIntro } from "@/lib/motion";
 import { DISTRIBUTORS } from "@/lib/role";
-import type { AdminRiskGroup, RevenueEntry } from "@/lib/types";
+import type { AdminRisk, AdminRiskGroup, RevenueEntry } from "@/lib/types";
 import { AddressPill, cx } from "@/components/ui";
 import { RatingBadge, ratingBar } from "@/components/RiskCard";
 import { FUNDER_NAMES, Panel, StatCell, StatGrid, addressUrl, formatPct, pct, txUrl, useLoad } from "./shared";
@@ -178,6 +178,76 @@ function Concentration({ title, rows, label }: { title: string; rows: AdminRiskG
   );
 }
 
+function RiskModelPanel({ model }: { model: NonNullable<AdminRisk["model"]> }) {
+  const { t, locale } = useI18n();
+  const a = t.admin;
+  const p = useIntro();
+  const lc = locale === "pt" ? "pt-BR" : "en-US";
+  const num = (v: number, d = 2) => v.toLocaleString(lc, { minimumFractionDigits: d, maximumFractionDigits: d });
+  const m = model.metrics;
+  const maxDecile = Math.max(...m.deciles.map((d) => Math.max(d.predicted, d.observed)), 0.01);
+  const feats = [...model.features].sort((x, y) => Math.abs(y.coef) - Math.abs(x.coef));
+  const maxCoef = Math.max(...feats.map((f) => Math.abs(f.coef)), 0.01);
+  const label = (k: string, fallback: string) => (locale === "pt" ? fallback : (t.risk.factorLabels[k] ?? fallback));
+  const cells = [
+    { k: "AUC", v: num(m.auc), hint: a.aucHint },
+    { k: "KS", v: num(m.ks), hint: a.ksHint },
+    { k: "Brier", v: num(m.brier, 3), hint: a.brierHint },
+    { k: a.baseRate, v: formatPct(model.dataset.defaultRate, locale, 1), hint: a.rowsHint(model.dataset.trainRows, model.dataset.testRows) },
+  ];
+  return (
+    <section className="overflow-hidden rounded-[14px] border border-border bg-surface" data-testid="risk-model">
+      <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-divider px-5 py-4">
+        <h2 className="text-base font-medium">{a.modelTitle}</h2>
+        <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-faint">{a.modelSubtitle} · v{model.version}</span>
+      </header>
+      <StatGrid>
+        {cells.map((c) => (
+          <StatCell key={c.k} label={c.k} value={c.v} hint={c.hint} />
+        ))}
+      </StatGrid>
+      <div className="grid gap-px border-t border-border bg-border lg:grid-cols-2">
+        <div className="bg-surface p-5">
+          <p className="text-sm font-medium">{a.calibration}</p>
+          <p className="text-xs text-faint">{a.calibrationHint}</p>
+          <div className="mt-4 grid h-[120px] grid-cols-10 items-end gap-1.5" aria-hidden>
+            {m.deciles.map((d, i) => (
+              <div key={i} className="flex h-full items-end justify-center gap-0.5">
+                <span className="w-2.5 rounded-t-[2px] bg-step" style={{ height: `${(d.predicted / maxDecile) * 100 * p}%` }} />
+                <span className="w-2.5 rounded-t-[2px] bg-brand" style={{ height: `${Math.max(d.observed ? 2 : 0, (d.observed / maxDecile) * 100 * p)}%` }} />
+              </div>
+            ))}
+          </div>
+          <div className="mt-1.5 grid grid-cols-10 gap-1.5 text-center font-mono text-[10px] text-faint" aria-hidden>
+            {m.deciles.map((_, i) => <span key={i}>{i + 1}</span>)}
+          </div>
+          <p className="mt-3 flex gap-4 text-xs text-muted">
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-step" aria-hidden /> {a.predicted}</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-brand" aria-hidden /> {a.observed}</span>
+          </p>
+          <span className="sr-only">{m.deciles.map((d, i) => `${i + 1}: ${formatPct(d.predicted, locale)} / ${formatPct(d.observed, locale)}`).join("; ")}</span>
+        </div>
+        <div className="bg-surface p-5">
+          <p className="text-sm font-medium">{a.importance}</p>
+          <p className="text-xs text-faint">{a.importanceHint}</p>
+          <ul className="mt-4 space-y-1.5 text-sm">
+            {feats.map((f) => (
+              <li key={f.key} className="grid grid-cols-[minmax(0,1fr)_120px_44px] items-center gap-3">
+                <span className="truncate text-muted">{label(f.key, f.label)}</span>
+                <span className="relative h-1.5 rounded-full bg-divider" aria-hidden>
+                  <span className={cx("absolute inset-y-0 left-0 rounded-full", f.coef < 0 ? "bg-brand" : "bg-terra-fill")} style={{ width: `${(Math.abs(f.coef) / maxCoef) * 100 * p}%` }} />
+                </span>
+                <span className={cx("text-right font-mono text-xs", f.coef < 0 ? "text-brand" : "text-terra")}>{f.coef > 0 ? "+" : ""}{num(f.coef)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <p className="border-t border-divider bg-row px-5 py-3 text-xs text-muted">{a.syntheticNote}</p>
+    </section>
+  );
+}
+
 export function Risk() {
   const { t, locale } = useI18n();
   const a = t.admin;
@@ -197,6 +267,8 @@ export function Risk() {
             <StatCell label={a.topState} value={topState ? formatPct(topState.amountCents / portfolio, locale, 0) : "—"} hint={topState?.key} />
           </StatGrid>
         </div>
+
+        {d.model && <RiskModelPanel model={d.model} />}
 
         <Panel title={a.elByRating} aside={a.fadedNote} bodyClass="">
           <div className="overflow-x-auto">

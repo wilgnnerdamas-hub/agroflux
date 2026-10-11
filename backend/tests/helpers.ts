@@ -86,7 +86,7 @@ export async function makeApp(
   opts: { dataDir?: string; confirmTimeoutMs?: number; env?: Record<string, string>; assignmentGateway?: AssignmentGateway; cdiProvider?: CdiProvider; today?: string } = {},
 ) {
   const dataDir = opts.dataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "agroflux-test-"));
-  const config = loadConfig({ FRONTEND_ORIGIN: "http://localhost:3000", DATA_DIR: dataDir, ...opts.env });
+  const config = loadConfig({ FRONTEND_ORIGIN: "http://localhost:3000", DATA_DIR: dataDir, CLIMATE_SOURCE: "off", ...opts.env });
   // v1.3: CDI fixo (14,90% a.a.) e data de cálculo fixa, para o preço ser determinístico e sem rede externa.
   const today = opts.today ?? TODAY;
   const built = await buildApp({

@@ -1,5 +1,7 @@
 // Painel de administração da AgroFlux (contrato v1.3, §15.5). Visão da operação inteira; tudo SIMULADO.
 import type { AssignmentGateway } from "./chain/assignment.js";
+import { RISK_MODEL } from "./risk.js";
+import { FEATURE_LABELS } from "./risk-model/features.js";
 import { DISTRIBUTOR_DEFS } from "./distributors.js";
 import { FUNDER_DEFS } from "./funders.js";
 import { RATINGS } from "./pricing/settings.js";
@@ -190,6 +192,15 @@ export class AdminService {
       }),
       expectedLossCents: rows.reduce((s, { k }) => s + k.expectedLossCents, 0),
       portfolioCents: all.reduce((s, r) => s + r.amountCents, 0),
+      // 11/10 (aditivo): o modelo que estima a PD, com a validação na base de teste.
+      model: {
+        name: RISK_MODEL.name,
+        version: RISK_MODEL.version,
+        trainedAt: RISK_MODEL.trainedAt,
+        dataset: RISK_MODEL.dataset,
+        metrics: RISK_MODEL.metrics,
+        features: RISK_MODEL.features.map((f) => ({ key: f.key, label: FEATURE_LABELS[f.key], coef: f.coef })),
+      },
       byDebtor: group((r) => r.debtor.alias),
       byState: group((r) => r.debtor.state),
       byCategory: group((r) => r.product.category),

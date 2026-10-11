@@ -11,6 +11,7 @@ import { ListingService } from "./listing.js";
 import { AdminService } from "./admin.js";
 import { createCdiProvider, type CdiProvider } from "./pricing/cdi.js";
 import { PricingService } from "./pricing/service.js";
+import { ClimateService } from "./risk-model/climate.js";
 import { Registrar } from "./registration.js";
 import { routes } from "./routes.js";
 import { Store } from "./store.js";
@@ -55,7 +56,10 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
   confirmations.resumePending();
   const bcb = cdiProvider ?? createCdiProvider();
   const cdi: CdiProvider = config.cdiFromBcb || cdiProvider ? bcb : (opts) => bcb({ ...opts, source: "manual" });
-  const pricing = new PricingService(store, cdi, today);
+  // Chuva real por UF para o risco; o cache aquece em segundo plano com as UFs da carteira.
+  const climate = config.climateFromOpenMeteo ? new ClimateService() : null;
+  if (climate) void climate.warm(store.all().map((r) => r.debtor.state));
+  const pricing = new PricingService(store, cdi, today, climate);
   const listings = new ListingService(store, chain, pricing, confirmTimeoutMs, (msg, err) => app.log.error({ err }, msg));
   listings.resumePending();
 

@@ -111,3 +111,10 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 - Backend: `GET /admin/receivables` ganhou `debtorConfirmation.status` (aditivo, registrado no contrato), para a trilha de portões e o próximo passo.
 - Configurações: alterações não salvas marcadas em âmbar, barra fixa para salvar ou descartar, confirmação ao trocar de aba ou seguir um link interno e aviso ao fechar a página.
 - Limite de "concentração alta" do maior sacado fixo em 50% (`HIGH_CONCENTRATION`), porque não há parâmetro equivalente nas configurações.
+
+### B23 — Risco por modelo estatístico e clima real (11/10)
+- O scorecard de pesos fixos virou uma **regressão logística** (`backend/src/risk-model`), treinada em uma **base sintética** de 5.000 operações, gerada com premissas ilustrativas do setor (`npm run risk:train`, determinístico pela semente; o modelo fica em `model.json`). Teste: AUC 0,79, KS 0,45 e inadimplência da base de 5,8%.
+- A PD no prazo vem do modelo. O rating sai da PD anual, nas faixas da tabela configurável, e o score usa a escala de scorecard (+50 pontos dobram a chance de pagar). Cada fator mostra a contribuição em pontos em relação à operação média.
+- **Clima real:** chuva de 12 meses contra a média dos 10 anos anteriores, num município agrícola de referência por UF (Open-Meteo, sem chave), com cache de 12 h e a tabela antiga como reserva. Nos testes fica desligado (`CLIMATE_SOURCE=off`).
+- O painel admin ganhou o cartão "Modelo de risco" (AUC, KS, Brier, calibração por decil e coeficientes). O cartão de risco do recebível identifica o modelo e a base sintética.
+- No pitch: o pipeline está pronto para dados reais (SCR do Banco Central, bureaus de crédito e satélite); hoje a base de treino é sintética.

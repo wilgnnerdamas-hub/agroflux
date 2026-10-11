@@ -11,7 +11,8 @@
     "wallet:new": "tsx scripts/wallet-new.ts",
     "wallet:airdrop": "tsx scripts/wallet-airdrop.ts",
     "wallet:send": "tsx scripts/wallet-send.ts",
-    "setup:assignment": "tsx scripts/setup-assignment.ts"
+    "setup:assignment": "tsx scripts/setup-assignment.ts",
+    "risk:train": "tsx scripts/train-risk-model.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",

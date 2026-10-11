@@ -26,6 +26,8 @@ export interface Config {
   } | null;
   /** Busca o CDI na API do Banco Central (`CDI_SOURCE=manual` desliga). */
   cdiFromBcb: boolean;
+  /** Chuva real por UF (Open-Meteo) no risco. */
+  climateFromOpenMeteo: boolean;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -56,5 +58,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
           }
         : null,
     cdiFromBcb: env.CDI_SOURCE !== "manual",
+    /** Lê a chuva real por UF no Open-Meteo para o risco (`CLIMATE_SOURCE=off` desliga). */
+    climateFromOpenMeteo: env.CLIMATE_SOURCE !== "off",
   };
 }

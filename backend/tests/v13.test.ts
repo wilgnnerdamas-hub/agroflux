@@ -3,7 +3,9 @@ import { businessDaysBetween, easter, holidays, isBusinessDay, todayBrasilia } f
 import { createCdiProvider, parseBcb } from "../src/pricing/cdi.js";
 import { price } from "../src/pricing/pricing.js";
 import { IOF_RULE } from "../src/pricing/settings.js";
-import { producerHistory, ratingFor } from "../src/risk.js";
+import { producerHistory, ratingForPd, RISK_MODEL } from "../src/risk.js";
+import { buildModel } from "../src/risk-model/train.js";
+import { defaultSettings } from "../src/pricing/settings.js";
 import type { Offer, Receivable } from "../src/types.js";
 import { createConfirmed, createOne, createPublished, form, makeApp, PUBLISH_BODY, uniquePdf, validInput } from "./helpers.js";
 
@@ -107,8 +109,18 @@ describe("CDI do Banco Central (§15.1)", () => {
 });
 
 describe("risco (§15.2)", () => {
-  it("rating pelos limites e histórico simulado determinístico", () => {
-    expect([900, 850, 760, 650, 549, 450, 350, 250, 150, 149].map(ratingFor)).toEqual(["AA", "AA", "A", "B", "D", "D", "E", "F", "G", "H"]);
+  it("rating pela PD anual, modelo treinado e histórico simulado determinístico", () => {
+    const st = defaultSettings();
+    expect([30, 50, 100, 200, 400, 800, 1_500, 2_500, 4_000, 9_000].map((pd) => ratingForPd(pd, st))).toEqual(["AA", "AA", "A", "B", "C", "D", "E", "F", "G", "H"]);
+    // O modelo gravado é a regressão logística da base sintética, com qualidade mínima de crédito.
+    expect(RISK_MODEL.dataset.synthetic).toBe(true);
+    expect(RISK_MODEL.metrics.auc).toBeGreaterThan(0.7);
+    expect(RISK_MODEL.features.find((f) => f.key === "acceptance")!.coef).toBeLessThan(0);
+    expect(RISK_MODEL.features.find((f) => f.key === "concentration")!.coef).toBeGreaterThan(0);
+    // Mesma semente, mesmo modelo.
+    const m1 = buildModel(7, 400);
+    const m2 = buildModel(7, 400);
+    expect(m1.features).toEqual(m2.features);
     const h = producerHistory("Produtor Demo 01");
     expect(producerHistory("produtor demo 01")).toEqual(h);
     expect(h.isSimulated).toBe(true);
@@ -122,14 +134,16 @@ describe("risco (§15.2)", () => {
     const before: Receivable = await get(built, `/receivables/${created.id}`);
     expect(before.risk).toMatchObject({ score: expect.any(Number), rating: expect.any(String), lgdBps: 6_000 });
     expect(before.risk!.factors.map((f) => f.key)).toEqual(
-      expect.arrayContaining(["acceptance", "coobligation", "registry", "term", "harvest", "amount", "climate", "concentration", "history_payments", "history_seasons"]),
+      expect.arrayContaining(["acceptance", "coobligation", "term", "log_amount", "climate", "concentration", "on_time", "seasons"]),
     );
-    expect(before.risk!.factors.find((f) => f.key === "acceptance")!.points).toBe(-30);
+    expect(before.risk!.model).toMatchObject({ synthetic: true });
+    expect(before.risk!.factors.find((f) => f.key === "acceptance")!.points).toBeLessThan(0);
 
     const { id } = await createPublished(built);
     const after: Receivable = await get(built, `/receivables/${id}`);
-    expect(after.risk!.factors.find((f) => f.key === "acceptance")!.points).toBe(80);
-    expect(after.risk!.factors.find((f) => f.key === "coobligation")!.points).toBe(40);
+    expect(after.risk!.factors.find((f) => f.key === "acceptance")!.points).toBeGreaterThan(0);
+    expect(after.risk!.factors.find((f) => f.key === "coobligation")!.points).toBeGreaterThan(0);
+    expect(after.risk!.pdTermBps).toBeLessThan(before.risk!.pdTermBps);
     expect(after.risk!.lgdBps).toBe(3_500);
     // Perda esperada = PD no prazo × LGD × valor (a PD exibida está arredondada em pontos-base).
     expect(after.risk!.expectedLossCents / ((after.risk!.pdTermBps / 10_000) * 0.35 * after.amountCents)).toBeCloseTo(1, 2);

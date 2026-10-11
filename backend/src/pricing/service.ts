@@ -4,6 +4,7 @@ import type { Store } from "../store.js";
 import type { FunderType, PricingReference, Quote, Receivable, ReceivableSummary, Risk } from "../types.js";
 import { todayBrasilia } from "./calendar.js";
 import type { CdiProvider } from "./cdi.js";
+import type { ClimateService } from "../risk-model/climate.js";
 import { price, toBps } from "./pricing.js";
 import { IOF_RULE } from "./settings.js";
 
@@ -12,6 +13,7 @@ export class PricingService {
     private readonly store: Store,
     private readonly cdi: CdiProvider,
     private readonly today: () => string = () => todayBrasilia(),
+    private readonly climate: ClimateService | null = null,
   ) {}
 
   async reference(): Promise<PricingReference> {
@@ -28,7 +30,7 @@ export class PricingService {
   }
 
   risk(r: Receivable): Risk {
-    return assessRisk(r, this.store.all(), this.store.getSettings(), this.today());
+    return assessRisk(r, this.store.all(), this.store.getSettings(), this.today(), { climate: this.climate?.reading });
   }
 
   /** Recebível para resposta da API: cópia com o risco calculado agora. */

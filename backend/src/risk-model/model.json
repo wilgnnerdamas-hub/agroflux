@@ -1,0 +1,152 @@
+{
+  "name": "Regressão logística (base sintética)",
+  "version": "1.0.0",
+  "trainedAt": "2026-10-11T23:34:35.294Z",
+  "dataset": {
+    "synthetic": true,
+    "rows": 5000,
+    "trainRows": 4000,
+    "testRows": 1000,
+    "seed": 20261011,
+    "defaultRate": 0.058
+  },
+  "intercept": -3.328376,
+  "features": [
+    {
+      "key": "acceptance",
+      "mean": 0.7595,
+      "std": 0.427387,
+      "coef": -0.392673
+    },
+    {
+      "key": "declined",
+      "mean": 0.02675,
+      "std": 0.161352,
+      "coef": 0.272645
+    },
+    {
+      "key": "coobligation",
+      "mean": 0.68,
+      "std": 0.466476,
+      "coef": -0.310326
+    },
+    {
+      "key": "term",
+      "mean": 0.593616,
+      "std": 0.294367,
+      "coef": 0.314123
+    },
+    {
+      "key": "harvest_window",
+      "mean": 0.553,
+      "std": 0.497183,
+      "coef": -0.323612
+    },
+    {
+      "key": "harvest_before",
+      "mean": 0.201,
+      "std": 0.400748,
+      "coef": 0.283525
+    },
+    {
+      "key": "log_amount",
+      "mean": 0.389091,
+      "std": 0.912203,
+      "coef": 0.243741
+    },
+    {
+      "key": "climate",
+      "mean": 0.32343,
+      "std": 0.276835,
+      "coef": 0.27891
+    },
+    {
+      "key": "concentration",
+      "mean": 0.423569,
+      "std": 0.111197,
+      "coef": 0.300486
+    },
+    {
+      "key": "on_time",
+      "mean": 0.879626,
+      "std": 0.039291,
+      "coef": -0.26484
+    },
+    {
+      "key": "seasons",
+      "mean": 0.555175,
+      "std": 0.285383,
+      "coef": -0.11479
+    },
+    {
+      "key": "platform_accepted",
+      "mean": 0.271583,
+      "std": 0.332905,
+      "coef": -0.124234
+    },
+    {
+      "key": "platform_declined",
+      "mean": 0.0305,
+      "std": 0.144723,
+      "coef": 0.226476
+    }
+  ],
+  "metrics": {
+    "auc": 0.7936,
+    "ks": 0.4529,
+    "brier": 0.04922,
+    "defaultRate": 0.061,
+    "deciles": [
+      {
+        "predicted": 0.0074,
+        "observed": 0,
+        "count": 100
+      },
+      {
+        "predicted": 0.0124,
+        "observed": 0.01,
+        "count": 100
+      },
+      {
+        "predicted": 0.0174,
+        "observed": 0,
+        "count": 100
+      },
+      {
+        "predicted": 0.0228,
+        "observed": 0.07,
+        "count": 100
+      },
+      {
+        "predicted": 0.0301,
+        "observed": 0.01,
+        "count": 100
+      },
+      {
+        "predicted": 0.0399,
+        "observed": 0.04,
+        "count": 100
+      },
+      {
+        "predicted": 0.0505,
+        "observed": 0.04,
+        "count": 100
+      },
+      {
+        "predicted": 0.0678,
+        "observed": 0.09,
+        "count": 100
+      },
+      {
+        "predicted": 0.1066,
+        "observed": 0.11,
+        "count": 100
+      },
+      {
+        "predicted": 0.2602,
+        "observed": 0.24,
+        "count": 100
+      }
+    ]
+  }
+}
