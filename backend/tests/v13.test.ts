@@ -160,7 +160,7 @@ describe("configurações e administração (§15.5)", () => {
   it("lê, valida e altera as configurações; a taxa nova vale para as próximas propostas", async () => {
     const built = await makeApp();
     const s = await get(built, "/admin/settings");
-    expect(s).toMatchObject({ platformFeeBps: 50, registryFeeCents: 2_500, cdi: { source: "bcb", manualAnnualBps: 1490 } });
+    expect(s).toMatchObject({ platformFeeBps: 50, registryFeeCents: 2_500, cdi: { source: "bcb", manualAnnualBps: 1365 } });
 
     const bad = await built.app.inject({ method: "PUT", url: "/api/v1/admin/settings", payload: { platformFeeBps: 900, ratings: { AA: { spreadBps: -1 } } } });
     expect(bad.statusCode).toBe(422);

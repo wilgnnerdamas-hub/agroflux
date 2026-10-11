@@ -10,7 +10,7 @@ export const IOF_RULE = { dailyRate: 0.000041, additionalRate: 0.0038 };
 
 export function defaultSettings(): Settings {
   return {
-    cdi: { source: "bcb", manualAnnualBps: 1490 },
+    cdi: { source: "bcb", manualAnnualBps: 1365 },
     platformFeeBps: 50,
     registryFeeCents: 2_500,
     iofByFunderType: { simulated_fidc: false, simulated_bank: true, simulated_cooperative: false },

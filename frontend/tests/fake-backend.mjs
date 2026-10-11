@@ -23,7 +23,7 @@ const DISTRIBUTORS = [
 ];
 const RATINGS = ["AA", "A", "B", "C", "D", "E", "F", "G", "H"];
 const defaultSettings = () => ({
-  cdi: { source: "manual", manualAnnualBps: 1490 },
+  cdi: { source: "manual", manualAnnualBps: 1365 },
   platformFeeBps: 50,
   registryFeeCents: 2500,
   iofByFunderType: { simulated_fidc: false, simulated_bank: true, simulated_cooperative: false },
