@@ -90,9 +90,10 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
 
 **10/10 (madrugada): v1.3** (contrato §15, decisão G4)
 16. Precificação CDI + spread em dias úteis, risco AA–H, taxa AgroFlux on-chain (escrow com 3ª perna para a tesouraria),
-    três distribuidoras demo e painel `/admin`. Escrow 7/7, backend 91 testes, e2e 14/14. Falta: atualizar o programa
-    na Devnet junto com o deploy (o backend v1.2 em produção não fala com o programa v1.3) e criar no Railway
-    `DEMO_DISTRIBUTOR_B_SECRET` e `DEMO_DISTRIBUTOR_C_SECRET`.
+    três distribuidoras demo e painel `/admin`. Escrow 7/7, backend 91 testes, e2e 14/14. **v1.3 em produção (10/10):** escrow
+    atualizado na Devnet (mesmo endereço), Railway com `DEMO_DISTRIBUTOR_B_SECRET`/`_C_SECRET`; fluxo real testado
+    (liquidação em 3 pernas com taxa na tesouraria, verificação 11/11, prova de recusa) e `/admin` conferido.
+    Falta: roteiro da demo v1.3 e gravação de reserva.
 
 **12/10: só correções críticas e submissão.**
 
