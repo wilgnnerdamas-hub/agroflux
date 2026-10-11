@@ -63,3 +63,107 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
 }
+
+/* ---------- Landing (refino visual do Claude Design) ----------
+   Escopo próprio (.lp) para não mudar as outras telas. O terciário do design (#8A948E) foi escurecido
+   para #69746D para passar no contraste AA em texto pequeno. */
+.lp {
+  --lp-bg: #f6f5f0;
+  --lp-surface: #ffffff;
+  --lp-border: #dad9d2;
+  --lp-divider: #eeede8;
+  --lp-ink: #16201b;
+  --lp-muted: #5e6a63;
+  --lp-faint: #69746d;
+  --lp-green: #1e6b4a;
+  --lp-green-soft: #e6efe9;
+  --lp-green-softer: #f1f6f2;
+  --lp-chain: #5b4bd6;
+  --lp-chain-border: #d9d4f7;
+  --lp-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  font-family: var(--font-geist), var(--font-sans);
+  background-color: var(--lp-bg);
+  background-image: radial-gradient(#d3e0d7 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--lp-ink);
+}
+.lp-mono {
+  font-family: var(--font-geist-mono), var(--font-mono);
+}
+.lp :where(a, button):focus-visible {
+  outline-color: var(--lp-green);
+}
+
+/* Carimbos do passaporte animado */
+.lp-stamp {
+  border: 1px solid var(--lp-divider);
+  background: var(--lp-surface);
+  color: var(--lp-faint);
+  transition: border-color 600ms var(--lp-ease), background-color 600ms var(--lp-ease), color 600ms var(--lp-ease);
+}
+.lp-stamp .lp-stamp-fade {
+  opacity: 0;
+  transition: opacity 600ms var(--lp-ease);
+}
+.lp-stamp[data-on="true"] {
+  border-color: var(--lp-green);
+  background: var(--lp-green-softer);
+  color: var(--lp-ink);
+}
+.lp-stamp[data-on="true"] .lp-stamp-fade {
+  opacity: 1;
+}
+.lp-stamp .lp-check {
+  border: 1px solid var(--lp-border);
+  transition: border-color 600ms var(--lp-ease), background-color 600ms var(--lp-ease);
+}
+.lp-stamp[data-on="true"] .lp-check {
+  border-color: var(--lp-green);
+  background: var(--lp-green);
+}
+
+@keyframes lp-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.lp-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 1px;
+  vertical-align: -0.15em;
+  background: var(--lp-green);
+  animation: lp-blink 1s steps(1) infinite;
+}
+
+/* Faixa "Tudo verificável" */
+@keyframes lp-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.lp-marquee {
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+}
+.lp-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: lp-marquee 28s linear infinite;
+}
+.lp-marquee:hover .lp-marquee-track,
+.lp-marquee:focus-within .lp-marquee-track {
+  animation-play-state: paused;
+}
+
+.lp-lift {
+  transition: translate 300ms var(--lp-ease), transform 300ms var(--lp-ease), border-color 300ms var(--lp-ease), background-color 300ms var(--lp-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-caret { animation: none; }
+  .lp-stamp, .lp-stamp .lp-stamp-fade, .lp-stamp .lp-check, .lp-lift { transition: none; }
+  .lp-lift:hover { transform: none !important; translate: none !important; }
+  .lp-marquee { overflow-x: auto; }
+  .lp-marquee-track { animation: none; }
+}

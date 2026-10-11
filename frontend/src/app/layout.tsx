@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { I18nProvider } from "@/lib/i18n";
+
+// Geist: por enquanto só a landing usa (classe .lp em globals.css).
+const geist = Geist({ subsets: ["latin"], weight: ["300", "400", "500", "600"], variable: "--font-geist" });
+const geistMono = Geist_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-geist-mono" });
 
 export const metadata: Metadata = {
   title: "AgroFlux — Passaporte digital de recebíveis",
@@ -10,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className={`${geist.variable} ${geistMono.variable}`}>
       <body>
         <I18nProvider>
           <AppShell>{children}</AppShell>

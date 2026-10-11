@@ -81,3 +81,11 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 - [x] Backend no Railway: `https://agroflux-production.up.railway.app/api/v1` (09/10). Health com saldo, `/demo/reset` e fluxo completo pela API na Devnet real.
 - [x] Dados persistem após redeploy no Railway (09/10). O volume não existia; foi criado em `/data`, e o log mostra `Diretório de dados: /data`. Os dados sobreviveram ao deploy do commit `ef285d9`. Lição: "Restart" não serve como teste de persistência.
 - [x] Frontend na Vercel: `https://agroflux-ruby.vercel.app` (09/10), com CORS liberado no Railway. Fluxo completo da demo pelo navegador em produção, no desktop e no celular, na Devnet real.
+
+### F19 — Landing refeita a partir do Claude Design (11/10)
+- Estilo próprio da landing no escopo `.lp` (`globals.css`), com fontes Geist e Geist Mono (`next/font`); as outras telas não mudam.
+- O terciário do design (#8A948E) passou para #69746D, para atingir contraste AA em texto pequeno.
+- O passaporte animado é uma ilustração rotulada "dados fictícios". As abreviações de transação são exemplos e não são links (regra 6).
+- A faixa "Tudo verificável" usa só assinaturas e endereços reais vindos do backend (recebíveis com etapas na rede e `/transparency`). Sem backend, mostra os endereços públicos dos programas, nunca assinaturas inventadas.
+- Conteúdo do design ajustado à v1.3: proposta em "CDI + spread", e não "% a.m."; o passo "Oferta simulada" virou "Propostas"; a referência segue o padrão AGF-.
+- A entrada "AgroFlux (operação)" e a escolha entre as três distribuidoras foram mantidas, embora o design não as tivesse previsto.

@@ -52,21 +52,25 @@ function ConnectionDot() {
   );
 }
 
-export function LanguageToggle() {
+export function LanguageToggle({ pill }: { pill?: boolean }) {
   const { locale, setLocale, t } = useI18n();
   const opts: { v: Locale; label: string }[] = [
     { v: "pt", label: "PT" },
     { v: "en", label: "EN" },
   ];
   return (
-    <div role="group" aria-label={t.shell.language} className="inline-flex rounded-lg border border-border p-0.5">
+    <div role="group" aria-label={t.shell.language} className={cx("inline-flex border p-0.5", pill ? "rounded-full border-[var(--lp-border)] bg-[var(--lp-surface)]" : "rounded-lg border-border")}>
       {opts.map((o) => (
         <button
           key={o.v}
           type="button"
           onClick={() => setLocale(o.v)}
           aria-pressed={locale === o.v}
-          className={cx("rounded-md px-2 py-0.5 text-xs font-semibold", locale === o.v ? "bg-ink text-white" : "text-muted hover:text-ink")}
+          className={cx(
+            "px-2 py-0.5 text-xs font-semibold",
+            pill ? "rounded-full px-2.5" : "rounded-md",
+            locale === o.v ? (pill ? "bg-[var(--lp-ink)] text-white" : "bg-ink text-white") : "text-muted hover:text-ink",
+          )}
           data-testid={`lang-${o.v}`}
         >
           {o.label}
@@ -85,6 +89,36 @@ function Brand() {
       </span>
       <span className="hidden sm:inline">{t.shell.brand}</span>
     </Link>
+  );
+}
+
+// Landing: cabeçalho leve (logo, Transparência, idioma) e página de largura total com fundo pontilhado.
+function LandingShell({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
+  return (
+    <div className="lp flex min-h-screen flex-col">
+      {API_MODE === "mock" && <div className="bg-warn px-4 py-1.5 text-center text-xs font-semibold text-white">{t.shell.mockBanner}</div>}
+      <DemoStrip width="max-w-[1200px]" />
+      <header className="border-b border-[var(--lp-border)] bg-[var(--lp-surface)]">
+        <div className="mx-auto flex max-w-[1200px] items-center gap-6 px-4 py-3 sm:px-8 lg:px-14">
+          <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold text-[var(--lp-ink)]">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--lp-green)] text-[var(--lp-green)]">
+              <Sprout className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+            </span>
+            {t.shell.brand}
+          </Link>
+          <nav aria-label="Principal">
+            <Link href="/transparencia" className="rounded-md px-1 py-1 text-sm text-[var(--lp-muted)] hover:text-[var(--lp-ink)]">
+              {t.shell.navTransparency}
+            </Link>
+          </nav>
+          <span className="ml-auto">
+            <LanguageToggle pill />
+          </span>
+        </div>
+      </header>
+      <main className="flex-1">{children}</main>
+    </div>
   );
 }
 
@@ -111,6 +145,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { role: storedRole, distributorName } = useRole();
   if (pathname.startsWith("/confirmar/")) return <PublicShell>{children}</PublicShell>;
+  if (pathname === "/") return <LandingShell>{children}</LandingShell>;
 
   const isLanding = pathname === "/";
   const role = roleFromPath(pathname) ?? (isLanding ? null : storedRole);
