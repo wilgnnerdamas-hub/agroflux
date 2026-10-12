@@ -7,8 +7,9 @@ Para caber em 3 min, use os dados do seed (o AGF-0003 já está publicado) e dei
 1. `POST /api/v1/demo/reset` e esperar cerca de 20 s. Conferir `GET /health` (assignment e doubleSpendProof em `true`).
 2. Abas abertas, nesta ordem:
    - **A:** passaporte de um recebível já registrado e com aceite (pode ser um criado antes da gravação, ou o AGF-0001 após registrar e aceitar).
-   - **B:** financiador → AGF-0003 (já publicado).
-   - **C:** distribuidora **Sul Sementes** → AGF-0003.
+   - **B:** landing → "Entrar como financiador" → **Financiador Demo A** → AGF-0003 (já publicado).
+   - **C:** landing → "Entrar como distribuidora" → **Sul Sementes (demo)** → AGF-0003.
+   - Os perfis de distribuidora e de financiador ficam guardados separados no navegador, então as abas B e C convivem.
    - **D:** VS Code com `blockchain/programs/agroflux-escrow/src/lib.rs` aberto na função `settle` (linha 32) e nas seeds (linha ~182–192).
    - **E:** `/verificar`, com o PDF do recebível cedido à mão.
 3. Zoom do navegador em 110–125% para ler no vídeo.

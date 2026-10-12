@@ -16,9 +16,9 @@ Duração alvo: **6 a 7 minutos** de tela (para o vídeo de 3 minutos, use o ata
    - `features.assignment` e `features.doubleSpendProof` em `true`;
    - `feePayerBalanceLamports` acima de 0,5 SOL.
 3. Abrir quatro janelas:
-   - **Notebook A:** https://agroflux-ruby.vercel.app → "Entrar como distribuidora" (Distribuidora Demo).
-   - **Notebook B (outra aba):** a mesma URL → "Entrar como financiador".
-   - **Notebook C (outra aba):** a mesma URL → "Entrar como AgroFlux" (painel de operação).
+   - **Notebook A:** https://agroflux-ruby.vercel.app → "Entrar como distribuidora" → **Distribuidora Demo** no seletor.
+   - **Notebook B (outra aba):** a mesma URL → "Entrar como financiador" → **Financiador Demo A** (FIDC, sem IOF). Para mostrar o efeito do IOF, entre como o B (banco).
+   - **Notebook C (outra aba):** a mesma URL → **Painel AgroFlux** (botão logo abaixo dos dois).
    - **Celular:** para escanear o QR code do aceite.
 4. Ter um PDF de teste **novo** à mão (`docs/demo/nf-gravacao-1.pdf`, `-2`, `-3`; cada cessão trava a nota para sempre). A registradora recusa um documento repetido; se quiser mostrar isso, reenvie o mesmo PDF de propósito.
 5. Para gravar em inglês, use o seletor **EN** no topo de qualquer tela.
@@ -48,8 +48,8 @@ risco venham de fontes oficiais, com a Solana garantindo a liquidação atômica
 ## Atalho (demo curta, 2 a 3 min)
 
 Use o AGF-0003 (Sul Sementes), que já está publicado:
-1. Entrar como financiador e enviar uma proposta (spread sobre o CDI).
-2. Entrar como distribuidora → **Sul Sementes**, abrir o AGF-0003 e aceitar a proposta.
+1. Entrar como financiador → **Financiador Demo A** e enviar uma proposta (spread sobre o CDI).
+2. Entrar como distribuidora → **Sul Sementes (demo)** no seletor, abrir o AGF-0003 e aceitar a proposta.
 3. Formalizar a cessão e rodar a prova de recusa.
 4. Abrir o painel AgroFlux → **Faturamento**: a receita nova aparece.
 
