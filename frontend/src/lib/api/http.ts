@@ -9,6 +9,7 @@ import type {
   AdminRisk,
   Distributor,
   PricingReference,
+  RiskMemo,
   Quote,
   Settings,
   ConfirmationSummary,
@@ -141,6 +142,15 @@ export function createHttpApi(baseUrl: string): AgroFluxApi {
     },
     getTransparency: () => request<Transparency>("/transparency"),
     getPricingReference: () => request<PricingReference>("/pricing/reference"),
+    runDocumentCheck: (id) => request<Receivable>(`/receivables/${encodeURIComponent(id)}/document-check`, { method: "POST" }),
+    async requestRiskMemo(id, lang) {
+      const r = await request<{ memo: RiskMemo }>(`/receivables/${encodeURIComponent(id)}/risk-memo`, {
+        method: "POST",
+        body: JSON.stringify({ lang }),
+        headers: { "Content-Type": "application/json" },
+      });
+      return r.memo;
+    },
     quote: (id, input) =>
       request<Quote>(`/receivables/${encodeURIComponent(id)}/quote`, {
         method: "POST",

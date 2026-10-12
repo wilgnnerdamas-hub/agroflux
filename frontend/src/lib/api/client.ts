@@ -7,6 +7,7 @@ import type {
   AdminRisk,
   Distributor,
   PricingReference,
+  RiskMemo,
   Quote,
   Settings,
   ConfirmationSummary,
@@ -56,6 +57,9 @@ export interface AgroFluxApi {
   getTransparency(): Promise<Transparency>;
   // v1.3 (§15).
   getPricingReference(): Promise<PricingReference>;
+  // 11/10: analista de IA (Claude).
+  runDocumentCheck(id: string): Promise<Receivable>;
+  requestRiskMemo(id: string, lang: "pt" | "en"): Promise<RiskMemo>;
   quote(id: string, input: { funderId: string; spreadBps: number; feesCents: number }): Promise<Quote>;
   listDistributors(): Promise<{ items: Distributor[] }>;
   adminOverview(): Promise<AdminOverview>;

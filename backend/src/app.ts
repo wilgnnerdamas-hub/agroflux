@@ -12,6 +12,8 @@ import { AdminService } from "./admin.js";
 import { createCdiProvider, type CdiProvider } from "./pricing/cdi.js";
 import { PricingService } from "./pricing/service.js";
 import { ClimateService } from "./risk-model/climate.js";
+import { createClaudeCaller, type ClaudeToolCaller } from "./ai/claude.js";
+import { AiService } from "./ai/service.js";
 import { Registrar } from "./registration.js";
 import { routes } from "./routes.js";
 import { Store } from "./store.js";
@@ -28,9 +30,11 @@ export interface AppDeps {
   // v1.3: CDI e data de cálculo injetáveis nos testes.
   cdiProvider?: CdiProvider;
   today?: () => string;
+  // 11/10: dublê do Claude nos testes (em produção vem de ANTHROPIC_API_KEY).
+  aiCaller?: ClaudeToolCaller;
 }
 
-export async function buildApp({ config, chain, store = new Store(config.dataDir), confirmTimeoutMs, assignmentGateway, cdiProvider, today }: AppDeps) {
+export async function buildApp({ config, chain, store = new Store(config.dataDir), confirmTimeoutMs, assignmentGateway, cdiProvider, today, aiCaller }: AppDeps) {
   const app = Fastify({
     logger: process.env.NODE_ENV === "test" ? false : { level: "info" },
   });
@@ -83,8 +87,12 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
     }
   }
 
+  const caller = aiCaller ?? (config.ai ? createClaudeCaller(config.ai.apiKey, config.ai.model) : null);
+  const ai = caller ? new AiService(store, pricing, caller, config.ai?.model ?? "claude (teste)") : null;
+
   await app.register(routes, {
     prefix: "/api/v1",
+    ai,
     store,
     chain,
     registrar,
@@ -96,5 +104,5 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
     admin: new AdminService(store, pricing, activeGateway),
     demoResetEnabled: config.demoResetEnabled,
   });
-  return { app, registrar, confirmations, listings, assignments, store, pricing };
+  return { app, registrar, confirmations, listings, assignments, store, pricing, ai };
 }

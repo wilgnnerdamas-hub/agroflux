@@ -261,6 +261,30 @@ export interface Funder {
   isSimulated: true;
 }
 
+// 11/10 (aditivo): conferência do documento e parecer de risco por IA (Claude).
+export type DocumentCheckField = "amount" | "issueDate" | "dueDate" | "product" | "debtor";
+export interface DocumentCheck {
+  status: "pending" | "done" | "failed";
+  model: string;
+  requestedAt: string;
+  checkedAt: string | null;
+  verdict: "consistent" | "divergent" | "unreadable" | null;
+  documentType: string | null;
+  summary: string | null;
+  fields: { field: DocumentCheckField; declared: string; found: string | null; status: "match" | "mismatch" | "not_found" }[];
+  error: string | null;
+}
+
+export interface RiskMemo {
+  lang: "pt" | "en";
+  model: string;
+  createdAt: string;
+  inputsHash: string;
+  memo: string;
+  strengths: string[];
+  concerns: string[];
+}
+
 export interface Receivable {
   id: string;
   reference: string;
@@ -285,6 +309,8 @@ export interface Receivable {
   assignment: Assignment;
   registry: Registry;
   listing: Listing;
+  documentCheck?: DocumentCheck;
+  riskMemos?: Partial<Record<"pt" | "en", RiskMemo>>;
   createdAt: string;
   updatedAt: string;
 }
@@ -408,7 +434,7 @@ export interface Health {
   version: string;
   cluster: "devnet";
   solana: { reachable: boolean; feePayerBalanceLamports: number | null };
-  features: { debtorConfirmation: boolean; assignment: boolean; marketplace: boolean; doubleSpendProof: boolean };
+  features: { debtorConfirmation: boolean; assignment: boolean; marketplace: boolean; doubleSpendProof: boolean; ai?: boolean };
 }
 
 // v1.1 (§5.10 e §5.11)
@@ -525,6 +551,8 @@ export type ApiErrorCode =
   | "CONFIRMATION_LINK_EXPIRED"
   // v1.2
   | "DUPLICATE_DOCUMENT"
+  // 11/10
+  | "AI_UNAVAILABLE"
   // Códigos só do frontend (não vêm do backend):
   | "NETWORK_ERROR"
   | "BACKEND_NOT_CONNECTED";

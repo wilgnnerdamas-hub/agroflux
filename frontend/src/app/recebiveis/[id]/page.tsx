@@ -23,6 +23,7 @@ import { AssignedSummary, AssignmentStep, useAssignmentAvailable } from "@/compo
 import { OnChainRecords } from "@/components/passport/OnChainRecords";
 import { ReceivableSummary } from "@/components/passport/ReceivableSummary";
 import { RatingBadge, RiskCard } from "@/components/RiskCard";
+import { DocumentCheckCard } from "@/components/AiPanels";
 
 const POLL_MS = 2000;
 const POLL_MAX_MS = 75_000;
@@ -38,7 +39,8 @@ function isWaiting(r: Receivable) {
     dc.chain?.status === "pending" ||
     r.listing.chain?.status === "pending" ||
     r.status === "assignment_pending" ||
-    r.assignment.doubleSpendProof?.status === "pending"
+    r.assignment.doubleSpendProof?.status === "pending" ||
+    r.documentCheck?.status === "pending"
   );
 }
 
@@ -206,7 +208,8 @@ function Passport() {
           </section>
           <div className={r.status === "published" ? "grid gap-6 lg:grid-cols-2" : "space-y-6 lg:pt-7"}>
             <ReceivableSummary receivable={r} />
-            {r.risk && <RiskCard risk={r.risk} compact />}
+            <DocumentCheckCard receivable={r} onUpdated={onUpdated} />
+            {r.risk && <RiskCard risk={r.risk} compact receivable={r} />}
           </div>
         </div>
 

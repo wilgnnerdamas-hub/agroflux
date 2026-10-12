@@ -36,12 +36,19 @@ export function assessRisk(r: Receivable, all: Receivable[], settings: Settings,
 
   // Contribuição de cada característica em log-odds, em relação à média da base de treino.
   const contrib = m.features.map((feat) => ({ key: feat.key, z: feat.coef * ((f.x[feat.key] - feat.mean) / feat.std) }));
-  const z = m.intercept + contrib.reduce((s, c) => s + c.z, 0);
+  // Conferência do documento por IA: ajuste fora do modelo estatístico (log-odds), só quando há resultado.
+  const dc = r.documentCheck?.status === "done" ? r.documentCheck : null;
+  const docAdj = !dc ? 0 : dc.verdict === "divergent" ? 0.7 : dc.verdict === "unreadable" ? 0.25 : -0.1;
+  const z = m.intercept + contrib.reduce((s, c) => s + c.z, 0) + docAdj;
   const pdTerm = Math.min(0.999, Math.max(0.0001, 1 / (1 + Math.exp(-z))));
   const pdAnnual = 1 - Math.pow(1 - pdTerm, 365 / Math.max(f.days, 30));
 
   const factors: RiskFactor[] = contrib
     .map((c) => ({ key: c.key, label: FEATURE_LABELS[c.key], points: Math.round(-POINTS_PER_LN_ODDS * c.z), detail: f.detail[c.key] }));
+  if (dc) {
+    const label = { consistent: "Documento confere com os dados", divergent: "Documento diverge dos dados declarados", unreadable: "Documento ilegível ou incompleto" }[dc.verdict ?? "unreadable"];
+    factors.push({ key: "document_ai", label: "Conferência do documento por IA", points: Math.round(-POINTS_PER_LN_ODDS * docAdj), detail: `${label} (ajuste fora do modelo estatístico).` });
+  }
   const score = Math.max(0, Math.min(1000, Math.round(BASE_SCORE + POINTS_PER_LN_ODDS * (m.intercept - z))));
 
   const pdAnnualBps = Math.round(pdAnnual * 10_000);

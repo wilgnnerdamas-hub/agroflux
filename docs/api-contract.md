@@ -1275,6 +1275,14 @@ Características (`factors[].key`): `acceptance`, `declined`, `coobligation`, `t
 
 `ReceivableSummary` e `MarketplaceItem.receivable` ganham `risk: { score, rating }`.
 
+### 15.2.1 Analista de IA (Claude), aditivo em 11/10
+
+Ativo só quando o backend tem `ANTHROPIC_API_KEY` (modelo em `ANTHROPIC_MODEL`, padrão `claude-sonnet-5-5`); `GET /health` informa `features.ai`. A chave nunca vai para o frontend.
+
+- **Conferência do documento:** ao criar o recebível, o backend envia o documento (PDF ou imagem) e os dados declarados ao Claude, em segundo plano. `Receivable.documentCheck` = `{ status: pending|done|failed, model, requestedAt, checkedAt, verdict: consistent|divergent|unreadable|null, documentType, summary, fields: { field: amount|issueDate|dueDate|product|debtor, declared, found, status: match|mismatch|not_found }[], error }`. Com resultado, o risco ganha o fator `document_ai` (**ajuste fora do modelo estatístico**, em log-odds: divergente +0,7; ilegível +0,25; confere −0,1).
+- `POST /receivables/:id/document-check` → 202 com o recebível (conferência pendente). Sem IA: 503 `AI_UNAVAILABLE`.
+- `POST /receivables/:id/risk-memo` `{ lang: "pt" | "en" }` → `{ memo: { lang, model, createdAt, inputsHash, memo, strengths[], concerns[] } }`. Parecer curto a partir do risco, do preço e da conferência; guardado em `Receivable.riskMemos[lang]` enquanto os dados de entrada não mudarem. Falha da IA: 503 `AI_UNAVAILABLE`.
+
 ### 15.3 Taxa da AgroFlux on-chain (escrow v1.3)
 
 A instrução passa a `settle(amount, fee, document_hash)`, com as contas novas `treasury` e `treasury_settlement` (ATA de tBRL-DEMO da tesouraria, criada se preciso). Na **mesma transação**:

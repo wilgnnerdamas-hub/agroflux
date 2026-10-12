@@ -3,7 +3,8 @@
 import { Gauge } from "lucide-react";
 import { formatBps, formatMoney } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
-import type { Rating, Risk } from "@/lib/types";
+import type { Rating, Receivable, Risk } from "@/lib/types";
+import { RiskMemoBlock } from "./AiPanels";
 import { Card, CardTitle, Collapsible, InfoTip, cx } from "./ui";
 
 // Cor do rating: verde nos melhores, âmbar no meio, vermelho nos piores.
@@ -32,7 +33,7 @@ export function RatingBadge({ rating, score, className }: { rating: Rating; scor
 }
 
 /** Risco do recebível (contrato v1.3, §15.2): resumo sempre visível, fatores recolhíveis. */
-export function RiskCard({ risk, compact = false }: { risk: Risk; compact?: boolean }) {
+export function RiskCard({ risk, compact = false, receivable }: { risk: Risk; compact?: boolean; receivable?: Pick<Receivable, "id" | "riskMemos"> }) {
   const { t, locale } = useI18n();
   const k = t.risk;
   const pct = (v: number) => `${(v * 100).toLocaleString(locale === "pt" ? "pt-BR" : "en-US", { maximumFractionDigits: 0 })}%`;
@@ -92,6 +93,7 @@ export function RiskCard({ risk, compact = false }: { risk: Risk; compact?: bool
           </>
         )}
       </div>
+      {receivable && <RiskMemoBlock receivable={receivable} />}
     </Card>
   );
 }

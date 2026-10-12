@@ -118,3 +118,9 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 - **Clima real:** chuva de 12 meses contra a média dos 10 anos anteriores, num município agrícola de referência por UF (Open-Meteo, sem chave), com cache de 12 h e a tabela antiga como reserva. Nos testes fica desligado (`CLIMATE_SOURCE=off`).
 - O painel admin ganhou o cartão "Modelo de risco" (AUC, KS, Brier, calibração por decil e coeficientes). O cartão de risco do recebível identifica o modelo e a base sintética.
 - No pitch: o pipeline está pronto para dados reais (SCR do Banco Central, bureaus de crédito e satélite); hoje a base de treino é sintética.
+
+### B24 — Analista de IA com o Claude (11/10)
+- **Conferência do documento:** no cadastro, o Claude lê a nota (PDF ou imagem) e compara valor, emissão, vencimento, insumo e sacado com o que foi declarado, com saída estruturada por ferramenta. Roda em segundo plano, e uma falha não bloqueia o cadastro. Divergência vira o fator `document_ai`, como ajuste fora do modelo estatístico, identificado assim.
+- **Parecer da IA:** sob demanda no cartão de risco (distribuidora e financiador), com pontos fortes e de atenção, guardado por idioma. Rotulado como apoio à análise, não recomendação.
+- Chamada direta à Messages API por `fetch` (sem SDK), com a chave só no backend (`ANTHROPIC_API_KEY`). Sem chave, tudo fica desligado e oculto (`features.ai=false`).
+- Notas de teste para a demo: `docs/demo/nf-teste-confere.pdf` e `docs/demo/nf-teste-diverge.pdf` (valor trocado: R$ 148.320 em vez de R$ 184.320). Dados para cadastrar: Produtor Demo 21, MT, Fertilizante NPK 20-05-20, R$ 184.320,00, emissão 10/10/2026, vencimento 15/03/2027.

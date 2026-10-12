@@ -11,7 +11,7 @@ describe("GET /api/v1/health", () => {
       version: "1.3.0",
       cluster: "devnet",
       solana: { reachable: true, feePayerBalanceLamports: 1_000_000_000 },
-      features: { debtorConfirmation: true, assignment: false, marketplace: true, doubleSpendProof: false },
+      features: { debtorConfirmation: true, assignment: false, marketplace: true, doubleSpendProof: false, ai: false },
     });
   });
 

@@ -17,6 +17,7 @@ import type { ConfirmationService } from "./confirmation.js";
 import type { Registrar } from "./registration.js";
 import { resetDemo } from "./seed.js";
 import { createReceivable, getReceivable, listReceivables, type UploadedDocument } from "./receivables.js";
+import type { AiService } from "./ai/service.js";
 import type { Store } from "./store.js";
 import type { Health } from "./types.js";
 import { detectMime, validateReceivableInput } from "./validation.js";
@@ -36,6 +37,7 @@ export interface RouteDeps {
   pricing: PricingService;
   admin: AdminService;
   demoResetEnabled: boolean;
+  ai: AiService | null;
 }
 
 type IdParams = { Params: { id: string } };
@@ -68,7 +70,7 @@ async function readMultipart(req: FastifyRequest) {
 }
 
 export async function routes(api: FastifyInstance, deps: RouteDeps) {
-  const { store, chain, registrar, confirmations, listings, assignments, assignmentGateway, pricing, admin, demoResetEnabled } = deps;
+  const { store, chain, registrar, confirmations, listings, assignments, assignmentGateway, pricing, admin, demoResetEnabled, ai } = deps;
   const wallets = assignmentGateway?.parties.funderWallets ?? null;
   // v1.3: toda resposta com recebível leva o risco calculado na hora.
   const out = (r: Receivable) => pricing.present(r);
@@ -81,7 +83,7 @@ export async function routes(api: FastifyInstance, deps: RouteDeps) {
       version: API_VERSION,
       cluster: "devnet",
       solana,
-      features: { debtorConfirmation: true, assignment, marketplace: true, doubleSpendProof: assignment },
+      features: { debtorConfirmation: true, assignment, marketplace: true, doubleSpendProof: assignment, ai: ai !== null },
     };
   });
 
@@ -110,7 +112,20 @@ export async function routes(api: FastifyInstance, deps: RouteDeps) {
     const header = req.headers["x-client-sha256"];
     const clientSha256 = Array.isArray(header) ? header[0] : header;
     const receivable = createReceivable(store, result.value, { ...document, mimeType }, clientSha256);
-    return reply.status(201).send(out(receivable));
+    // 11/10: a IA confere o documento em segundo plano (quando configurada).
+    return reply.status(201).send(out(ai ? ai.startDocumentCheck(receivable.id) : receivable));
+  });
+
+  // 11/10: conferência do documento (repetir) e parecer de risco por IA.
+  api.post<IdParams>("/receivables/:id/document-check", async (req, reply) => {
+    if (!ai) throw new ApiError(503, "AI_UNAVAILABLE", "A análise por IA não está configurada neste ambiente.");
+    return reply.status(202).send(out(ai.startDocumentCheck(req.params.id)));
+  });
+
+  api.post<IdParams & { Body: { lang?: string } }>("/receivables/:id/risk-memo", async (req) => {
+    if (!ai) throw new ApiError(503, "AI_UNAVAILABLE", "A análise por IA não está configurada neste ambiente.");
+    const lang = req.body?.lang === "en" ? "en" : "pt";
+    return { memo: await ai.riskMemo(req.params.id, lang) };
   });
 
   api.get<IdParams>("/receivables/:id", async (req) => out(getReceivable(store, req.params.id)));

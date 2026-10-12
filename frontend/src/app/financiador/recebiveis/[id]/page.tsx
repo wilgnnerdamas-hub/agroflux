@@ -16,6 +16,7 @@ import { ReceivableSummary } from "@/components/passport/ReceivableSummary";
 import { OnChainRecords } from "@/components/passport/OnChainRecords";
 import { OfferBreakdown, OfferRate } from "@/components/passport/ProposalsPanel";
 import { RatingBadge, RiskCard } from "@/components/RiskCard";
+import { DocumentCheckCard } from "@/components/AiPanels";
 import { toMs, YieldChart } from "@/components/YieldChart";
 
 const inputCls =
@@ -206,8 +207,9 @@ export default function FunderReceivablePage() {
       />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
         <div className="order-2 min-w-0 space-y-6 lg:order-1">
-          {r.risk && <RiskCard risk={r.risk} compact />}
+          {r.risk && <RiskCard risk={r.risk} compact receivable={r} />}
           <ReceivableSummary receivable={r} />
+          <DocumentCheckCard receivable={r} onUpdated={() => void reload(true)} />
           <div>
             <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-faint">
               <ShieldCheck className="h-4 w-4" aria-hidden /> {f.checkTitle}

@@ -438,6 +438,12 @@ export function createMockApi(): AgroFluxApi {
     },
 
     // v1.3: o mock não precifica nem tem painel de administração (só o backend real calcula).
+    async runDocumentCheck() {
+      throw new ApiError("BACKEND_NOT_CONNECTED", "A análise por IA só existe com o backend real.", 0);
+    },
+    async requestRiskMemo() {
+      throw new ApiError("BACKEND_NOT_CONNECTED", "A análise por IA só existe com o backend real.", 0);
+    },
     async getPricingReference() {
       await delay(150, 300);
       return { cdiAnnualBps: 1490, cdiSource: "manual", cdiReferenceDate: null, platformFeeBps: 50, registryFeeCents: 2_500, pricedAt: new Date().toISOString().slice(0, 10) };

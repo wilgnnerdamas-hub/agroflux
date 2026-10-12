@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import type { ClaudeToolCaller } from "../src/ai/claude.js";
 import os from "node:os";
 import path from "node:path";
 import { createHash, randomBytes } from "node:crypto";
@@ -83,7 +84,7 @@ export async function createRegistered(built: Awaited<ReturnType<typeof makeApp>
 
 export async function makeApp(
   chain: ChainGateway = fakeChain(),
-  opts: { dataDir?: string; confirmTimeoutMs?: number; env?: Record<string, string>; assignmentGateway?: AssignmentGateway; cdiProvider?: CdiProvider; today?: string } = {},
+  opts: { dataDir?: string; confirmTimeoutMs?: number; env?: Record<string, string>; assignmentGateway?: AssignmentGateway; cdiProvider?: CdiProvider; today?: string; aiCaller?: ClaudeToolCaller } = {},
 ) {
   const dataDir = opts.dataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "agroflux-test-"));
   const config = loadConfig({ FRONTEND_ORIGIN: "http://localhost:3000", DATA_DIR: dataDir, CLIMATE_SOURCE: "off", ...opts.env });
@@ -96,6 +97,7 @@ export async function makeApp(
     assignmentGateway: opts.assignmentGateway,
     cdiProvider: opts.cdiProvider ?? fixedCdi(1490),
     today: () => today,
+    aiCaller: opts.aiCaller,
   });
   return { ...built, dataDir };
 }
