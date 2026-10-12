@@ -16,8 +16,10 @@ import type { CreateReceivableInput, Offer } from "./types.js";
 const isoDaysFromToday = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
 // PDF mínimo e válido, gerado na hora, com um texto que deixa claro que é fictício.
-export function demoPdf(title: string): Buffer {
-  const text = `${title} - documento ficticio de teste AgroFlux, sem valor juridico`.replace(/[()\\]/g, "");
+// O lote muda a cada reset: os documentos ganham hashes novos, porque as travas on-chain de cessões
+// anteriores são permanentes na Devnet (e recusariam ceder de novo o mesmo documento).
+export function demoPdf(title: string, batch: string = new Date().toISOString()): Buffer {
+  const text = `${title} - documento ficticio de teste AgroFlux, sem valor juridico - lote ${batch}`.replace(/[()\\]/g, "");
   const stream = `BT /F1 12 Tf 50 750 Td (${text}) Tj ET`;
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
@@ -129,8 +131,9 @@ export async function resetDemo(
   assignments: AssignmentService | null = null,
 ) {
   store.reset();
+  const batch = new Date().toISOString();
   for (const ex of EXAMPLES) {
-    const r = createReceivable(store, ex.input(), { filename: ex.filename, mimeType: "application/pdf", bytes: demoPdf(ex.title) });
+    const r = createReceivable(store, ex.input(), { filename: ex.filename, mimeType: "application/pdf", bytes: demoPdf(ex.title, batch) });
     if (ex.stage === "created") continue;
     await registrar.register(r.id);
     await registrar.settle(r.id);

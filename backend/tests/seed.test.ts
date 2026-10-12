@@ -57,6 +57,23 @@ describe("POST /api/v1/demo/reset", () => {
     expect(res.json().error.message).toMatch(/sem saldo/);
   });
 
+  it("cada reset gera documentos novos (as travas on-chain antigas não bloqueiam o seed)", async () => {
+    const { app } = await makeApp(fakeChain(), ON);
+    const hashes = async () => {
+      const list = (await app.inject({ method: "GET", url: "/api/v1/receivables" })).json();
+      return Promise.all(
+        list.items.map(async (i: { id: string }) => (await app.inject({ method: "GET", url: `/api/v1/receivables/${i.id}` })).json().documents[0].sha256 as string),
+      );
+    };
+    await app.inject({ method: "POST", url: "/api/v1/demo/reset" });
+    const first = await hashes();
+    await new Promise((r) => setTimeout(r, 5));
+    await app.inject({ method: "POST", url: "/api/v1/demo/reset" });
+    const second = await hashes();
+    expect(second.some((h) => first.includes(h))).toBe(false);
+    expect(demoPdf("X", "a").equals(demoPdf("X", "b"))).toBe(false);
+  });
+
   it("o PDF de exemplo é reconhecido como PDF", () => {
     const pdf = demoPdf("Teste");
     expect(detectMime(pdf)).toBe("application/pdf");
