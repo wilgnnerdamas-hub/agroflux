@@ -1,4 +1,5 @@
-// Financiadores demo, SIMULADOS (§3.13 do contrato v1.2). A é operado pela tela do financiador; B e C propõem sozinhos.
+// Financiadores demo, SIMULADOS (§3.13 do contrato v1.2). B e C propõem sozinhos ao publicar; desde a v1.3.1,
+// qualquer um dos três pode ser escolhido na entrada e propor pela tela do financiador.
 import type { Funder, FunderId, FunderMode, FunderType } from "./types.js";
 
 export interface FunderDef {

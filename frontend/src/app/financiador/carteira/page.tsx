@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatBps, formatDate, formatMoney, formatRateBps } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
-import { INTERACTIVE_FUNDER_ID } from "@/lib/labels";
+import { useRole } from "@/lib/role";
 import { prefersReducedMotion } from "@/lib/motion";
 import { useAsync } from "@/lib/useAsync";
 import type { PortfolioItem } from "@/lib/types";
@@ -109,7 +109,8 @@ function Portfolio() {
   const router = useRouter();
   const pathname = usePathname();
   const pos = useSearchParams().get("pos");
-  const { state, reload } = useAsync(() => api.getPortfolio(INTERACTIVE_FUNDER_ID));
+  const { funderId, funderName } = useRole();
+  const { state, reload } = useAsync(() => api.getPortfolio(funderId), [funderId]);
   const data = state.data;
   const items = useMemo(() => data?.items ?? [], [data]);
   // Na curva, só as posições em aberto (as pagas no vencimento já viraram caixa).
@@ -152,7 +153,7 @@ function Portfolio() {
 
   return (
     <>
-      <PageHeader title={f.portfolioTitle} subtitle={f.portfolioSubtitle} />
+      <PageHeader title={f.portfolioTitle} subtitle={f.portfolioSubtitleFor(funderName)} />
       <div className="space-y-10">
         {!data && state.status === "loading" && <div className="rounded-[14px] border border-border bg-surface p-6"><LoadingBlock lines={4} /></div>}
         {!data && state.status === "error" && <ErrorState message={state.error.message} onRetry={() => reload()} />}

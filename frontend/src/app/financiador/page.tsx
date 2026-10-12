@@ -5,7 +5,7 @@ import { ArrowRight, Inbox, UserCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatBps, formatDate, formatMoney } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
-import { INTERACTIVE_FUNDER_ID } from "@/lib/labels";
+import { useRole } from "@/lib/role";
 import { useAsync } from "@/lib/useAsync";
 import { useEffect } from "react";
 import { Card, EmptyState, ErrorState, LoadingBlock, PageHeader } from "@/components/ui";
@@ -16,7 +16,8 @@ const POLL_MS = 8000;
 export default function MarketplacePage() {
   const { t } = useI18n();
   const f = t.funder;
-  const { state, reload } = useAsync(() => api.getMarketplace(INTERACTIVE_FUNDER_ID));
+  const { funderId, funderName } = useRole();
+  const { state, reload } = useAsync(() => api.getMarketplace(funderId), [funderId]);
   const data = state.data;
 
   // Novos recebíveis publicados aparecem sozinhos.
@@ -27,7 +28,7 @@ export default function MarketplacePage() {
 
   return (
     <>
-      <PageHeader title={f.marketTitle} subtitle={f.marketSubtitle} />
+      <PageHeader title={f.marketTitle} subtitle={f.marketSubtitleFor(funderName)} />
       <div className="space-y-5">
 
         {!data && state.status === "loading" && <Card><LoadingBlock lines={4} /></Card>}

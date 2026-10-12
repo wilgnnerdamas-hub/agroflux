@@ -318,3 +318,32 @@ test("distribuidoras demo e configurações do painel", async ({ page }) => {
   await page.getByTestId("tab-distributors").click();
   await expect(page.getByText("Cerrado Insumos (demo)")).toBeVisible();
 });
+
+test("landing: escolher distribuidora ou financiador e abrir o Painel AgroFlux", async ({ page }) => {
+  await page.goto("/");
+  // Distribuidora: o seletor lista as três cadastradas no backend.
+  await page.getByTestId("hero-distributor").click();
+  const dist = page.getByTestId("chooser-distributor");
+  await expect(dist.getByRole("link")).toHaveCount(3);
+  await expect(dist).toContainText("Sul Sementes (demo)");
+  // Trocar para financiador fecha o anterior; Esc fecha.
+  await page.getByTestId("hero-funder").click();
+  await expect(dist).toHaveCount(0);
+  await expect(page.getByTestId("chooser-funder")).toContainText("Banco simulado · com IOF");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("chooser-funder")).toHaveCount(0);
+
+  // Entrar como Financiador Demo B: cabeçalho e telas usam o perfil escolhido.
+  await page.getByTestId("hero-funder").click();
+  await page.getByTestId("choose-fnd_b").click();
+  await expect(page).toHaveURL(/\/financiador$/);
+  await expect(page.getByTestId("role-chip")).toContainText("Financiador Demo B");
+  await expect(page.getByText("Financiador Demo B · recebíveis publicados").filter({ visible: true })).toBeVisible();
+  await page.goto("/financiador/carteira");
+  await expect(page.getByText("Recebíveis comprados pelo Financiador Demo B").filter({ visible: true })).toBeVisible();
+
+  // Painel AgroFlux logo abaixo dos dois botões.
+  await page.goto("/");
+  await page.getByTestId("hero-admin").click();
+  await expect(page).toHaveURL(/\/admin/);
+});

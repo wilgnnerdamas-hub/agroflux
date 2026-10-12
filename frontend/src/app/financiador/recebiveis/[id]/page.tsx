@@ -7,7 +7,7 @@ import { ArrowLeft, Send, ShieldCheck } from "lucide-react";
 import { api, toApiError } from "@/lib/api";
 import { formatBps, formatMoney, todayISO } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
-import { INTERACTIVE_FUNDER_ID } from "@/lib/labels";
+import { useRole } from "@/lib/role";
 import { useAsync } from "@/lib/useAsync";
 import type { Offer, Quote, Receivable } from "@/lib/types";
 import { Alert, Button, ButtonLink, Card, CardTitle, ErrorState, InfoTip, LoadingBlock, PageHeader, cx } from "@/components/ui";
@@ -31,6 +31,7 @@ function parseDecimal(s: string, locale: "pt" | "en"): number | null {
 
 function ProposalForm({ r, mine, onSent }: { r: Receivable; mine: Offer | null; onSent: () => void }) {
   const { t, errorMessage, locale } = useI18n();
+  const { funderId } = useRole();
   const f = t.funder;
   const fmt = (n: number) => n.toLocaleString(locale === "pt" ? "pt-BR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false });
   const suggested = r.risk?.spreadBaseBps ?? 400;
@@ -54,7 +55,7 @@ function ProposalForm({ r, mine, onSent }: { r: Receivable; mine: Offer | null; 
     let alive = true;
     const timer = setTimeout(() => {
       api
-        .quote(r.id, { funderId: INTERACTIVE_FUNDER_ID, spreadBps, feesCents })
+        .quote(r.id, { funderId, spreadBps, feesCents })
         .then((q) => {
           if (!alive) return;
           setQuote(q);
@@ -66,10 +67,10 @@ function ProposalForm({ r, mine, onSent }: { r: Receivable; mine: Offer | null; 
       alive = false;
       clearTimeout(timer);
     };
-  }, [r.id, spreadBps, feesCents, errorMessage]);
+  }, [r.id, funderId, spreadBps, feesCents, errorMessage]);
 
   const preview = useMemo(
-    () => (quote && quote.netAmountCents > 0 ? [{ paidCents: quote.presentValueCents - quote.feesCents, faceCents: r.amountCents, startMs: toMs(todayISO()), endMs: toMs(r.dueDate) }] : []),
+    () => (quote && quote.netAmountCents > 0 ? [{ paidCents: quote.funderCashOutCents, faceCents: r.amountCents, startMs: toMs(todayISO()), endMs: toMs(r.dueDate) }] : []),
     [quote, r.amountCents, r.dueDate],
   );
 
@@ -84,7 +85,7 @@ function ProposalForm({ r, mine, onSent }: { r: Receivable; mine: Offer | null; 
     }
     setBusy(true);
     try {
-      await api.proposeOffer(r.id, { funderId: INTERACTIVE_FUNDER_ID, spreadBps, feesCents });
+      await api.proposeOffer(r.id, { funderId, spreadBps, feesCents });
       setSent(true);
       onSent();
     } catch (err) {
@@ -117,7 +118,7 @@ function ProposalForm({ r, mine, onSent }: { r: Receivable; mine: Offer | null; 
       <div className="grid grid-cols-2 gap-3 rounded-lg bg-subtle p-4 text-sm" data-testid="quote-preview">
         <div>
           <p className="text-xs text-muted">{f.preview}</p>
-          <p className="mt-0.5 text-lg font-bold tabular-nums">{quote && !negative ? formatMoney(quote.presentValueCents - quote.feesCents) : "—"}</p>
+          <p className="mt-0.5 text-lg font-bold tabular-nums">{quote && !negative ? formatMoney(quote.funderCashOutCents) : "—"}</p>
         </div>
         <div>
           <p className="text-xs text-muted">{f.previewYield}</p>
@@ -125,7 +126,7 @@ function ProposalForm({ r, mine, onSent }: { r: Receivable; mine: Offer | null; 
         </div>
         <div>
           <p className="text-xs text-muted">{f.previewIncome}</p>
-          <p className="mt-0.5 font-semibold tabular-nums">{quote && !negative ? formatMoney(r.amountCents - (quote.presentValueCents - quote.feesCents)) : "—"}</p>
+          <p className="mt-0.5 font-semibold tabular-nums">{quote && !negative ? formatMoney(r.amountCents - quote.funderCashOutCents) : "—"}</p>
         </div>
         <div>
           <p className="flex items-center gap-1 text-xs text-muted">
@@ -157,6 +158,7 @@ export default function FunderReceivablePage() {
   const { t } = useI18n();
   const f = t.funder;
   const { id } = useParams<{ id: string }>();
+  const { funderId } = useRole();
   const { state, reload } = useAsync(async () => {
     const receivable = await api.getReceivable(id);
     const offers = receivable.chain.status === "confirmed" ? (await api.listOffers(id)).items : [];
@@ -182,9 +184,9 @@ export default function FunderReceivablePage() {
   if (!d) return null;
 
   const r = d.receivable;
-  const mine = d.offers.find((o) => o.funder.id === INTERACTIVE_FUNDER_ID) ?? null;
-  const others = d.offers.filter((o) => o.funder.id !== INTERACTIVE_FUNDER_ID);
-  const won = r.assignment.funderId === INTERACTIVE_FUNDER_ID || (!!mine && r.selectedOfferId === mine.id);
+  const mine = d.offers.find((o) => o.funder.id === funderId) ?? null;
+  const others = d.offers.filter((o) => o.funder.id !== funderId);
+  const won = r.assignment.funderId === funderId || (!!mine && r.selectedOfferId === mine.id);
 
   return (
     <>

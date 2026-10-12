@@ -194,17 +194,35 @@ describe("propostas do financiador e marketplace (v1.2)", () => {
     expect((await built.app.inject({ method: "GET", url: "/api/v1/marketplace" })).json().items).toHaveLength(0);
   });
 
-  it("valida a proposta: financiador interativo, faixas e valor líquido positivo", async () => {
+  it("valida a proposta: financiador demo, faixas e valor líquido positivo", async () => {
     const built = await makeApp();
     const { id } = await createPublished(built);
     const errors = async (body: object) => (await propose(built, id, body)).json().error.fieldErrors;
-    expect(await errors({ funderId: "fnd_b", spreadBps: 400, feesCents: 0 })).toEqual({ funderId: "Selecione um financiador demo válido." });
-    expect(await errors({ funderId: "fnd_x", spreadBps: 400, feesCents: 0 })).toHaveProperty("funderId");
+    expect(await errors({ funderId: "fnd_x", spreadBps: 400, feesCents: 0 })).toEqual({ funderId: "Selecione um financiador demo válido." });
     expect(await errors({ funderId: "fnd_a", spreadBps: 49, feesCents: 0 })).toHaveProperty("spreadBps");
     expect(await errors({ funderId: "fnd_a", spreadBps: 3_001, feesCents: 0 })).toHaveProperty("spreadBps");
     expect(await errors({ funderId: "fnd_a", spreadBps: 400.5, feesCents: 0 })).toHaveProperty("spreadBps");
     expect(await errors({ funderId: "fnd_a", spreadBps: 400, feesCents: 100_001 })).toHaveProperty("feesCents");
     expect((await propose(built, id, { funderId: "fnd_a", spreadBps: 400, feesCents: 0 })).statusCode).toBe(201);
+  });
+
+  it("v1.3.1: financiador B propõe pela tela e substitui a própria proposta automática", async () => {
+    const built = await makeApp();
+    const { id } = await createPublished(built);
+    const before: Offer[] = (await built.app.inject({ method: "GET", url: `/api/v1/receivables/${id}/offers` })).json().items;
+    const auto = before.find((o) => o.funder.id === "fnd_b")!;
+    expect(auto.origin).toBe("automatic");
+
+    const res = await propose(built, id, { funderId: "fnd_b", spreadBps: 180, feesCents: 5_000 });
+    expect(res.statusCode).toBe(201);
+    const offer = res.json().offer as Offer;
+    expect(offer).toMatchObject({ id: auto.id, origin: "proposal", spreadBps: 180, funder: { id: "fnd_b", type: "simulated_bank" } });
+    expect(offer.iofCents).toBeGreaterThan(0);
+
+    const after: Offer[] = (await built.app.inject({ method: "GET", url: `/api/v1/receivables/${id}/offers` })).json().items;
+    expect(after.map((o) => o.funder.id)).toEqual(["fnd_b", "fnd_c"]);
+    const market = (await built.app.inject({ method: "GET", url: "/api/v1/marketplace?funderId=fnd_b" })).json();
+    expect(market.items[0].myOffer).toMatchObject({ id: auto.id, spreadBps: 180 });
   });
 
   it("proposta antes da publicação: 409; recebível inexistente: 404", async () => {

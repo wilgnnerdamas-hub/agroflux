@@ -145,7 +145,7 @@ function PublicShell({ children }: { children: React.ReactNode }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
   const pathname = usePathname();
-  const { role: storedRole, distributorName } = useRole();
+  const { role: storedRole, distributorName, funderName } = useRole();
   if (pathname.startsWith("/confirmar/")) return <PublicShell>{children}</PublicShell>;
   if (pathname === "/") return <LandingShell>{children}</LandingShell>;
 
@@ -205,7 +205,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 title={t.shell.switchProfile}
                 data-testid="role-chip"
               >
-                <span className="hidden font-medium text-ink md:inline">{role === "distributor" ? distributorName : role === "funder" ? t.shell.roleFunder : t.shell.roleAdmin}</span>
+                <span className="hidden font-medium text-ink md:inline">{role === "distributor" ? distributorName : role === "funder" ? funderName : t.shell.roleAdmin}</span>
                 <ArrowLeftRight className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden />
                 <span className="sr-only">{t.shell.switchProfile}</span>
               </Link>

@@ -799,7 +799,7 @@ O financiador envia ou revisa a proposta.
 { "funderId": "fnd_a", "monthlyRateBps": 140, "feesCents": 10000 }
 ```
 
-- Permitido quando `status = published` e só para financiadores `interactive` (A).
+- Permitido quando `status = published`, para qualquer financiador demo. **[v1.3.1]** Antes, só o `interactive` (A). Uma proposta de B ou C pela tela substitui a proposta automática dele (`origin: "proposal"`).
 - Uma proposta por financiador e recebível: um novo envio revisa a mesma proposta (mesmo `id`, novo `updatedAt`).
 - Evento `offer_proposed`. Resposta `201` com `{ offer, receivable }`.
 
@@ -807,7 +807,7 @@ Validação:
 
 | Campo | Regra | Mensagem |
 |---|---|---|
-| `funderId` | Financiador `interactive` existente. | "Selecione um financiador demo válido." |
+| `funderId` | Financiador demo existente (`fnd_a`, `fnd_b` ou `fnd_c`). **[v1.3.1]** | "Selecione um financiador demo válido." |
 | `monthlyRateBps` | Inteiro de 50 a 500. | "Informe uma taxa entre 0,50% e 5,00% ao mês." |
 | `feesCents` | Inteiro de 0 a 100000. | "Informe tarifas entre R$ 0 e R$ 1.000." |
 | (valor líquido) | Maior que zero. | "Com essa taxa e esse prazo, o valor líquido ficaria negativo." |
@@ -1199,6 +1199,7 @@ Enquanto a API não estiver pronta, o frontend pode rodar com `NEXT_PUBLIC_API_M
 | 1.1 | 09/10/2026 | Aprovada pela gestão. Confirmação do sacado (§3.9, §4.5, §5.10–5.13, §6.3), cessão tokenizada (§3.10, §4.6, §4.7, §5.14, §6.4), confirmação obrigatória antes da seleção (G1), `features` no health e novos totais. |
 | 1.2 | 10/10/2026 | (Ajuste do mesmo dia: avisos de simulação concentrados na faixa fixa e no painel "Sobre a demo"; `offerCount` no resumo da lista.) Definida pela gestão. Registradora simulada (§3.11), publicação com termo de coobrigação (§3.12, §5.16–5.17, §6.6), propostas e financiadores demo (§3.13, §5.18–5.21), trava por documento e prova de recusa (§3.10.1, §5.22, §6.5), verificação da cessão (§6.7), transparência (§5.23), estado `published` e `DUPLICATE_DOCUMENT`. |
 | 1.3 | 10/10/2026 | Definida pela gestão (G4). Precificação CDI + spread em dias úteis, risco (score, rating AA–H, perda esperada), taxa da AgroFlux on-chain (escrow com terceira perna), três distribuidoras demo e painel de administração (§15). |
+| 1.3.1 | 12/10/2026 | Pedido da gestão: o visitante escolhe na entrada qual financiador demo operar, e qualquer um deles pode propor pela tela (§5.18). B e C continuam com as propostas automáticas ao publicar. |
 
 ---
 

@@ -67,7 +67,7 @@ function Panel({ title, aside, children, className }: { title: string; aside?: R
 export default function TransparencyPage() {
   const { t, locale } = useI18n();
   const tr = t.transparency;
-  const { role, distributorId } = useRole();
+  const { role, distributorId, funderId } = useRole();
   const { state, reload } = useAsync(() => api.getTransparency());
   const [spin, setSpin] = useState(0);
   const d = state.data;
@@ -78,7 +78,7 @@ export default function TransparencyPage() {
       : w.settlementUnits == null ? null : { v: nf(w.settlementUnits / 100, 2), unit: "tBRL-DEMO" };
   const isMine = (w: TransparencyWallet) =>
     (role === "distributor" && w.role === "distributor" && (w.distributorId ?? "dst_a") === distributorId) ||
-    (role === "funder" && w.role === "funder" && w.funderId === "fnd_a") ||
+    (role === "funder" && w.role === "funder" && w.funderId === funderId) ||
     (role === "admin" && w.role === "treasury");
   const roleLabel = (w: TransparencyWallet) => tr.roles[w.role];
   const programDesc = (r: string) => tr.programDesc[r as keyof typeof tr.programDesc] ?? "";

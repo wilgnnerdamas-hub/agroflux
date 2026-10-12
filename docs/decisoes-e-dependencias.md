@@ -134,3 +134,9 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 - O passaporte (depois da cessão) ganhou "Simular pagamento do sacado". Numa só transação, a face em tBRL-DEMO vai ao financiador, o token do recebível é queimado e um memo de quitação é gravado. Sem estado novo: `assignment.maturityPayment`, para não mexer no fluxo existente.
 - Carteira do financiador: posições pagas saem da curva e mostram "Paga · recebido R$ X". O admin mostra "Paga no vencimento", e o verificador público mostra a prova do pagamento.
 - O pagamento é simulado: na vida real, viria do sacado pelo domicílio de pagamento da registradora.
+
+### F24 — Entrada com escolha do perfil demo e Painel AgroFlux no hero (12/10)
+- Na landing, "Entrar como distribuidora" e "Entrar como financiador" abrem um seletor com os perfis cadastrados no backend (as três distribuidoras e os Financiadores A, B e C, com o tipo e o efeito no IOF). Logo abaixo fica o botão "Painel AgroFlux". O seletor fecha com Esc ou no X, e só um fica aberto por vez.
+- O financiador escolhido fica em `agroflux.funder` (localStorage), como a distribuidora. A vitrine, a carteira, a proposta, a transparência e o cabeçalho usam esse perfil.
+- Backend (contrato v1.3.1): qualquer financiador demo pode propor pela tela. A proposta de B ou C substitui a automática dele (mesmo `id`, `origin: "proposal"`).
+- A prévia "Você aporta" passou a usar `funderCashOutCents` do backend. Antes, ignorava o IOF, o que só aparecia com o Financiador B (banco).

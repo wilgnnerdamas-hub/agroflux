@@ -251,7 +251,7 @@ const server = createServer(async (req, res) => {
       const r = find(mm[1]);
       if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
       const b = await json(req);
-      const f = FUNDERS.find((x) => x.id === b.funderId && x.mode === "interactive");
+      const f = FUNDERS.find((x) => x.id === b.funderId);
       const fe = {};
       if (!f) fe.funderId = "Selecione um financiador demo válido.";
       if (!Number.isInteger(b.spreadBps) || b.spreadBps < 50 || b.spreadBps > 3000) fe.spreadBps = "Informe um spread entre 0,50% e 30,00% ao ano.";
@@ -271,7 +271,7 @@ const server = createServer(async (req, res) => {
       if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
       const b = await json(req);
       if (!Number.isInteger(b.spreadBps) || b.spreadBps < 50 || b.spreadBps > 3000) return err(res, 422, "VALIDATION_ERROR", "Alguns campos precisam de ajuste.", { fieldErrors: { spreadBps: "Informe um spread entre 0,50% e 30,00% ao ano." } });
-      return send(res, 200, quote(r, "simulated_fidc", b.spreadBps, b.feesCents ?? 0));
+      return send(res, 200, quote(r, FUNDERS.find((x) => x.id === b.funderId)?.type ?? "simulated_fidc", b.spreadBps, b.feesCents ?? 0));
     }
     if ((mm = m(/^\/receivables\/([^/]+)\/offers\/([^/]+)\/select$/)) && req.method === "POST") {
       const r = find(mm[1]);

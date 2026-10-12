@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { ArrowRight, Check } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ArrowRight, Check, ChevronDown, Landmark, LayoutDashboard, Store, X } from "lucide-react";
 import { api, API_MODE } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import { DISTRIBUTORS, useRole } from "@/lib/role";
+import { DISTRIBUTORS, FUNDERS, useRole } from "@/lib/role";
 import type { Receivable } from "@/lib/types";
 import { cx } from "@/components/ui";
 
@@ -223,11 +223,74 @@ function SectionHead({ id, title, intro }: { id: string; title: string; intro: s
   );
 }
 
+// ---------- Entrada: escolha do perfil demo (os mesmos cadastrados no backend) ----------
+
+type Chooser = "distributor" | "funder";
+
+function ProfileChooser({ kind, onClose }: { kind: Chooser; onClose: () => void }) {
+  const { t } = useI18n();
+  const { setRole } = useRole();
+  const l = t.landing;
+  const isDist = kind === "distributor";
+  const Icon = isDist ? Store : Landmark;
+  const options = isDist
+    ? DISTRIBUTORS.map((d) => ({ id: d.id, name: d.name, hint: l.distributorHint, href: "/distribuidor" }))
+    : FUNDERS.map((f) => ({ id: f.id, name: f.name, hint: l.funderKinds[f.id], href: "/financiador" }));
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      id="profile-chooser"
+      role="region"
+      aria-label={isDist ? l.chooseDistributor : l.chooseFunder}
+      className="agf-up overflow-hidden rounded-[14px] border border-[var(--lp-border)] bg-[var(--lp-surface)]"
+      data-testid={`chooser-${kind}`}
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--lp-divider)] px-4 py-2.5">
+        <p className="text-xs font-medium text-[var(--lp-muted)]">{isDist ? l.chooseDistributor : l.chooseFunder}</p>
+        <button type="button" onClick={onClose} className="rounded-md p-1 text-[var(--lp-faint)] transition-colors hover:text-[var(--lp-ink)]" aria-label={l.closeChooser}>
+          <X className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+        </button>
+      </div>
+      <ul>
+        {options.map((o, i) => (
+          <li key={o.id} className="agf-rise border-t border-[var(--lp-divider)] first:border-t-0" style={{ animationDelay: `${i * 40}ms` }}>
+            <Link
+              href={o.href}
+              onClick={() => setRole(kind, o.id)}
+              className="group flex items-center gap-3 px-4 py-3 transition-colors duration-200 hover:bg-[var(--lp-bg)]"
+              data-testid={`choose-${o.id}`}
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--lp-green-soft)] text-[var(--lp-green)]">
+                <Icon className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{o.name}</span>
+                <span className="block text-xs text-[var(--lp-faint)]">{o.hint}</span>
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-[var(--lp-faint)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--lp-green)]" strokeWidth={1.5} aria-hidden />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const { t } = useI18n();
   const { setRole } = useRole();
   const l = t.landing;
   const [mainDistributor, ...otherDistributors] = DISTRIBUTORS;
+  const [mainFunder, ...otherFunders] = FUNDERS;
+  const [chooser, setChooser] = useState<Chooser | null>(null);
+  const closeChooser = useCallback(() => setChooser(null), []);
+  const toggle = (k: Chooser) => setChooser((c) => (c === k ? null : k));
 
   return (
     <div className="text-[var(--lp-ink)]">
@@ -242,20 +305,46 @@ export default function LandingPage() {
             {l.title}
           </h1>
           <p className="mt-6 max-w-[500px] text-[17px] leading-relaxed text-[var(--lp-muted)]">{l.subtitle}</p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-8 flex max-w-[520px] flex-col gap-3">
+            <div className="grid gap-3 min-[560px]:max-[899px]:grid-cols-2 min-[1120px]:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => toggle("distributor")}
+                aria-expanded={chooser === "distributor"}
+                aria-controls="profile-chooser"
+                className={cx(
+                  "inline-flex min-h-[46px] items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-4 text-sm font-medium text-white transition-colors",
+                  chooser === "distributor" ? "bg-[var(--lp-ink)]" : "bg-[var(--lp-green)] hover:bg-[var(--lp-ink)]",
+                )}
+                data-testid="hero-distributor"
+              >
+                {l.enterDistributor}
+                <ChevronDown className={cx("h-4 w-4 transition-transform duration-200", chooser === "distributor" && "rotate-180")} strokeWidth={1.5} aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => toggle("funder")}
+                aria-expanded={chooser === "funder"}
+                aria-controls="profile-chooser"
+                className={cx(
+                  "inline-flex min-h-[46px] items-center justify-center gap-2 whitespace-nowrap rounded-[10px] border bg-[var(--lp-surface)] px-4 text-sm font-medium transition-colors",
+                  chooser === "funder" ? "border-[var(--lp-ink)]" : "border-[var(--lp-border)] hover:border-[var(--lp-ink)]",
+                )}
+                data-testid="hero-funder"
+              >
+                {l.enterFunder}
+                <ChevronDown className={cx("h-4 w-4 transition-transform duration-200", chooser === "funder" && "rotate-180")} strokeWidth={1.5} aria-hidden />
+              </button>
+            </div>
+            {chooser && <ProfileChooser key={chooser} kind={chooser} onClose={closeChooser} />}
             <Link
-              href="/distribuidor"
-              onClick={() => setRole("distributor", mainDistributor.id)}
-              className="inline-flex min-h-[46px] items-center justify-center rounded-[10px] bg-[var(--lp-green)] px-5 text-sm font-medium text-white transition-colors hover:bg-[var(--lp-ink)]"
+              href="/admin"
+              onClick={() => setRole("admin")}
+              className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[10px] border border-[var(--lp-border)] bg-[var(--lp-surface)] px-5 text-sm font-medium text-[var(--lp-muted)] transition-colors hover:border-[var(--lp-ink)] hover:text-[var(--lp-ink)]"
+              data-testid="hero-admin"
             >
-              {l.enterDistributor}
-            </Link>
-            <Link
-              href="/financiador"
-              onClick={() => setRole("funder")}
-              className="inline-flex min-h-[46px] items-center justify-center rounded-[10px] border border-[var(--lp-border)] bg-[var(--lp-surface)] px-5 text-sm font-medium transition-colors hover:border-[var(--lp-ink)]"
-            >
-              {l.enterFunder}
+              <LayoutDashboard className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+              {l.openAdmin}
             </Link>
           </div>
           <p className="mt-3 text-xs text-[var(--lp-faint)]">{l.demoAccess}</p>
@@ -322,18 +411,35 @@ export default function LandingPage() {
               ))}
             </p>
           </div>
-          <Link
-            href="/financiador"
-            onClick={() => setRole("funder")}
-            className="lp-lift group flex flex-col rounded-2xl border border-[var(--lp-border)] bg-[var(--lp-surface)] p-8 hover:-translate-y-[3px] hover:border-[var(--lp-green)]"
+          <div
+            className="lp-lift flex flex-col rounded-2xl border border-[var(--lp-border)] bg-[var(--lp-surface)] p-8 hover:-translate-y-[3px] hover:border-[var(--lp-green)]"
             data-testid="enter-funder"
           >
-            <span className="text-xl font-medium">{l.funderCard.title}</span>
-            <span className="mt-2 flex-1 text-[15px] leading-relaxed text-[var(--lp-muted)]">{l.funderCard.text}</span>
-            <span className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-[var(--lp-green)]">
+            <p className="text-xl font-medium">{l.funderCard.title}</p>
+            <p className="mt-2 flex-1 text-[15px] leading-relaxed text-[var(--lp-muted)]">{l.funderCard.text}</p>
+            <Link
+              href="/financiador"
+              onClick={() => setRole("funder", mainFunder.id)}
+              className="group mt-6 inline-flex items-center gap-2 self-start text-sm font-medium text-[var(--lp-green)] hover:underline"
+              data-testid={`enter-${mainFunder.id}`}
+            >
               {l.enterFunder} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} aria-hidden />
-            </span>
-          </Link>
+            </Link>
+            <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--lp-divider)] pt-4 text-xs text-[var(--lp-faint)]">
+              {l.otherDistributors}
+              {otherFunders.map((f) => (
+                <Link
+                  key={f.id}
+                  href="/financiador"
+                  onClick={() => setRole("funder", f.id)}
+                  className="rounded-full border border-[var(--lp-border)] px-2.5 py-0.5 font-medium text-[var(--lp-ink)] transition-colors hover:border-[var(--lp-green)] hover:text-[var(--lp-green)]"
+                  data-testid={`enter-${f.id}`}
+                >
+                  {f.name}
+                </Link>
+              ))}
+            </p>
+          </div>
         </div>
         <Link
           href="/admin"

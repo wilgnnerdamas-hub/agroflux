@@ -82,7 +82,8 @@ export function listOffers(store: Store, id: string): OfferList {
 function validateProposal(body: unknown) {
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const fieldErrors: Record<string, string> = {};
-  if (!(isFunderId(b.funderId) && funderDef(b.funderId).mode === "interactive")) fieldErrors.funderId = "Selecione um financiador demo válido.";
+  // v1.3.1: qualquer financiador demo pode propor pela tela; B e C também seguem com as propostas automáticas.
+  if (!isFunderId(b.funderId)) fieldErrors.funderId = "Selecione um financiador demo válido.";
   const spread = b.spreadBps;
   if (!Number.isInteger(spread) || (spread as number) < 50 || (spread as number) > 3_000) fieldErrors.spreadBps = "Informe um spread entre 0,50% e 30,00% ao ano.";
   const fees = b.feesCents;
@@ -98,7 +99,7 @@ export async function quoteOffer(store: Store, pricing: PricingService, id: stri
   return pricing.quote(r, funderDef(v.funderId).type, v.spreadBps, v.feesCents);
 }
 
-// §5.18: o financiador interativo envia ou revisa a proposta (uma por financiador e recebível).
+// §5.18: o financiador escolhido na entrada envia ou revisa a proposta (uma por financiador e recebível).
 export async function proposeOffer(store: Store, pricing: PricingService, id: string, body: unknown): Promise<{ offer: Offer; receivable: Receivable }> {
   const r = getReceivable(store, id);
   const v = validateProposal(body);
