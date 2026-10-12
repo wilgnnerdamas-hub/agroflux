@@ -95,6 +95,13 @@ Novas funções A (confirmação do sacado) e B (cessão tokenizada + liquidaç�
     (liquidação em 3 pernas com taxa na tesouraria, verificação 11/11, prova de recusa) e `/admin` conferido.
     Falta: roteiro da demo v1.3 e gravação de reserva.
 
+**11/10 (noite): risco com IA e ciclo completo** (decisões B23–B25, F20–F23)
+17. Telas da distribuidora, financiador (carteira com curva interativa) e admin no estilo do Claude Design.
+18. Risco por regressão logística (base sintética, AUC 0,79), chuva real (Open-Meteo), analista de IA (OpenAI ou
+    Anthropic: conferência do documento e parecer), verificador público `/verificar`, pagamento no vencimento (face ao
+    financiador + token queimado). Backend 100 testes, e2e 14/14. README em inglês e licença MIT.
+    Antes de gravar: `/demo/reset` (o seed agora gera documentos novos a cada reset).
+
 **12/10: só correções críticas e submissão.**
 
 ## Comandos do backend (dentro de `backend/`)
