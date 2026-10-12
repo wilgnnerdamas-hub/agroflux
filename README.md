@@ -43,6 +43,13 @@ After the assignment:
 - **Cheap, fast proofs:** each gate is a sub-cent transaction that confirms in seconds, so every step of a small agri receivable can be anchored.
 - **Invisible to the user:** the demo uses backend-held demo wallets and a fee payer, so distributors and farmers never see a wallet or pay gas. Self-custody for funders is on the roadmap.
 
+## Market and positioning
+
+- Input distributors billed **R$ 171 billion** in 2025 (Andav members), deliver 47% of the inputs that reach Brazilian farmers and already fund **about 20% of agricultural credit**, with their own cash.
+- Stress is at a record: 1,990 agribusiness bankruptcy filings in 2025 (+56%, Serasa Experian) and farmer default up from 1.4% to 4.4% since 2021 (Central Bank).
+- Capital is there: agricultural credit funds (Fiagros) at R$ 41–45 billion, with the receivables category up 93% in a year. The bottleneck is trustworthy, cheap-to-verify collateral.
+- Brazil's new electronic duplicata (Res. BCB 540/2025) makes registries block a second assignment inside their systems. AgroFlux **sits on top of these rails**: public verification of the whole dossier, a marketplace where funders compete, and atomic settlement with the fee built in, which neither registries nor agri-lenders provide.
+
 ## Pricing and risk, as in the market
 
 - **Rate:** daily **CDI from the Central Bank of Brazil** (SGS series 4389, with a manual fallback). Annual rate = (1 + CDI) × (1 + spread) − 1. Present value is computed on **business days, base 252**, with Brazilian holidays.

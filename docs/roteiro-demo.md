@@ -20,7 +20,7 @@ Duração alvo: **6 a 7 minutos** de tela (para o vídeo de 3 minutos, use o ata
    - **Notebook B (outra aba):** a mesma URL → "Entrar como financiador".
    - **Notebook C (outra aba):** a mesma URL → "Entrar como AgroFlux" (painel de operação).
    - **Celular:** para escanear o QR code do aceite.
-4. Ter um PDF de teste **novo** à mão. A registradora recusa um documento repetido; se quiser mostrar isso, reenvie o mesmo PDF de propósito.
+4. Ter um PDF de teste **novo** à mão (`docs/demo/nf-gravacao-1.pdf`, `-2`, `-3`; cada cessão trava a nota para sempre). A registradora recusa um documento repetido; se quiser mostrar isso, reenvie o mesmo PDF de propósito.
 5. Para gravar em inglês, use o seletor **EN** no topo de qualquer tela.
 
 ## Roteiro
@@ -28,7 +28,7 @@ Duração alvo: **6 a 7 minutos** de tela (para o vídeo de 3 minutos, use o ata
 | # | Tela | O que fazer | O que dizer (resumo) |
 |---|---|---|---|
 | 1 | Página inicial | Deixar o passaporte animado rodar. Mostrar as três perguntas e os cinco portões. | "Antes de antecipar um recebível, o financiador pergunta: ele existe, o comprador reconhece e já foi vendido? A AgroFlux responde as três com um passaporte verificável na Solana." |
-| 2 | Novo recebível | Entrar como distribuidora e cadastrar com os dados da nota de teste (Produtor Demo 45, MT, Fertilizante NPK 20-05-20, R$ 184.320,00, emissão 10/10/2026, vencimento 15/03/2027). Anexar `docs/demo/nf-teste-confere.pdf`. O hash aparece no navegador. | "O título ganha um número na registradora, que aqui é simulada. Só hashes vão para a blockchain." |
+| 2 | Novo recebível | Entrar como distribuidora e cadastrar com os dados da nota de teste (Produtor Demo 45, MT, Fertilizante NPK 20-05-20, R$ 184.320,00, emissão 10/10/2026, vencimento 15/03/2027). Anexar `docs/demo/nf-gravacao-1.pdf` (ou `-2`/`-3` se precisar refazer; a `nf-teste-confere.pdf` já foi cedida e travada on-chain). O hash aparece no navegador. | "O título ganha um número na registradora, que aqui é simulada. Só hashes vão para a blockchain." |
 | 3 | Passaporte | Mostrar a **Conferência do documento por IA** (todos os campos conferem). **Registrar na Solana Devnet**. Mostrar o cartão de risco e clicar em **Gerar parecer da IA**. | "Uma IA lê a nota e confere com o que foi digitado. O risco vem de um modelo estatístico (regressão logística) com chuva real da região; o histórico do produtor e a base de treino são simulados." |
 | 4 | Aceite do sacado | **Gerar QR code** e escanear com o celular. No celular, **Aceitar título**. O rating melhora. | "No balcão, o produtor aceita o título pelo celular. O aceite vai para a Solana e reduz o risco. Num produto real, ele seria feito na registradora ou na nota fiscal." |
 | 5 | Publicação | Ler o termo, marcar o aceite e **Publicar para financiadores**. Chegam as propostas de B e C. | "A distribuidora assume a coobrigação, e o hash do termo também fica on-chain." |

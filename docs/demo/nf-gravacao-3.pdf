@@ -1,0 +1,50 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Length 1119 >>
+stream
+BT /F2 8 Tf 56 780 Td (DOCUMENTO DE TESTE - SEM VALOR FISCAL - DEMONSTRACAO AGROFLUX) Tj ET
+BT /F2 15 Tf 56 762 Td (NF-e de teste n. 000.463  -  Serie 1) Tj ET
+BT /F1 8.5 Tf 56 736 Td (Natureza da operacao: Venda de insumos agricolas a prazo) Tj ET
+BT /F1 8.5 Tf 56 718 Td (Data de emissao: 10/10/2026) Tj ET
+BT /F2 11 Tf 56 700 Td (EMITENTE) Tj ET
+BT /F1 8.5 Tf 56 682 Td (Distribuidora Demo \(empresa ficticia\)  -  CNPJ omitido \(teste\)) Tj ET
+BT /F2 11 Tf 56 664 Td (DESTINATARIO) Tj ET
+BT /F1 8.5 Tf 56 646 Td (Produtor Demo 45 \(pseudonimo\)  -  Sorriso / MT) Tj ET
+BT /F2 11 Tf 56 628 Td (PRODUTOS) Tj ET
+BT /F1 8.5 Tf 56 610 Td (Fertilizante NPK 20-05-20  -  48 t  x  R$ 3.840,00 /t) Tj ET
+BT /F2 11 Tf 56 590 Td (VALOR TOTAL DA NOTA: R$ 184.320,00) Tj ET
+BT /F2 11 Tf 56 570 Td (FATURA / DUPLICATA) Tj ET
+BT /F1 8.5 Tf 56 552 Td (Duplicata 001/1  -  Vencimento: 15/03/2027  -  Valor: R$ 184.320,00) Tj ET
+BT /F1 8.5 Tf 56 534 Td (Condicao de pagamento: a prazo, safra 2026/27 \(pagamento na colheita\)) Tj ET
+BT /F1 7 Tf 56 516 Td (Documento gerado para testes. Nao possui validade juridica ou fiscal.) Tj ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000348 00000 n 
+0000000450 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+1620
+%%EOF
