@@ -10,6 +10,7 @@ import type {
   Distributor,
   PricingReference,
   RiskMemo,
+  DocumentVerification,
   Quote,
   Settings,
   ConfirmationSummary,
@@ -142,6 +143,7 @@ export function createHttpApi(baseUrl: string): AgroFluxApi {
     },
     getTransparency: () => request<Transparency>("/transparency"),
     getPricingReference: () => request<PricingReference>("/pricing/reference"),
+    verifyDocument: (sha256) => request<DocumentVerification>(`/verify/${encodeURIComponent(sha256)}`),
     runDocumentCheck: (id) => request<Receivable>(`/receivables/${encodeURIComponent(id)}/document-check`, { method: "POST" }),
     async requestRiskMemo(id, lang) {
       const r = await request<{ memo: RiskMemo }>(`/receivables/${encodeURIComponent(id)}/risk-memo`, {

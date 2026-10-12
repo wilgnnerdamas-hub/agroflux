@@ -8,6 +8,7 @@ import type {
   Distributor,
   PricingReference,
   RiskMemo,
+  DocumentVerification,
   Quote,
   Settings,
   ConfirmationSummary,
@@ -60,6 +61,7 @@ export interface AgroFluxApi {
   // 11/10: analista de IA (Claude).
   runDocumentCheck(id: string): Promise<Receivable>;
   requestRiskMemo(id: string, lang: "pt" | "en"): Promise<RiskMemo>;
+  verifyDocument(sha256: string): Promise<DocumentVerification>;
   quote(id: string, input: { funderId: string; spreadBps: number; feesCents: number }): Promise<Quote>;
   listDistributors(): Promise<{ items: Distributor[] }>;
   adminOverview(): Promise<AdminOverview>;

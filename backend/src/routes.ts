@@ -18,6 +18,7 @@ import type { Registrar } from "./registration.js";
 import { resetDemo } from "./seed.js";
 import { createReceivable, getReceivable, listReceivables, type UploadedDocument } from "./receivables.js";
 import type { AiService } from "./ai/service.js";
+import { verifyDocument } from "./verify-document.js";
 import type { Store } from "./store.js";
 import type { Health } from "./types.js";
 import { detectMime, validateReceivableInput } from "./validation.js";
@@ -129,6 +130,9 @@ export async function routes(api: FastifyInstance, deps: RouteDeps) {
   });
 
   api.get<IdParams>("/receivables/:id", async (req) => out(getReceivable(store, req.params.id)));
+
+  // 11/10: verificador público por hash do documento (registro, etapas e trava on-chain).
+  api.get<{ Params: { sha256: string } }>("/verify/:sha256", async (req) => verifyDocument(store, assignmentGateway, req.params.sha256));
 
   api.post<IdParams>("/receivables/:id/register", async (req, reply) => {
     const header = req.headers["idempotency-key"];

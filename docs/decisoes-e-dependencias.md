@@ -125,3 +125,7 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 - Chamada direta à Messages API por `fetch` (sem SDK), com a chave só no backend (`ANTHROPIC_API_KEY`). Sem chave, tudo fica desligado e oculto (`features.ai=false`).
 - Notas de teste para a demo: `docs/demo/nf-teste-confere.pdf` e `docs/demo/nf-teste-diverge.pdf` (valor trocado: R$ 148.320 em vez de R$ 184.320). Dados para cadastrar: Produtor Demo 45, MT, Fertilizante NPK 20-05-20, R$ 184.320,00, emissão 10/10/2026, vencimento 15/03/2027.
 - (11/10) Provedor da IA configurável: `OPENAI_API_KEY` (Chat Completions, PDF como parte `file`, saída por function calling; modelo em `OPENAI_MODEL`, padrão `gpt-4.1`) ou `ANTHROPIC_API_KEY`. O serviço de IA é o mesmo para os dois.
+
+### F23 — Verificador público e seed com documentos únicos (11/10)
+- `/verificar`: arraste um documento, e o navegador calcula o SHA-256 e consulta `GET /verify/:sha256`. Mostra o registro, as provas na Devnet (registro, aceite, termo e cessão) e a **trava on-chain do escrow, lida direto da rede só pelo hash**. É a dupla cessão vista de fora, por exemplo por um segundo financiador.
+- Seed: cada `/demo/reset` gera documentos com um lote novo, para ter hashes novos. Antes, as travas on-chain permanentes de cessões anteriores faziam o AGF-0003 falhar (`DOCUMENT_ALREADY_ASSIGNED`) e fariam o próximo reset falhar no AGF-0004.

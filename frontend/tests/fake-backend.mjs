@@ -119,6 +119,18 @@ const server = createServer(async (req, res) => {
   const m = (re) => p.match(re);
   const find = (id) => db.get(id);
   try {
+    if (req.method === "GET" && p.startsWith("/verify/")) {
+      const sha = p.slice("/verify/".length).toLowerCase();
+      if (!/^[0-9a-f]{64}$/.test(sha)) return send(res, 400, { error: { code: "BAD_REQUEST", message: "Hash inválido." } });
+      const r = [...db.values()].find((x) => x.documents[0].sha256 === sha);
+      const tx = (sig) => (sig ? { signature: sig, explorerUrl: `https://explorer.solana.com/tx/${sig}?cluster=devnet` } : null);
+      return send(res, 200, {
+        isSimulated: true, sha256: sha, found: !!r,
+        receivable: r ? { reference: r.reference, registryId: r.registry.registryId, status: r.status, distributor: r.distributor.name, debtorAlias: r.debtor.alias, debtorState: r.debtor.state, dueDate: r.dueDate, registeredAt: r.chain.confirmedAt } : null,
+        proofs: r ? { registration: r.chain.status === "confirmed" ? tx(r.chain.signature) : null, debtorConfirmation: r.debtorConfirmation.chain?.status === "confirmed" ? tx(r.debtorConfirmation.chain.signature) : null, publication: r.listing?.chain?.status === "confirmed" ? tx(r.listing.chain.signature) : null, assignment: r.status === "assigned" ? { ...tx(r.assignment.settlementSignature), creditor: r.registry.creditor.name, tokenMint: r.assignment.tokenMint, tokenUrl: r.assignment.explorerUrls.tokenMint } : null } : null,
+        onChainLock: { checked: !!r && r.status === "assigned", exists: !!r && r.status === "assigned", address: r && r.status === "assigned" ? "FAKELock1111111111111111111111111111111111" : null, explorerUrl: null, funder: null, funderName: r && r.status === "assigned" ? r.registry.creditor.name : null },
+      });
+    }
     if (req.method === "GET" && p === "/health") return send(res, 200, { status: "ok", version: "fake-test", cluster: "devnet", solana: { reachable: true, feePayerBalanceLamports: 2_000_000_000 }, features: { debtorConfirmation: true, assignment: ASSIGNMENT, marketplace: true, doubleSpendProof: ASSIGNMENT } });
     if (req.method === "POST" && p === "/__reset") { db.clear(); tokens.clear(); n = 0; failedOnce = false; settings = defaultSettings(); revenue.length = 0; return send(res, 204); }
     if (req.method === "GET" && p === "/distributors") return send(res, 200, { items: DISTRIBUTORS.map((d) => ({ ...d, wallet: null, isSimulated: true })) });

@@ -78,6 +78,8 @@ export interface AssignmentGateway {
   // `rejectedByDocumentLock` só é true se os logs mostrarem a trava do documento como causa.
   attemptDoubleSettle(input: SettleInput, opts: SendOptions): Promise<{ signature: string; landedWithError: boolean; rejectedByDocumentLock: boolean }>;
   documentLockAddress(documentSha256: string): string;
+  // 11/10: lê a trava de um documento direto na Devnet, só pelo hash (verificador público). null = sem trava.
+  readDocumentLock?(documentSha256: string): Promise<AssignmentInspection["documentLock"]>;
   // Lança ChainUnavailableError se a rede não responder.
   inspect(input: { assetMint: string; funderId: FunderId; documentSha256: string }): Promise<AssignmentInspection>;
   readBalances(addresses: string[]): Promise<WalletBalance[]>;
@@ -439,6 +441,11 @@ export function createAssignmentGateway(env: AssignmentEnv): AssignmentGateway {
     },
 
     documentLockAddress: (documentSha256) => documentLockPda(programId, documentSha256).toBase58(),
+
+    async readDocumentLock(documentSha256) {
+      const acc = await read(connection.getAccountInfo(documentLockPda(programId, documentSha256), "confirmed"));
+      return acc?.owner.equals(programId) ? decodeDocumentLock(Buffer.from(acc.data)) : null;
+    },
 
     async inspect({ assetMint, funderId, documentSha256 }) {
       const mintKey = new PublicKey(assetMint);

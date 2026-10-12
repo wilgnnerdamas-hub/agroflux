@@ -1283,6 +1283,10 @@ Ativo só quando o backend tem `OPENAI_API_KEY` (modelo em `OPENAI_MODEL`, padr�
 - `POST /receivables/:id/document-check` → 202 com o recebível (conferência pendente). Sem IA: 503 `AI_UNAVAILABLE`.
 - `POST /receivables/:id/risk-memo` `{ lang: "pt" | "en" }` → `{ memo: { lang, model, createdAt, inputsHash, memo, strengths[], concerns[] } }`. Parecer curto a partir do risco, do preço e da conferência; guardado em `Receivable.riskMemos[lang]` enquanto os dados de entrada não mudarem. Falha da IA: 503 `AI_UNAVAILABLE`.
 
+### 15.2.2 Verificador público, aditivo em 11/10
+
+`GET /verify/:sha256` (público): `{ isSimulated, sha256, found, receivable: { reference, registryId, status, distributor, debtorAlias, debtorState, dueDate, registeredAt } | null, proofs: { registration, debtorConfirmation, publication, assignment: { signature, explorerUrl, creditor, tokenMint, tokenUrl } | null } | null, onChainLock: { checked, exists, address, explorerUrl, funder, funderName } }`. A trava é lida **direto da Devnet**, pela PDA `["document", sha256]` do escrow, e não depende do banco da AgroFlux. Hash inválido: 400. A tela `/verificar` calcula o hash no navegador, e o arquivo não é enviado.
+
 ### 15.3 Taxa da AgroFlux on-chain (escrow v1.3)
 
 A instrução passa a `settle(amount, fee, document_hash)`, com as contas novas `treasury` e `treasury_settlement` (ATA de tBRL-DEMO da tesouraria, criada se preciso). Na **mesma transação**:

@@ -106,7 +106,10 @@ function LandingShell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-border bg-surface">
         <div className={cx(WRAP, "flex items-center gap-6 py-3")}>
           <Brand alwaysText />
-          <nav aria-label="Principal">
+          <nav aria-label="Principal" className="flex items-center gap-4">
+            <Link href="/verificar" className="hidden rounded-md px-1 py-1 text-sm text-muted hover:text-ink sm:inline">
+              {t.shell.navVerify}
+            </Link>
             <Link href="/transparencia" className="rounded-md px-1 py-1 text-sm text-muted hover:text-ink">
               {t.shell.navTransparency}
             </Link>
@@ -161,6 +164,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         : role === "admin"
           ? [{ href: "/admin", label: t.shell.navAdmin, active: pathname.startsWith("/admin") }]
           : [];
+  nav.push({ href: "/verificar", label: t.shell.navVerify, active: pathname === "/verificar" });
   nav.push({ href: "/transparencia", label: t.shell.navTransparency, active: pathname === "/transparencia" });
 
   return (

@@ -149,6 +149,13 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
   await page.getByTestId("view-list").click();
   await page.screenshot({ path: shots("06b-painel", p), fullPage: true });
 
+  // Verificador público: o mesmo documento aparece como já cedido, com a trava on-chain.
+  await page.goto("/verificar");
+  await page.getByTestId("verify-input").setInputFiles(path.join(__dirname, "fixtures/nf-teste.pdf"));
+  await expect(page.getByTestId("verify-verdict")).toContainText("Já cedido");
+  await expect(page.getByTestId("verify-result")).toContainText("AGF-0001");
+  await expect(page.getByTestId("verify-lock")).toContainText("Existe");
+
   // O sacado, reabrindo o link, vê para quem pagar.
   await debtor.reload();
   await expect(debtor.getByTestId("payment-domicile")).toContainText("Financiador Demo A");

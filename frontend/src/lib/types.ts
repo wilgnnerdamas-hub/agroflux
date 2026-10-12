@@ -662,3 +662,22 @@ export interface AdminRisk {
     features: { key: string; label: string; coef: number }[];
   };
 }
+
+// 11/10: verificador público (GET /verify/:sha256).
+export interface ProofLink {
+  signature: string;
+  explorerUrl: string;
+}
+export interface DocumentVerification {
+  isSimulated: true;
+  sha256: string;
+  found: boolean;
+  receivable: { reference: string; registryId: string | null; status: ReceivableStatus; distributor: string; debtorAlias: string; debtorState: string; dueDate: string; registeredAt: string | null } | null;
+  proofs: {
+    registration: ProofLink | null;
+    debtorConfirmation: ProofLink | null;
+    publication: ProofLink | null;
+    assignment: (ProofLink & { creditor: string; tokenMint: string | null; tokenUrl: string | null }) | null;
+  } | null;
+  onChainLock: { checked: boolean; exists: boolean; address: string | null; explorerUrl: string | null; funder: string | null; funderName: string | null };
+}
