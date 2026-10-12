@@ -1,11 +1,11 @@
 # Checklist da submissão — prazo: 12/10/2026 às 23:59 PT (13/10 às 03:59 em Brasília)
 
 ## Depende de você (wilgnner)
-- [ ] **Time:** nome, papel, formação e experiência de cada integrante (+ ligação com o agro ou com crédito) → `formulario.md`, seção Team, e uma frase em `pitch.md`, bloco 2:20.
+- [ ] **Time:** papel, formação e experiência de cada integrante (nomes já no formulário e no README) (+ ligação com o agro ou com crédito) → `formulario.md`, seção Team, e uma frase em `pitch.md`, bloco 2:20.
 - [ ] **Localização:** cidade e estado.
-- [ ] **Validação:** alguma conversa com distribuidora, gestora, produtor ou gente de crédito agro? Mesmo informal, conta. Se não houver, usamos o texto honesto que já está no formulário.
+- [ ] **Validação:** 3 a 5 conversas hoje com o kit em `validacao.md`. Mande as anotações para eu atualizar o formulário e o pitch. Se não der, usamos o texto honesto que já está no formulário.
 - [ ] **Tração:** qualquer número real (pessoas que testaram, lista de espera, seguidores).
-- [ ] **Confirmar:** "no prior code was reused" (repositório criado em 09/10) e o nome no copyright da licença ("wilgnner").
+- [x] Confirmado: código escrito desde 09/10; autores na licença: Wilgnner Guilherme Damas Garcia Salgado e Marco Antonio Souza Cavalcante.
 - [ ] **Gravar o pitch** (2–3 min) → `pitch.md`.
 - [ ] **Gravar a demo técnica** (até 3 min) → `demo-tecnica.md`.
 - [ ] Subir os vídeos (YouTube não listado ou Loom) e colar os links no formulário.

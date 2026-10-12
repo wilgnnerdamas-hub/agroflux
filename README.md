@@ -131,6 +131,11 @@ npm run dev
 - **Real credit data** to train the model: Central Bank SCR, credit bureaus, satellite crop monitoring.
 - **Secondary market** for the receivable token, with the registry creditor following the transfer.
 
+## Team
+
+- Wilgnner Guilherme Damas Garcia Salgado
+- Marco Antonio Souza Cavalcante
+
 ## Hackathon disclosure
 
 This repository was created and built during the Crypto World's Fair (first commit on 2026-10-09); no prior code was reused. The demo runs on Devnet with fictitious data; it is not an investment offer, a legal assignment or financing of any kind.

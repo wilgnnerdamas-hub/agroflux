@@ -54,8 +54,8 @@ Solana — DeFi / RWA (real-world assets) / payments. **[PREENCHER conforme as o
 - Technical demo video: **[PREENCHER]**
 
 ## Team
-**[PREENCHER]** Nome, papel, formação e experiência relevante de cada integrante. Exemplo de formato:
-> wilgnner — founder; product, UX, frontend and backend. [formação] · [experiência com agro, crédito ou tecnologia]
+- **Wilgnner Guilherme Damas Garcia Salgado** — **[PREENCHER: papel]**; product, UX, frontend and backend. **[PREENCHER: formação e experiência]**
+- **Marco Antonio Souza Cavalcante** — **[PREENCHER: papel, formação e experiência]**
 
 Dica: o critério "founder–market fit" pesa. Vale citar qualquer ligação com o agro (família, região, trabalho) ou com crédito e finanças.
 
@@ -98,4 +98,4 @@ Agri-fintechs such as TerraMagna, Traive and Agrolend lend their own or their fu
 Registry, funders and their proposals, farmer payment history, the risk model's training data and the value of the test currency (tBRL-DEMO). Solana transactions, the escrow program, Token-2022 assets, document locks, CDI and rainfall data and the AI check are real. Nothing personal goes on-chain.
 
 ## Was any code written before the hackathon?
-No. The repository was created on 2026-10-09, during the hackathon. **[CONFIRMAR]**
+No. The repository was created on 2026-10-09, during the hackathon; no prior code was reused.
