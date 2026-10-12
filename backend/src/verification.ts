@@ -114,15 +114,24 @@ export async function verifyReceivable(store: Store, chain: ChainGateway, id: st
       throw unavailable(e);
     }
     const s = info.settlement;
+    const paid = a.maturityPayment?.status === "paid";
     const lock = info.documentLock;
     checks.push(
-      {
-        name: "asset_token_unique",
-        passed: !!info.mint && info.mint.supply === 1 && info.mint.decimals === 0 && info.mint.mintAuthorityRevoked,
-        label: "Token da cessão é único (supply 1, sem autoridade de mint)",
-      },
+      paid
+        ? {
+            name: "asset_token_unique",
+            passed: !!info.mint && info.mint.supply === 0 && info.mint.decimals === 0 && info.mint.mintAuthorityRevoked,
+            label: "Token da cessão era único e foi baixado (queimado) no pagamento",
+          }
+        : {
+            name: "asset_token_unique",
+            passed: !!info.mint && info.mint.supply === 1 && info.mint.decimals === 0 && info.mint.mintAuthorityRevoked,
+            label: "Token da cessão é único (supply 1, sem autoridade de mint)",
+          },
       { name: "asset_metadata_matches", passed: info.metadataPayloadHash !== null && info.metadataPayloadHash === r.chain.payloadHash, label: "Metadados do token apontam para este recebível" },
-      { name: "asset_held_by_funder", passed: info.funderBalance === 1, label: "Token está com o financiador" },
+      paid
+        ? { name: "asset_held_by_funder", passed: info.funderBalance === 0, label: "Token saiu da carteira do financiador no pagamento" }
+        : { name: "asset_held_by_funder", passed: info.funderBalance === 1, label: "Token está com o financiador" },
       {
         name: "settlement_record_matches",
         passed:

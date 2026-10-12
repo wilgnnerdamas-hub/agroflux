@@ -71,6 +71,7 @@ export class AdminService {
           distributor: r.distributor,
           debtor: r.debtor,
           debtorConfirmation: { status: r.debtorConfirmation.status },
+          maturityPaid: r.assignment.maturityPayment?.status === "paid",
           product: r.product,
           amountCents: r.amountCents,
           dueDate: r.dueDate,

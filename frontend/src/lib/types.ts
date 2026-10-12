@@ -142,6 +142,17 @@ export interface DoubleSpendProof {
   error: { code: AssignmentErrorCode; message: string } | null;
 }
 
+// 11/10 (aditivo): pagamento do sacado no vencimento (simulado).
+export interface MaturityPayment {
+  status: "pending" | "paid" | "failed";
+  requestedAt: string;
+  amount: number;
+  signature: string | null;
+  explorerUrl: string | null;
+  paidAt: string | null;
+  error: { code: AssignmentErrorCode; message: string } | null;
+}
+
 export interface Assignment {
   status: AssignmentStatus;
   isSimulated: true;
@@ -168,6 +179,7 @@ export interface Assignment {
   // v1.3 (§15.3): taxa AgroFlux + tarifa de registro, enviada à tesouraria na liquidação.
   platformFeeAmount: number | null;
   treasuryWallet: string | null;
+  maturityPayment?: MaturityPayment | null;
 }
 
 // v1.3 (§15.2)
@@ -503,6 +515,8 @@ export interface PortfolioItem {
   tokenMint: string | null;
   settlementSignature: string | null;
   explorerUrls: { tokenMint: string | null; settlement: string | null };
+  // 11/10 (aditivo): pagamento no vencimento (simulado).
+  maturityPayment?: { paidAt: string | null; amount: number; explorerUrl: string | null } | null;
 }
 
 export interface Portfolio {
@@ -591,6 +605,7 @@ export interface AdminReceivableRow {
   debtor: Debtor;
   // v1.3.1 (aditivo): situação do aceite, para a trilha de portões e o próximo passo.
   debtorConfirmation?: { status: DebtorConfirmationStatus };
+  maturityPaid?: boolean;
   product: Product;
   amountCents: number;
   dueDate: string;
@@ -678,6 +693,7 @@ export interface DocumentVerification {
     debtorConfirmation: ProofLink | null;
     publication: ProofLink | null;
     assignment: (ProofLink & { creditor: string; tokenMint: string | null; tokenUrl: string | null }) | null;
+    payment?: (ProofLink & { paidAt: string | null }) | null;
   } | null;
   onChainLock: { checked: boolean; exists: boolean; address: string | null; explorerUrl: string | null; funder: string | null; funderName: string | null };
 }

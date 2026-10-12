@@ -16,6 +16,6 @@ describe("verificador público (GET /verify/:sha256)", () => {
     const res = (await app.inject({ method: "GET", url: `/api/v1/verify/${sha.toUpperCase()}` })).json();
     expect(res.found).toBe(true);
     expect(res.receivable).toMatchObject({ reference: created.reference, registryId: created.registry.registryId, status: "created" });
-    expect(res.proofs).toEqual({ registration: null, debtorConfirmation: null, publication: null, assignment: null });
+    expect(res.proofs).toEqual({ registration: null, debtorConfirmation: null, publication: null, assignment: null, payment: null });
   });
 });

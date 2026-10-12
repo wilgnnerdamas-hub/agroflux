@@ -59,6 +59,7 @@ export function portfolio(store: Store, funderId: string, wallets: FunderWallets
         tokenMint: a.tokenMint,
         settlementSignature: a.settlementSignature,
         explorerUrls: { tokenMint: a.explorerUrls.tokenMint, settlement: a.explorerUrls.settlement },
+        maturityPayment: a.maturityPayment?.status === "paid" ? { paidAt: a.maturityPayment.paidAt, amount: a.maturityPayment.amount, explorerUrl: a.maturityPayment.explorerUrl } : null,
       };
     });
   const settled = items.filter((i) => i.status === "settled");

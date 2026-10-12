@@ -129,3 +129,8 @@ As decisões D1 a D7 estão no §13 do [contrato da API](api-contract.md). Este 
 ### F23 — Verificador público e seed com documentos únicos (11/10)
 - `/verificar`: arraste um documento, e o navegador calcula o SHA-256 e consulta `GET /verify/:sha256`. Mostra o registro, as provas na Devnet (registro, aceite, termo e cessão) e a **trava on-chain do escrow, lida direto da rede só pelo hash**. É a dupla cessão vista de fora, por exemplo por um segundo financiador.
 - Seed: cada `/demo/reset` gera documentos com um lote novo, para ter hashes novos. Antes, as travas on-chain permanentes de cessões anteriores faziam o AGF-0003 falhar (`DOCUMENT_ALREADY_ASSIGNED`) e fariam o próximo reset falhar no AGF-0004.
+
+### B25 — Pagamento no vencimento: ciclo completo (11/10)
+- O passaporte (depois da cessão) ganhou "Simular pagamento do sacado". Numa só transação, a face em tBRL-DEMO vai ao financiador, o token do recebível é queimado e um memo de quitação é gravado. Sem estado novo: `assignment.maturityPayment`, para não mexer no fluxo existente.
+- Carteira do financiador: posições pagas saem da curva e mostram "Paga · recebido R$ X". O admin mostra "Paga no vencimento", e o verificador público mostra a prova do pagamento.
+- O pagamento é simulado: na vida real, viria do sacado pelo domicílio de pagamento da registradora.

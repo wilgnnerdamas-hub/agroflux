@@ -10,6 +10,7 @@ import {
   TYPE_SIZE,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
+  createBurnCheckedInstruction,
   createInitializeMetadataPointerInstruction,
   createInitializeMintInstruction,
   createMintToInstruction,
@@ -26,6 +27,7 @@ import type { DistributorWallets } from "../distributors.js";
 import type { FunderWallets } from "../funders.js";
 import type { AssignmentErrorCode, DistributorId, FunderId } from "../types.js";
 import { ChainUnavailableError, classifySendError, parseSecret, type Confirmed, type SendOptions } from "./solana.js";
+import { MEMO_PROGRAM_ID } from "./payload.js";
 
 export interface AssignmentParties {
   // v1.3: uma carteira por distribuidora demo e a tesouraria da AgroFlux (só o endereço público).
@@ -80,6 +82,9 @@ export interface AssignmentGateway {
   documentLockAddress(documentSha256: string): string;
   // 11/10: lê a trava de um documento direto na Devnet, só pelo hash (verificador público). null = sem trava.
   readDocumentLock?(documentSha256: string): Promise<AssignmentInspection["documentLock"]>;
+  // 11/10: pagamento no vencimento (simulado), numa só transação: credita `amount` de tBRL-DEMO ao financiador,
+  // queima o token do recebível da carteira dele e grava o memo de quitação.
+  payAtMaturity?(input: { assetMint: string; funderId: FunderId; amount: number; memo: string }, opts: SendOptions): Promise<Confirmed>;
   // Lança ChainUnavailableError se a rede não responder.
   inspect(input: { assetMint: string; funderId: FunderId; documentSha256: string }): Promise<AssignmentInspection>;
   readBalances(addresses: string[]): Promise<WalletBalance[]>;
@@ -441,6 +446,25 @@ export function createAssignmentGateway(env: AssignmentEnv): AssignmentGateway {
     },
 
     documentLockAddress: (documentSha256) => documentLockPda(programId, documentSha256).toBase58(),
+
+    payAtMaturity({ assetMint, funderId, amount, memo }, { timeoutMs, onSubmitted }) {
+      const funder = funderKeypair(funderId);
+      const mintKey = new PublicKey(assetMint);
+      const funderTbrl = getAssociatedTokenAddressSync(settlementMint, funder.publicKey, false, TOKEN_PROGRAM_ID);
+      const funderAsset = getAssociatedTokenAddressSync(mintKey, funder.publicKey, false, TOKEN_2022_PROGRAM_ID);
+      return sendAndPoll(
+        () => [
+          createAssociatedTokenAccountIdempotentInstruction(payer.publicKey, funderTbrl, funder.publicKey, settlementMint, TOKEN_PROGRAM_ID),
+          createMintToInstruction(settlementMint, funderTbrl, payer.publicKey, BigInt(amount), [], TOKEN_PROGRAM_ID),
+          createBurnCheckedInstruction(funderAsset, mintKey, funder.publicKey, 1n, 0, [], TOKEN_2022_PROGRAM_ID),
+          new TransactionInstruction({ programId: new PublicKey(MEMO_PROGRAM_ID), keys: [], data: Buffer.from(memo, "utf8") }),
+        ],
+        [funder],
+        timeoutMs,
+        (e) => classifySettleError(e),
+        onSubmitted,
+      );
+    },
 
     async readDocumentLock(documentSha256) {
       const acc = await read(connection.getAccountInfo(documentLockPda(programId, documentSha256), "confirmed"));

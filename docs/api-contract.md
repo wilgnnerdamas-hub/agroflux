@@ -1287,6 +1287,10 @@ Ativo só quando o backend tem `OPENAI_API_KEY` (modelo em `OPENAI_MODEL`, padr�
 
 `GET /verify/:sha256` (público): `{ isSimulated, sha256, found, receivable: { reference, registryId, status, distributor, debtorAlias, debtorState, dueDate, registeredAt } | null, proofs: { registration, debtorConfirmation, publication, assignment: { signature, explorerUrl, creditor, tokenMint, tokenUrl } | null } | null, onChainLock: { checked, exists, address, explorerUrl, funder, funderName } }`. A trava é lida **direto da Devnet**, pela PDA `["document", sha256]` do escrow, e não depende do banco da AgroFlux. Hash inválido: 400. A tela `/verificar` calcula o hash no navegador, e o arquivo não é enviado.
 
+### 15.2.3 Pagamento no vencimento (simulado), aditivo em 11/10
+
+`POST /receivables/:id/maturity-payment` → 202 `{ receivable }` (só com a cessão ligada e o recebível `assigned`; um segundo pagamento: 409). Em **uma transação** na Devnet: a carteira da AgroFlux (autoridade da tBRL-DEMO) credita a **face** ao financiador, que representa a liquidação do sacado pela registradora simulada; o token do recebível é **queimado** da carteira do financiador; e o memo `{ app, v, evt: "receivable_paid", rid, amt }` registra a quitação. `Assignment.maturityPayment` = `{ status: pending|paid|failed, requestedAt, amount, signature, explorerUrl, paidAt, error }`; evento `maturity_paid`. O status do recebível continua `assigned`. Com o título pago, a verificação confere o token baixado (supply 0, fora da carteira do financiador). `PortfolioItem.maturityPayment`, `AdminReceivableRow.maturityPaid` e `proofs.payment` no verificador (aditivos).
+
 ### 15.3 Taxa da AgroFlux on-chain (escrow v1.3)
 
 A instrução passa a `settle(amount, fee, document_hash)`, com as contas novas `treasury` e `treasury_settlement` (ATA de tBRL-DEMO da tesouraria, criada se preciso). Na **mesma transação**:

@@ -62,6 +62,7 @@ export interface AgroFluxApi {
   runDocumentCheck(id: string): Promise<Receivable>;
   requestRiskMemo(id: string, lang: "pt" | "en"): Promise<RiskMemo>;
   verifyDocument(sha256: string): Promise<DocumentVerification>;
+  requestMaturityPayment(id: string): Promise<Receivable>;
   quote(id: string, input: { funderId: string; spreadBps: number; feesCents: number }): Promise<Quote>;
   listDistributors(): Promise<{ items: Distributor[] }>;
   adminOverview(): Promise<AdminOverview>;

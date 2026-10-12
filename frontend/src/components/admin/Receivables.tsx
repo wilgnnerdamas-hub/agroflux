@@ -17,7 +17,7 @@ export type ReceivableFilter = "all" | "waiting" | "assigned" | "failed";
 function Situation({ r, onRetry, busy }: { r: AdminReceivableRow; onRetry: () => void; busy: boolean }) {
   const { t } = useI18n();
   const a = t.admin;
-  if (r.status === "assigned") return <span className="whitespace-nowrap text-sm text-brand">✓ {a.settledOk}</span>;
+  if (r.status === "assigned") return <span className="whitespace-nowrap text-sm text-brand">✓ {r.maturityPaid ? t.maturity.adminPaid : a.settledOk}</span>;
   if (r.status === "assignment_failed") {
     return (
       <button

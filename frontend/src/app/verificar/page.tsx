@@ -168,6 +168,7 @@ export default function VerifyPage() {
                       proof={v.proofs.assignment}
                       extra={v.proofs.assignment && <span className="text-xs text-muted">→ {v.proofs.assignment.creditor}</span>}
                     />
+                    {v.proofs.payment && <ProofRow label={t.maturity.proof} proof={v.proofs.payment} />}
                   </ul>
                   {v.receivable.registeredAt && <p className="mt-3 text-xs text-faint">{k.registeredAt(formatDateTime(v.receivable.registeredAt))}</p>}
                 </section>

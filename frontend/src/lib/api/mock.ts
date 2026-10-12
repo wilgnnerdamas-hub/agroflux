@@ -438,6 +438,9 @@ export function createMockApi(): AgroFluxApi {
     },
 
     // v1.3: o mock não precifica nem tem painel de administração (só o backend real calcula).
+    async requestMaturityPayment() {
+      throw new ApiError("BACKEND_NOT_CONNECTED", "O pagamento no vencimento só existe com o backend real.", 0);
+    },
     async verifyDocument() {
       throw new ApiError("BACKEND_NOT_CONNECTED", "O verificador só existe com o backend real.", 0);
     },

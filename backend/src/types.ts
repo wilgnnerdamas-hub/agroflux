@@ -46,7 +46,9 @@ export type EventType =
   | "listing_chain_failed"
   | "offer_proposed"
   | "registry_creditor_updated"
-  | "double_assignment_rejected";
+  | "double_assignment_rejected"
+  // 11/10
+  | "maturity_paid";
 
 export type ProductCategory = "fertilizer" | "crop_protection" | "seed" | "other";
 export type DocumentKind = "test_invoice" | "test_contract" | "other";
@@ -142,6 +144,17 @@ export interface DoubleSpendProof {
   error: { code: AssignmentErrorCode; message: string } | null;
 }
 
+// 11/10 (aditivo): pagamento do sacado no vencimento (simulado). Credita a face ao financiador e queima o token.
+export interface MaturityPayment {
+  status: "pending" | "paid" | "failed";
+  requestedAt: string;
+  amount: number;
+  signature: string | null;
+  explorerUrl: string | null;
+  paidAt: string | null;
+  error: { code: AssignmentErrorCode; message: string } | null;
+}
+
 export interface Assignment {
   status: AssignmentStatus;
   isSimulated: true;
@@ -165,6 +178,7 @@ export interface Assignment {
   funderName: string | null;
   documentLock: string | null;
   doubleSpendProof: DoubleSpendProof | null;
+  maturityPayment?: MaturityPayment | null;
   // v1.3 (§15.3): taxa AgroFlux + tarifa de registro, enviada à tesouraria na liquidação.
   platformFeeAmount: number | null;
   treasuryWallet: string | null;
@@ -503,6 +517,8 @@ export interface PortfolioItem {
   tokenMint: string | null;
   settlementSignature: string | null;
   explorerUrls: { tokenMint: string | null; settlement: string | null };
+  // 11/10 (aditivo): pagamento no vencimento (simulado).
+  maturityPayment?: { paidAt: string | null; amount: number; explorerUrl: string | null } | null;
 }
 
 export interface Portfolio {

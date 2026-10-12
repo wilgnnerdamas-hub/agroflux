@@ -40,7 +40,8 @@ function isWaiting(r: Receivable) {
     r.listing.chain?.status === "pending" ||
     r.status === "assignment_pending" ||
     r.assignment.doubleSpendProof?.status === "pending" ||
-    r.documentCheck?.status === "pending"
+    r.documentCheck?.status === "pending" ||
+    r.assignment.maturityPayment?.status === "pending"
   );
 }
 

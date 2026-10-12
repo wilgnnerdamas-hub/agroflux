@@ -143,6 +143,10 @@ export function createHttpApi(baseUrl: string): AgroFluxApi {
     },
     getTransparency: () => request<Transparency>("/transparency"),
     getPricingReference: () => request<PricingReference>("/pricing/reference"),
+    async requestMaturityPayment(id) {
+      const r = await request<{ receivable: Receivable }>(`/receivables/${encodeURIComponent(id)}/maturity-payment`, { method: "POST" });
+      return r.receivable;
+    },
     verifyDocument: (sha256) => request<DocumentVerification>(`/verify/${encodeURIComponent(sha256)}`),
     runDocumentCheck: (id) => request<Receivable>(`/receivables/${encodeURIComponent(id)}/document-check`, { method: "POST" }),
     async requestRiskMemo(id, lang) {

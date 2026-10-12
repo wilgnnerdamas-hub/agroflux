@@ -70,6 +70,7 @@ export async function verifyDocument(store: Store, gateway: AssignmentGateway | 
             r.status === "assigned"
               ? { ...link(r.assignment.settlementSignature)!, creditor: r.registry.creditor.name, tokenMint: r.assignment.tokenMint, tokenUrl: r.assignment.explorerUrls.tokenMint }
               : null,
+          payment: r.assignment.maturityPayment?.status === "paid" ? { ...link(r.assignment.maturityPayment.signature)!, paidAt: r.assignment.maturityPayment.paidAt } : null,
         }
       : null,
     onChainLock,

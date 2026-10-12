@@ -127,7 +127,7 @@ const server = createServer(async (req, res) => {
       return send(res, 200, {
         isSimulated: true, sha256: sha, found: !!r,
         receivable: r ? { reference: r.reference, registryId: r.registry.registryId, status: r.status, distributor: r.distributor.name, debtorAlias: r.debtor.alias, debtorState: r.debtor.state, dueDate: r.dueDate, registeredAt: r.chain.confirmedAt } : null,
-        proofs: r ? { registration: r.chain.status === "confirmed" ? tx(r.chain.signature) : null, debtorConfirmation: r.debtorConfirmation.chain?.status === "confirmed" ? tx(r.debtorConfirmation.chain.signature) : null, publication: r.listing?.chain?.status === "confirmed" ? tx(r.listing.chain.signature) : null, assignment: r.status === "assigned" ? { ...tx(r.assignment.settlementSignature), creditor: r.registry.creditor.name, tokenMint: r.assignment.tokenMint, tokenUrl: r.assignment.explorerUrls.tokenMint } : null } : null,
+        proofs: r ? { registration: r.chain.status === "confirmed" ? tx(r.chain.signature) : null, debtorConfirmation: r.debtorConfirmation.chain?.status === "confirmed" ? tx(r.debtorConfirmation.chain.signature) : null, publication: r.listing?.chain?.status === "confirmed" ? tx(r.listing.chain.signature) : null, payment: r.assignment.maturityPayment?.status === "paid" ? { ...tx(r.assignment.maturityPayment.signature), paidAt: r.assignment.maturityPayment.paidAt } : null, assignment: r.status === "assigned" ? { ...tx(r.assignment.settlementSignature), creditor: r.registry.creditor.name, tokenMint: r.assignment.tokenMint, tokenUrl: r.assignment.explorerUrls.tokenMint } : null } : null,
         onChainLock: { checked: !!r && r.status === "assigned", exists: !!r && r.status === "assigned", address: r && r.status === "assigned" ? "FAKELock1111111111111111111111111111111111" : null, explorerUrl: null, funder: null, funderName: r && r.status === "assigned" ? r.registry.creditor.name : null },
       });
     }
@@ -371,6 +371,19 @@ const server = createServer(async (req, res) => {
           ev("assignment_settled", "Liquidação atômica confirmada na Solana Devnet (simulação, tBRL-DEMO sem valor)", { signature: sig }, { actor: "system", onChain: true, chain: { signature: sig, explorerUrl: txUrl(sig) } }),
           ev("registry_creditor_updated", `Registradora (simulada): credor atualizado para ${f.name}`, { funderId: f.id }, { actor: "system" }),
         );
+        r.updatedAt = now();
+      }, CONFIRM_MS);
+      return send(res, 202, { receivable: r });
+    }
+    if (ASSIGNMENT && (mm = m(/^\/receivables\/([^/]+)\/maturity-payment$/)) && req.method === "POST") {
+      const r = find(mm[1]);
+      if (!r) return err(res, 404, "NOT_FOUND", "Recebível não encontrado.");
+      if (r.status !== "assigned" || (r.assignment.maturityPayment && r.assignment.maturityPayment.status !== "failed")) return err(res, 409, "INVALID_STATE", "Ação não permitida no estado atual.");
+      r.assignment.maturityPayment = { status: "pending", requestedAt: now(), amount: r.amountCents, signature: null, explorerUrl: null, paidAt: null, error: null };
+      setTimeout(() => {
+        const sig = fakeSig("PAID", r.id);
+        r.assignment.maturityPayment = { ...r.assignment.maturityPayment, status: "paid", signature: sig, explorerUrl: txUrl(sig), paidAt: now() };
+        r.events.push(ev("maturity_paid", "Pagamento no vencimento (simulado): valor de face creditado ao financiador e token baixado", { signature: sig }, { actor: "system", onChain: true, chain: { signature: sig, explorerUrl: txUrl(sig) } }));
         r.updatedAt = now();
       }, CONFIRM_MS);
       return send(res, 202, { receivable: r });

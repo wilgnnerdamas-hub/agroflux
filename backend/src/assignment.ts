@@ -115,16 +115,76 @@ export class AssignmentService {
     return r;
   }
 
+  // 11/10: pagamento do sacado no vencimento (simulado). Só depois da cessão liquidada; credita a face ao financiador
+  // e queima o token, na mesma transação.
+  async requestMaturityPayment(id: string): Promise<Receivable> {
+    const check = (r: Receivable) => {
+      if (r.status !== "assigned") throw invalidState("O pagamento no vencimento fica disponível depois da cessão liquidada.");
+      const p = r.assignment.maturityPayment;
+      if (p && p.status !== "failed") throw invalidState(p.status === "pending" ? "O pagamento já está em andamento." : "Este título já foi pago.");
+      if (!this.gateway.payAtMaturity) throw invalidState("O pagamento no vencimento não está disponível neste ambiente.");
+    };
+    check(getReceivable(this.store, id));
+    await this.ping();
+    const r = getReceivable(this.store, id);
+    check(r);
+    r.assignment.maturityPayment = { status: "pending", requestedAt: now(), amount: r.amountCents, signature: null, explorerUrl: null, paidAt: null, error: null };
+    r.updatedAt = now();
+    this.store.put(r);
+    this.track(`pay:${id}`, this.runMaturityPayment(id));
+    return r;
+  }
+
+  private async runMaturityPayment(id: string) {
+    const r = this.store.get(id);
+    const pay = r?.assignment.maturityPayment;
+    if (!r || pay?.status !== "pending" || !r.assignment.tokenMint || !r.assignment.funderId || !this.gateway.payAtMaturity) return;
+    const patch = (next: Partial<NonNullable<Receivable["assignment"]["maturityPayment"]>>, event = false) => {
+      const cur = this.store.get(id);
+      if (!cur?.assignment.maturityPayment) return;
+      cur.assignment.maturityPayment = { ...cur.assignment.maturityPayment, ...next };
+      if (event && next.signature) {
+        cur.events.push(
+          makeEvent(
+            "maturity_paid",
+            "Pagamento no vencimento (simulado): valor de face creditado ao financiador e token baixado",
+            { signature: next.signature, amount: cur.assignment.maturityPayment.amount, funderId: cur.assignment.funderId },
+            { actor: "system", onChain: true, chain: { signature: next.signature, explorerUrl: explorerTxUrl(next.signature) } },
+          ),
+        );
+      }
+      cur.updatedAt = now();
+      this.store.put(cur);
+    };
+    try {
+      const memo = JSON.stringify({ app: "agroflux", v: 1, evt: "receivable_paid", rid: r.id, amt: pay.amount });
+      const done = await this.gateway.payAtMaturity(
+        { assetMint: r.assignment.tokenMint, funderId: r.assignment.funderId, amount: pay.amount, memo },
+        { timeoutMs: this.timeoutMs, onSubmitted: (sig) => patch({ signature: sig, explorerUrl: explorerTxUrl(sig) }) },
+      );
+      patch({ status: "paid", signature: done.signature, explorerUrl: explorerTxUrl(done.signature), paidAt: done.blockTime ?? now() }, true);
+    } catch (e) {
+      if (!(e instanceof AssignmentFailure)) this.log("Erro inesperado no pagamento no vencimento", e);
+      const f = e instanceof AssignmentFailure ? e : new AssignmentFailure("TX_FAILED");
+      patch({ status: "failed", error: this.err(f.code) });
+    }
+  }
+
   resumePending() {
     for (const r of this.store.all()) {
       if (r.status === "assignment_pending") this.track(r.id, this.run(r.id));
       // Uma prova interrompida por reinício não é retomada: fica em erro e pode ser refeita.
       if (r.assignment.doubleSpendProof?.status === "pending") this.markProof(r.id, { status: "error", error: this.err("TIMEOUT") });
+      // Pagamento interrompido por reinício: fica em falha e pode ser refeito (a verificação confere o token na rede).
+      if (r.assignment.maturityPayment?.status === "pending") {
+        r.assignment.maturityPayment = { ...r.assignment.maturityPayment, status: "failed", error: this.err("TIMEOUT") };
+        this.store.put(r);
+      }
     }
   }
 
   async settle(id?: string) {
-    if (id) await Promise.all([this.inflight.get(id), this.inflight.get(`ds:${id}`)]);
+    if (id) await Promise.all([this.inflight.get(id), this.inflight.get(`ds:${id}`), this.inflight.get(`pay:${id}`)]);
     else await Promise.all([...this.inflight.values()]);
   }
 

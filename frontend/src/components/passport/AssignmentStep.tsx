@@ -143,6 +143,49 @@ function DoubleSpendProof({ receivable, onUpdated }: StepProps) {
 }
 
 // Fluxo concluído: cessão liquidada, credor atualizado na registradora e prova de recusa.
+/** 11/10: pagamento do sacado no vencimento (simulado). Credita a face ao financiador e baixa (queima) o token. */
+function MaturityPaymentBlock({ receivable, onUpdated }: StepProps) {
+  const { t, errorMessage } = useI18n();
+  const k = t.maturity;
+  const pay = receivable.assignment.maturityPayment;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      onUpdated(await api.requestMaturityPayment(receivable.id));
+    } catch (e) {
+      setError(errorMessage(toApiError(e)));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-5 rounded-xl border border-divider bg-row p-4" data-testid="maturity-payment">
+      <p className="text-sm font-medium">{k.title}</p>
+      {!pay || pay.status === "failed" ? (
+        <>
+          <p className="mt-1 text-sm text-muted">{k.text(formatMoney(receivable.amountCents), receivable.assignment.funderName ?? "—")}</p>
+          {pay?.status === "failed" && pay.error && <p className="mt-2 text-sm text-terra">{pay.error.message}</p>}
+          <Button variant="secondary" className="mt-3" onClick={() => void run()} loading={busy}>
+            {pay?.status === "failed" ? k.retry : k.button}
+          </Button>
+        </>
+      ) : pay.status === "pending" ? (
+        <p className="mt-2 text-sm text-muted" role="status">{k.pending}</p>
+      ) : (
+        <div className="agf-rise mt-2 space-y-2">
+          <p className="text-sm text-brand">✓ {k.done(formatMoney(pay.amount), receivable.assignment.funderName ?? "—")}</p>
+          {pay.explorerUrl && <ExplorerLink href={pay.explorerUrl}>{k.viewTx}</ExplorerLink>}
+        </div>
+      )}
+      <p className="mt-3 text-[11px] text-faint">{k.note}</p>
+      {error && <p className="mt-2 text-sm text-terra" role="alert">{error}</p>}
+    </div>
+  );
+}
+
 export function AssignedSummary({ receivable, onUpdated, proofAvailable }: StepProps & { proofAvailable: boolean }) {
   const { t } = useI18n();
   const a = receivable.assignment;
@@ -185,6 +228,8 @@ export function AssignedSummary({ receivable, onUpdated, proofAvailable }: StepP
           <DoubleSpendProof receivable={receivable} onUpdated={onUpdated} />
         </div>
       )}
+
+      {proofAvailable && <MaturityPaymentBlock receivable={receivable} onUpdated={onUpdated} />}
     </Card>
   );
 }

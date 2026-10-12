@@ -204,6 +204,10 @@ export async function routes(api: FastifyInstance, deps: RouteDeps) {
       const receivable = await assignments.request(req.params.id, idempotencyKey(req));
       return reply.status(202).send({ receivable: out(receivable) });
     });
+    api.post<IdParams>("/receivables/:id/maturity-payment", async (req, reply) => {
+      const receivable = await assignments.requestMaturityPayment(req.params.id);
+      return reply.status(202).send({ receivable: out(receivable) });
+    });
     api.post<IdParams>("/receivables/:id/assignment/double-spend-test", async (req, reply) => {
       const receivable = await assignments.requestDoubleSpendProof(req.params.id);
       return reply.status(202).send({ receivable: out(receivable) });

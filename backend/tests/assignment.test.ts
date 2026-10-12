@@ -317,3 +317,49 @@ describe("cessão tokenizada (função B)", () => {
     expect(classifySettleError(inUse, { documentLock: "OutraConta" })).toBe("ESCROW_REJECTED");
   });
 });
+
+describe("pagamento no vencimento (simulado)", () => {
+  it("credita a face ao financiador, queima o token e a verificação passa a conferir a baixa", async () => {
+    let paid = false;
+    const payments: { amount: number; memo: string }[] = [];
+    const base = fakeAssignment();
+    const gw = fakeAssignment({
+      payAtMaturity: async (input, opts) => {
+        payments.push({ amount: input.amount, memo: input.memo });
+        opts.onSubmitted?.(SIG("Pay"));
+        paid = true;
+        return { signature: SIG("Pay"), slot: 3, blockTime: "2027-03-15T12:00:00.000Z" };
+      },
+      inspect: async (args) => {
+        const info = await base.inspect(args);
+        return paid ? { ...info, mint: { supply: 0, decimals: 0, mintAuthorityRevoked: true }, funderBalance: 0 } : info;
+      },
+    });
+    const { built, id } = await withSelectedOffer(gw);
+    // Antes da cessão, não há pagamento.
+    const early = await built.app.inject({ method: "POST", url: `/api/v1/receivables/${id}/maturity-payment` });
+    expect(early.statusCode).toBe(409);
+
+    await post(built, id, "k-pay");
+    await built.assignments!.settle();
+    const res = await built.app.inject({ method: "POST", url: `/api/v1/receivables/${id}/maturity-payment` });
+    expect(res.statusCode).toBe(202);
+    expect(["pending", "paid"]).toContain(res.json().receivable.assignment.maturityPayment.status);
+    await built.assignments!.settle(id);
+
+    const r = (await built.app.inject({ method: "GET", url: `/api/v1/receivables/${id}` })).json();
+    expect(r.assignment.maturityPayment).toMatchObject({ status: "paid", amount: r.amountCents, signature: SIG("Pay") });
+    expect(payments[0].amount).toBe(r.amountCents);
+    expect(JSON.parse(payments[0].memo)).toMatchObject({ evt: "receivable_paid", rid: id });
+    expect(r.events.at(-1)).toMatchObject({ type: "maturity_paid", onChain: true });
+
+    // Pagar de novo é recusado.
+    expect((await built.app.inject({ method: "POST", url: `/api/v1/receivables/${id}/maturity-payment` })).statusCode).toBe(409);
+
+    // A verificação aceita o token baixado (supply 0, fora da carteira do financiador).
+    const v = (await built.app.inject({ method: "GET", url: `/api/v1/receivables/${id}/verification` })).json();
+    const byName = Object.fromEntries(v.checks.map((c: { name: string; passed: boolean }) => [c.name, c.passed]));
+    expect(byName.asset_token_unique).toBe(true);
+    expect(byName.asset_held_by_funder).toBe(true);
+  });
+});

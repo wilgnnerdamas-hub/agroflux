@@ -131,6 +131,8 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
   await expect(done.getByText("A Solana recusou a segunda venda")).toBeVisible({ timeout: 20_000 });
   await page.screenshot({ path: shots("06-cessao-e-prova", p), fullPage: true });
 
+  const passportUrl = page.url();
+
   // Registros on-chain e verificação incluindo a cessão.
   await page.getByTestId("onchain-records").locator("summary").first().click();
   await expect(page.getByTestId("record-settle")).toBeVisible();
@@ -190,6 +192,14 @@ test("fluxo completo v1.2: distribuidora, sacado e financiador", async ({ page }
   await expect(funder.getByTestId("transparency")).toContainText("Financiador Demo A");
   await funder.screenshot({ path: shots("08-transparencia", p), fullPage: true });
   await funder.close();
+
+  // Pagamento no vencimento (simulado): face ao financiador e token baixado; o verificador mostra a quitação.
+  await page.goto(passportUrl);
+  await page.getByRole("button", { name: "Simular pagamento do sacado" }).click();
+  await expect(page.getByTestId("maturity-payment")).toContainText("Título quitado", { timeout: 20_000 });
+  await page.goto("/verificar");
+  await page.getByTestId("verify-input").setInputFiles(path.join(__dirname, "fixtures/nf-teste.pdf"));
+  await expect(page.getByTestId("verify-result")).toContainText("Pagamento no vencimento");
 });
 
 test("registradora simulada recusa documento repetido", async ({ page }) => {

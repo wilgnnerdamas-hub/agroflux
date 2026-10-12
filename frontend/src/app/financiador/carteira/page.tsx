@@ -112,7 +112,8 @@ function Portfolio() {
   const { state, reload } = useAsync(() => api.getPortfolio(INTERACTIVE_FUNDER_ID));
   const data = state.data;
   const items = useMemo(() => data?.items ?? [], [data]);
-  const settled = useMemo(() => items.filter((i) => i.status === "settled"), [items]);
+  // Na curva, só as posições em aberto (as pagas no vencimento já viraram caixa).
+  const settled = useMemo(() => items.filter((i) => i.status === "settled" && !i.maturityPayment), [items]);
   const [today] = useState(() => Date.now());
   const [pointMs, setPointMs] = useState<number | null>(null);
   const intro = useIntro();
@@ -259,7 +260,7 @@ function Portfolio() {
                 <tbody>
                   {items.map((i, n) => {
                     const on = selected?.receivableId === i.receivableId;
-                    const can = i.status === "settled";
+                    const can = i.status === "settled" && !i.maturityPayment;
                     const toggle = () => can && select(on ? null : i.reference);
                     return (
                       <tr
@@ -284,7 +285,9 @@ function Portfolio() {
                         <td className="px-5 py-4">
                           <p className="flex flex-wrap items-center gap-2">
                             <span className="font-mono font-medium">{i.reference}</span>
-                            {can ? (
+                            {i.maturityPayment ? (
+                              <span className="rounded-full bg-chain-soft px-2 py-0.5 text-[11px] font-medium text-chain">{t.maturity.paidChip}</span>
+                            ) : can ? (
                               <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-medium text-brand">{f.settled}</span>
                             ) : (
                               <span className="inline-flex items-center gap-1 rounded-full bg-amber-soft px-2 py-0.5 text-[11px] font-medium text-amber-ink">
@@ -298,6 +301,11 @@ function Portfolio() {
                           <p className="mt-1 text-xs text-muted">
                             {i.product.description} · {i.debtorState} · <span className="font-mono">{i.registryId ?? "—"}</span>
                           </p>
+                          {i.maturityPayment && (
+                            <p className="mt-1 text-xs text-chain">
+                              {t.maturity.received(formatMoney(i.maturityPayment.amount), i.maturityPayment.paidAt ? formatDate(i.maturityPayment.paidAt.slice(0, 10)) : "—")}
+                            </p>
+                          )}
                         </td>
                         <td className="tnum whitespace-nowrap px-4 py-4 text-right">{formatMoney(i.paidAmountCents)}</td>
                         <td className="tnum whitespace-nowrap px-4 py-4 text-right">{formatMoney(i.faceAmountCents)}</td>
@@ -314,7 +322,7 @@ function Portfolio() {
               <ul className="divide-y divide-divider min-[1000px]:hidden">
                 {items.map((i, n) => {
                   const on = selected?.receivableId === i.receivableId;
-                  const can = i.status === "settled";
+                  const can = i.status === "settled" && !i.maturityPayment;
                   return (
                     <li key={i.receivableId} className="agf-rise" style={{ animationDelay: `${n * 60}ms` }}>
                       <div
