@@ -2,7 +2,7 @@
 
 ## Depende de você (wilgnner)
 - [ ] **Time:** papel, formação e experiência de cada integrante (nomes já no formulário e no README) (+ ligação com o agro ou com crédito) → `formulario.md`, seção Team, e uma frase em `pitch.md`, bloco 2:20.
-- [ ] **Localização:** cidade e estado.
+- [x] Localização: São José dos Campos, SP.
 - [ ] **Validação:** 3 a 5 conversas hoje com o kit em `validacao.md`. Mande as anotações para eu atualizar o formulário e o pitch. Se não der, usamos o texto honesto que já está no formulário.
 - [ ] **Tração:** qualquer número real (pessoas que testaram, lista de espera, seguidores).
 - [x] Confirmado: código escrito desde 09/10; autores na licença: Wilgnner Guilherme Damas Garcia Salgado e Marco Antonio Souza Cavalcante.

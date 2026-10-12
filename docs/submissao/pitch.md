@@ -36,7 +36,7 @@ Ao lado, em itálico, o que mostrar na tela.
 
 ### 2:20 – 2:40 · Status e time
 > AgroFlux is live on Devnet today, with the full cycle: registration, farmer acceptance, atomic assignment, double-sale rejection and payment at maturity.
-> **[PREENCHER: 1 frase sobre você/time e a ligação com o agro ou com crédito.]**
+> I'm Wilgnner. I grew up in a dairy and grain farming family, so I've watched this credit cycle from the inside. Marco and I are engineering students at ITA and members of ITA Finance — that's where the farm and the finance sides of AgroFlux came together.
 
 ### 2:40 – 2:50 · Fechamento
 > Next: a pilot with one distributor and one fund in the 2026/27 season. AgroFlux: **trust you can verify, cash you can settle.**

@@ -54,13 +54,15 @@ Solana — DeFi / RWA (real-world assets) / payments. **[PREENCHER conforme as o
 - Technical demo video: **[PREENCHER]**
 
 ## Team
-- **Wilgnner Guilherme Damas Garcia Salgado** — **[PREENCHER: papel]**; product, UX, frontend and backend. **[PREENCHER: formação e experiência]**
-- **Marco Antonio Souza Cavalcante** — **[PREENCHER: papel, formação e experiência]**
+Two engineering students at ITA (Instituto Tecnológico de Aeronáutica), in São José dos Campos, Brazil, both members of ITA Finance, the university's student finance group.
 
-Dica: o critério "founder–market fit" pesa. Vale citar qualquer ligação com o agro (família, região, trabalho) ou com crédito e finanças.
+- **Wilgnner Guilherme Damas Garcia Salgado** — built the technical infrastructure (Solana program, backend, frontend) and led the market analysis. Undergraduate in Civil-Aeronautical Engineering. Grew up in a family of dairy and grain farmers, so he has seen the input-credit cycle from the inside, and has studied financial markets for several years. ITA Finance is what connects the farm side and the finance side of AgroFlux.
+- **Marco Antonio de Souza Cavalcante** — market analysis and product validation, talking to agribusiness customers. Undergraduate in Aerospace Engineering, member of ITA Finance, with experience in client relationships and sales.
+
+**Why us:** a founder raised inside the problem (farm credit paid at harvest), finance training from ITA Finance, and the engineering background to ship the full stack on Solana in three days.
 
 ## Location
-**[PREENCHER]** Cidade, estado, Brasil.
+São José dos Campos, São Paulo, Brazil.
 
 ## Go-to-market
 We start where the pain is sharpest and the sale is shortest: **mid-sized input distributors** (R$ 50–500 million in annual revenue) in Mato Grosso, Goiás and Paraná. They are too small to run their own receivables fund or issue agribusiness certificates (CRAs), and depend on one or two banks.

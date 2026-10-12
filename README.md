@@ -133,8 +133,10 @@ npm run dev
 
 ## Team
 
-- Wilgnner Guilherme Damas Garcia Salgado
-- Marco Antonio Souza Cavalcante
+Engineering students at ITA (Instituto Tecnológico de Aeronáutica), São José dos Campos, Brazil, and members of ITA Finance.
+
+- **Wilgnner Guilherme Damas Garcia Salgado** — technical infrastructure and market analysis. Raised in a dairy and grain farming family.
+- **Marco Antonio de Souza Cavalcante** — market analysis and product validation with agribusiness customers.
 
 ## Hackathon disclosure
 
