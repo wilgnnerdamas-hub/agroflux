@@ -180,7 +180,7 @@ export const pt = {
     memoLoading: "Escrevendo o parecer…",
     strengths: "Pontos fortes",
     concerns: "Pontos de atenção",
-    memoNote: "Gerado por IA (Claude) a partir dos dados do passaporte. Apoio à análise, não é recomendação de crédito.",
+    memoNote: "Gerado por IA a partir dos dados do passaporte. Apoio à análise, não é recomendação de crédito.",
   },
   admin: {
     modelTitle: "Modelo de risco",

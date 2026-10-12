@@ -28,8 +28,8 @@ export interface Config {
   cdiFromBcb: boolean;
   /** Chuva real por UF (Open-Meteo) no risco. */
   climateFromOpenMeteo: boolean;
-  /** Analista de IA (Claude): ativo só com `ANTHROPIC_API_KEY`. */
-  ai: { apiKey: string; model: string } | null;
+  /** Analista de IA: OpenAI (`OPENAI_API_KEY`) ou Anthropic (`ANTHROPIC_API_KEY`); sem chave, desligado. */
+  ai: { provider: "openai" | "anthropic"; apiKey: string; model: string } | null;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -62,6 +62,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     cdiFromBcb: env.CDI_SOURCE !== "manual",
     /** Lê a chuva real por UF no Open-Meteo para o risco (`CLIMATE_SOURCE=off` desliga). */
     climateFromOpenMeteo: env.CLIMATE_SOURCE !== "off",
-    ai: env.ANTHROPIC_API_KEY?.trim() ? { apiKey: env.ANTHROPIC_API_KEY.trim(), model: env.ANTHROPIC_MODEL?.trim() || "claude-sonnet-5-5" } : null,
+    ai: env.OPENAI_API_KEY?.trim()
+      ? { provider: "openai", apiKey: env.OPENAI_API_KEY.trim(), model: env.OPENAI_MODEL?.trim() || "gpt-4.1" }
+      : env.ANTHROPIC_API_KEY?.trim()
+        ? { provider: "anthropic", apiKey: env.ANTHROPIC_API_KEY.trim(), model: env.ANTHROPIC_MODEL?.trim() || "claude-sonnet-5-5" }
+        : null,
   };
 }

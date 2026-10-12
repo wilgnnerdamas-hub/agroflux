@@ -14,6 +14,7 @@ import { PricingService } from "./pricing/service.js";
 import { ClimateService } from "./risk-model/climate.js";
 import { createClaudeCaller, type ClaudeToolCaller } from "./ai/claude.js";
 import { AiService } from "./ai/service.js";
+import { createOpenAiCaller } from "./ai/openai.js";
 import { Registrar } from "./registration.js";
 import { routes } from "./routes.js";
 import { Store } from "./store.js";
@@ -87,8 +88,10 @@ export async function buildApp({ config, chain, store = new Store(config.dataDir
     }
   }
 
-  const caller = aiCaller ?? (config.ai ? createClaudeCaller(config.ai.apiKey, config.ai.model) : null);
-  const ai = caller ? new AiService(store, pricing, caller, config.ai?.model ?? "claude (teste)") : null;
+  const caller =
+    aiCaller ??
+    (config.ai ? (config.ai.provider === "openai" ? createOpenAiCaller(config.ai.apiKey, config.ai.model) : createClaudeCaller(config.ai.apiKey, config.ai.model)) : null);
+  const ai = caller ? new AiService(store, pricing, caller, config.ai?.model ?? "ia (teste)") : null;
 
   await app.register(routes, {
     prefix: "/api/v1",

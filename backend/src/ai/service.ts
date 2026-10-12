@@ -1,4 +1,4 @@
-// Analista de IA (Claude): confere o documento de teste contra os dados declarados e escreve um parecer de risco.
+// Analista de IA (OpenAI ou Anthropic): confere o documento de teste contra os dados declarados e escreve um parecer de risco.
 // SIMULAÇÃO: documentos fictícios; o parecer é apoio à análise, não recomendação de crédito.
 import { createHash } from "node:crypto";
 import { ApiError } from "../errors.js";

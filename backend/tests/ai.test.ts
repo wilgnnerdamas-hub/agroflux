@@ -93,3 +93,28 @@ describe("analista de IA (Claude)", () => {
     expect(ok.calls.length).toBe(before);
   });
 });
+
+describe("cliente OpenAI", () => {
+  it("manda o PDF como parte file, força a função e lê os argumentos", async () => {
+    const { createOpenAiCaller } = await import("../src/ai/openai.js");
+    const original = globalThis.fetch;
+    let sent: any = null;
+    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+      sent = JSON.parse(String(init.body));
+      return new Response(JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "t", arguments: '{"ok":true}' } }] } }] }), { status: 200 });
+    }) as typeof fetch;
+    try {
+      const call = createOpenAiCaller("sk-test", "gpt-4.1");
+      const out = await call({
+        system: "s",
+        content: [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: "QUJD" } }, { type: "text", text: "x" }],
+        tool: { name: "t", description: "d", input_schema: { type: "object" } },
+      });
+      expect(out).toEqual({ ok: true });
+      expect(sent.messages[1].content[0]).toEqual({ type: "file", file: { filename: "documento.pdf", file_data: "data:application/pdf;base64,QUJD" } });
+      expect(sent.tool_choice).toEqual({ type: "function", function: { name: "t" } });
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});
