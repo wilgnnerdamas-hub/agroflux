@@ -57,7 +57,7 @@ Solana — DeFi / RWA (real-world assets) / payments. **[PREENCHER conforme as o
 Two engineering students at ITA (Instituto Tecnológico de Aeronáutica), in São José dos Campos, Brazil, both members of ITA Finance, the university's student finance group.
 
 - **Wilgnner Guilherme Damas Garcia Salgado** — built the technical infrastructure (Solana program, backend, frontend) and led the market analysis. Undergraduate in Civil-Aeronautical Engineering. Grew up in a family of dairy and grain farmers, so he has seen the input-credit cycle from the inside, and has studied financial markets for several years. ITA Finance is what connects the farm side and the finance side of AgroFlux.
-- **Marco Antonio de Souza Cavalcante** — market analysis and product validation, talking to agribusiness customers. Undergraduate in Aerospace Engineering, member of ITA Finance, with experience in client relationships and sales.
+- **Marco Antonio Souza Cavalcante** — market analysis and product validation, talking to agribusiness customers. Undergraduate in Aerospace Engineering, member of ITA Finance, with experience in client relationships and sales.
 
 **Why us:** a founder raised inside the problem (farm credit paid at harvest), finance training from ITA Finance, and the engineering background to ship the full stack on Solana in three days.
 
