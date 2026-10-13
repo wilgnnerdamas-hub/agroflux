@@ -39,8 +39,8 @@ Solana — DeFi / RWA (real-world assets) / payments. **[PREENCHER conforme as o
 - **Token-2022** (unique receivable asset with metadata, mint authority revoked, burn at maturity)
 - **SPL Memo** (registration, debtor acceptance, joint-liability term, payoff)
 - `@solana/web3.js`, `@solana/spl-token`, Helius RPC
-- Backend: Node.js, TypeScript, Fastify, Vitest (100 tests)
-- Frontend: Next.js 15, React 19, Tailwind CSS 4, Playwright (14 end-to-end tests, desktop and mobile)
+- Backend: Node.js, TypeScript, Fastify, Vitest (101 tests)
+- Frontend: Next.js 15, React 19, Tailwind CSS 4, Playwright (16 end-to-end tests, desktop and mobile)
 - Risk: logistic regression trained on a synthetic dataset (AUC 0.79), Open-Meteo rainfall, Central Bank of Brazil CDI (SGS API)
 - AI: OpenAI (gpt-4.1) or Anthropic, for invoice checks and credit notes
 - Hosting: Vercel (frontend), Railway (API)

@@ -122,7 +122,7 @@ npm run dev
 - Retrain the risk model: `npm run risk:train` (deterministic seed).
 - The Anchor program builds and tests in WSL/Linux: `anchor build && anchor test`.
 
-**Tests:** backend 100 (Vitest), escrow 7 (`anchor test`, local validator), frontend end-to-end 14 (Playwright, desktop and mobile, against a test double of the API).
+**Tests:** backend 101 (Vitest), escrow 7 (`anchor test`, local validator), frontend end-to-end 16 (Playwright, desktop and mobile, against a test double of the API).
 
 ## Roadmap
 
